@@ -14,8 +14,10 @@ void work(int grank, int gsize,
   std::cout.rdbuf()->pubsetbuf(buf, sizeof(buf));
 
   // communications buffers
-  buf_type sbuf = {grank, lrank};
-  buf_type rbuf(sbuf.size()*rsize);
+  //buf_type sbuf = {grank, lrank};
+  //buf_type rbuf(sbuf.size()*rsize);
+  int sbuf[] = {grank, lrank};
+  int rbuf[sizeof(sbuf)/sizeof(sbuf[0])];
 
   // output id
   std::cout << "Pre - "
@@ -26,14 +28,14 @@ void work(int grank, int gsize,
 	    << "rsize: " << rsize << std::endl;
 
   // send and receive
-  MPI_Allgather(&sbuf[0], sbuf.size(), MPI_INT,
-		&rbuf[0], rbuf.size(), MPI_INT,
+  MPI_Allgather(&sbuf[0], sizeof(sbuf)/sizeof(sbuf[0]), MPI_INT,
+		&rbuf[0], sizeof(rbuf)/sizeof(rbuf[0]), MPI_INT,
 		intercomm);
 
   // output other group
   std::cout << "Post - "
 	    << "rank: " << grank << ", ";
-  for (buf_type::size_type i = 0; i < rbuf.size(); i += 2) {
+  for (buf_type::size_type i = 0; i < sizeof(rbuf)/sizeof(rbuf[0]); i += 2) {
     std::cout << "prank(" << i/2 << ") "
 	      << rbuf[i] << ", " << rbuf[i+1]
 	      << "; ";
@@ -80,8 +82,8 @@ int main(int argc, char **argv)
   work(rank, size, lrank, lsize, rsize, intercomm);
 
   // cleanup
-  //MPI_Comm_free(&intercomm);
-  //MPI_Comm_free(&intracomm);  
+  MPI_Comm_free(&intercomm);
+  MPI_Comm_free(&intracomm);  
   MPI_Finalize();
   
   return 0;
