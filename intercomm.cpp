@@ -8,15 +8,15 @@ typedef std::vector<int> buf_type;
 void work(int grank, int gsize,
 	  int lrank, int lsize,
 	  int rsize,
-	  MPI_Comm intercomm)
+	  MPI_Comm intercomm, int right_root)
 {
   // cout buffer to not overwrite
   char buf[1024*10];
   std::cout.rdbuf()->pubsetbuf(buf, sizeof(buf));
 
   // communications buffers
-  static buf_type sbuf = {grank, lrank};
-  static buf_type rbuf(sbuf.size()*rsize);
+  buf_type sbuf = {grank, lrank};
+  buf_type rbuf(sbuf.size()*rsize);
 
   // output id
   std::cout << "Pre - "
@@ -40,6 +40,23 @@ void work(int grank, int gsize,
 	      << "; ";
   }
   std::cout << std::endl;
+
+//   buf_type bufv;
+//   if (grank >= right_root) {
+//     bufv = {grank, lrank};
+//   }
+
+//   MPI_Allgatherv(
+//   void *sendbuf,
+//   int sendcount,
+//   MPI_Datatype sendtype,
+//   void *recvbuf,
+//   int *recvcounts,
+//   int *displs,
+//   MPI_Datatype recvtype,
+//   MPI_Comm comm
+// );
+
 }
 
 int main(int argc, char **argv) 
@@ -78,7 +95,7 @@ int main(int argc, char **argv)
   MPI_Comm_remote_size(intercomm, &rsize);
   
   // work
-  work(rank, size, lrank, lsize, rsize, intercomm);
+  work(rank, size, lrank, lsize, rsize, intercomm, right_root);
 
   // cleanup
   MPI_Comm_free(&intercomm);
