@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 
 typedef std::vector<int> buf_type;
 
@@ -14,10 +15,8 @@ void work(int grank, int gsize,
   std::cout.rdbuf()->pubsetbuf(buf, sizeof(buf));
 
   // communications buffers
-  //buf_type sbuf = {grank, lrank};
-  //buf_type rbuf(sbuf.size()*rsize);
-  int sbuf[] = {grank, lrank};
-  int rbuf[sizeof(sbuf)/sizeof(sbuf[0])];
+  static buf_type sbuf = {grank, lrank};
+  static buf_type rbuf(sbuf.size()*rsize);
 
   // output id
   std::cout << "Pre - "
@@ -27,15 +26,15 @@ void work(int grank, int gsize,
 	    << "lsize: " << lsize << ", "
 	    << "rsize: " << rsize << std::endl;
 
-  // send and receive
-  MPI_Allgather(&sbuf[0], sizeof(sbuf)/sizeof(sbuf[0]), MPI_INT,
-		&rbuf[0], sizeof(rbuf)/sizeof(rbuf[0]), MPI_INT,
+  // send and receive: receive length is the length of every send (??)
+  MPI_Allgather(&sbuf[0], sbuf.size(), MPI_INT,
+		&rbuf[0], sbuf.size(), MPI_INT,
 		intercomm);
 
   // output other group
   std::cout << "Post - "
 	    << "rank: " << grank << ", ";
-  for (buf_type::size_type i = 0; i < sizeof(rbuf)/sizeof(rbuf[0]); i += 2) {
+  for (size_t i = 0; i < rbuf.size(); i += 2) {
     std::cout << "prank(" << i/2 << ") "
 	      << rbuf[i] << ", " << rbuf[i+1]
 	      << "; ";
