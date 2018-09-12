@@ -93,28 +93,47 @@ public:
 
         cell_local_size_type n_cons =
             util::sum_by(gid_infos, [](const gid_info& g){ return g.conns.size(); });
-        std::vector<unsigned> src_domains;
+        std::vector<int> src_domains;
+        unsigned ext_src_count = 0;
         src_domains.reserve(n_cons);
         std::vector<cell_size_type> src_counts(num_domains_);
         for (const auto& g: gid_infos) {
             for (auto con: g.conns) {
                 const auto src = dom_dec.gid_domain(con.source.gid);
                 src_domains.push_back(src);
-                src_counts[src]++;
+                // if src==-1 the connection is not coming from an arbor cell,
+                // which is either an error, or from an external model.
+                if (src>=0) {
+                    ++src_counts[src];
+                }
+                else {
+                    ++ext_src_count;
+                }
             }
         }
+
+        // exthack
+        // Construct the external connections
+        extern_connections_.reserve(ext_src_count);
 
         // Construct the connections.
         // The loop above gave the information required to construct in place
         // the connections as partitioned by the domain of their source gid.
-        connections_.resize(n_cons);
+        connections_.resize(n_cons-ext_src_count);
         connection_part_ = algorithms::make_index(src_counts);
         auto offsets = connection_part_;
         std::size_t pos = 0;
         for (const auto& cell: gid_infos) {
             for (auto c: cell.conns) {
-                const auto i = offsets[src_domains[pos]]++;
-                connections_[i] = {c.source, c.dest, c.weight, c.delay, cell.index_on_domain};
+                auto dom = src_domains[pos];
+                if (dom>=0) {
+                    const auto i = offsets[dom]++;
+                    connections_[i] = {c.source, c.dest, c.weight, c.delay, cell.index_on_domain};
+                }
+                else {
+                    extern_connections_.push_back(
+                            {c.source, c.dest, c.weight, c.delay, cell.index_on_domain});
+                }
                 ++pos;
             }
         }
@@ -238,6 +257,37 @@ public:
         }
     }
 
+    /// Check each global spike in turn to see it generates local events.
+    /// If so, make the events and insert them into the appropriate event list.
+    ///
+    /// Takes reference to a vector of event lists as an argument, with one list
+    /// for each local cell group. On completion, the events in each list are
+    /// all events that must be delivered to targets in that cell group as a
+    /// result of the global spike exchange, plus any events that were already
+    /// in the list.
+    void make_event_queues(
+            const std::vector<spike>& spikes,
+            std::vector<pse_vector>& queues)
+    {
+        arb_assert(queues.size()==num_local_cells_);
+
+        using util::make_range;
+
+        auto& cons = extern_connections_;
+
+        auto cn = cons.begin();
+        auto sp = spikes.begin();
+        while (cn!=cons.end() && sp!=spikes.end()) {
+            auto targets = std::equal_range(cn, cons.end(), sp->source);
+            for (auto c: make_range(targets)) {
+                queues[c.index_on_domain()].push_back(c.make_event(*sp));
+            }
+
+            cn = targets.first;
+            ++sp;
+        }
+    }
+
     /// Returns the total number of global spikes over the duration of the simulation
     std::uint64_t num_spikes() const { return num_spikes_; }
 
@@ -257,6 +307,7 @@ private:
     cell_size_type num_local_cells_;
     cell_size_type num_local_groups_;
     cell_size_type num_domains_;
+    std::vector<connection> extern_connections_;
     std::vector<connection> connections_;
     std::vector<cell_size_type> connection_part_;
     std::vector<cell_size_type> index_divisions_;

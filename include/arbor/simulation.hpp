@@ -17,6 +17,7 @@
 namespace arb {
 
 using spike_export_function = std::function<void(const std::vector<spike>&)>;
+using external_spike_function = std::function<std::vector<spike>(time_type tfrom)>;
 
 // simulation_state comprises private implentation for simulation class.
 class simulation_state;
@@ -51,6 +52,10 @@ public:
     // Register a callback that will perform a export of the rank local
     // spike vector.
     void set_local_spike_callback(spike_export_function = spike_export_function{});
+
+    // Register a callback for getting spikes from an external source,
+    // typically another simulator.
+    void set_external_spike_callback(external_spike_function);
 
     // Add events directly to targets.
     // Must be called before calling simulation::run, and must contain events that

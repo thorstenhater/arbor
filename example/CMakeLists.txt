@@ -1,5 +1,6 @@
-add_subdirectory(miniapp)
-add_subdirectory(generators)
 add_subdirectory(brunel)
 add_subdirectory(bench)
+add_subdirectory(extern)
+add_subdirectory(generators)
+add_subdirectory(miniapp)
 add_subdirectory(ring)

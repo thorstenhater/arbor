@@ -74,6 +74,7 @@ public:
 
     spike_export_function global_export_callback_;
     spike_export_function local_export_callback_;
+    external_spike_function external_spike_callback_;
 
 private:
     // Private helper function that sets up the event lanes for an epoch.
@@ -248,6 +249,11 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
         PE(communication_walkspikes);
         communicator_.make_event_queues(global_spikes, pending_events_);
         PL();
+
+        if (external_spike_callback_) {
+            auto ext_spikes = external_spike_callback_(t_);
+            communicator_.make_event_queues(ext_spikes, pending_events_);
+        }
 
         const auto t0 = epoch_.tfinal;
         const auto t1 = std::min(tfinal, t0+t_interval);
@@ -465,6 +471,10 @@ void simulation::set_global_spike_callback(spike_export_function export_callback
 
 void simulation::set_local_spike_callback(spike_export_function export_callback) {
     impl_->local_export_callback_ = std::move(export_callback);
+}
+
+void simulation::set_external_spike_callback(external_spike_function callback) {
+    impl_->external_spike_callback_ = std::move(callback);
 }
 
 void simulation::inject_events(const pse_vector& events) {

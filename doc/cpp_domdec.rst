@@ -259,8 +259,12 @@ Documentation for the data structures used to describe domain decompositions.
 
     .. cpp:member:: std::function<int(cell_gid_type)> gid_domain
 
-        A function for querying the domain id that a cell assigned to
+        A function that returns the domain id that a cell assigned to
         (using global identifier :cpp:var:`gid`).
+        If the :cpp:var:`gid` is not valid, that is it is greater than
+        or equal to the number of cells in the model, returns -1.
+        This can be the case when Arbor is receiving spikes from an
+        external model.
         It must be a pure function, that is it has no side effects, and hence is
         thread safe.
 

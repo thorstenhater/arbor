@@ -25,6 +25,10 @@ domain_decomposition partition_load_balance(
         {}
 
         int operator()(cell_gid_type gid) const {
+            // TODO: exthack: for the external spike sources
+            if (gid>=gid_divisions.back()) {
+                return -1;
+            }
             auto gid_part = util::partition_view(gid_divisions);
             return gid_part.index(gid);
         }
