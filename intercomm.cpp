@@ -42,16 +42,20 @@ void work(int grank, int gsize,
   std::cout << std::endl;
   if (grank >= right_root) {
     buf_type rbufv(sbuf.size()*right_root);
-    std::vector<int> rbufvc(right_root);
-    std::vector<int> rbufvd(right_root);
+    std::vector<int> rbufvc(rsize, 2);
+    std::vector<int> rbufvd;
     buf_type sbufv;
+
+    for (int i = 0; i < rsize; i++) {
+      rbufvd.push_back(2*i);
+    }
     
-    MPI_Allgatherv(&sbufv[0], 0, MPI_DATATYPE_NULL,
+    MPI_Allgatherv(&sbufv[0], 0, MPI_INT,
 		   &rbufv[0], &rbufvc[0], &rbufvd[0], MPI_INT,
 		   intercomm);
 
     std::cout << "rank {" << grank << ", " << lrank << "}: ";
-    for (int i = 0; i < right_root; i++) {
+    for (int i = 0; i < rsize; i++) {
       const auto num = rbufvc[i];
       const auto off = rbufvd[i];
       std::cout << "{" << off << ", " << num;
@@ -64,8 +68,12 @@ void work(int grank, int gsize,
   }
   else {
     buf_type sbufv = {grank, lrank};
+    buf_type rbufv;
+    std::vector<int> rbufvc(rsize, 0);
+    std::vector<int> rbufvd(rsize, 0);
+    
     MPI_Allgatherv(&sbufv[0], sbufv.size(), MPI_INT,
-		   nullptr, nullptr, nullptr, MPI_DATATYPE_NULL,
+		   &rbufv[0], &rbufvc[0], &rbufvd[0], MPI_INT,
 		   intercomm);
   }
 }

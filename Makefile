@@ -1,6 +1,6 @@
 all: intercomm
 
 intercomm: intercomm.cpp
-	mpic++ -Wall intercomm.cpp -o intercomm
+	mpic++ -Wall -g intercomm.cpp -o intercomm
 
 clean: ; rm intercomm
