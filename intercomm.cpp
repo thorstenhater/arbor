@@ -40,23 +40,34 @@ void work(int grank, int gsize,
 	      << "; ";
   }
   std::cout << std::endl;
+  if (grank >= right_root) {
+    buf_type rbufv(sbuf.size()*right_root);
+    std::vector<int> rbufvc(right_root);
+    std::vector<int> rbufvd(right_root);
+    buf_type sbufv;
+    
+    MPI_Allgatherv(&sbufv[0], 0, MPI_DATATYPE_NULL,
+		   &rbufv[0], &rbufvc[0], &rbufvd[0], MPI_INT,
+		   intercomm);
 
-//   buf_type bufv;
-//   if (grank >= right_root) {
-//     bufv = {grank, lrank};
-//   }
-
-//   MPI_Allgatherv(
-//   void *sendbuf,
-//   int sendcount,
-//   MPI_Datatype sendtype,
-//   void *recvbuf,
-//   int *recvcounts,
-//   int *displs,
-//   MPI_Datatype recvtype,
-//   MPI_Comm comm
-// );
-
+    std::cout << "rank {" << grank << ", " << lrank << "}: ";
+    for (int i = 0; i < right_root; i++) {
+      const auto num = rbufvc[i];
+      const auto off = rbufvd[i];
+      std::cout << "{" << off << ", " << num;
+      for (int j = off; j < off+num; j++) {
+	std::cout << ", " << rbufv[j];
+      }
+      std::cout << "} ";
+    }
+    std::cout << std::endl;
+  }
+  else {
+    buf_type sbufv = {grank, lrank};
+    MPI_Allgatherv(&sbufv[0], sbufv.size(), MPI_INT,
+		   nullptr, nullptr, nullptr, MPI_DATATYPE_NULL,
+		   intercomm);
+  }
 }
 
 int main(int argc, char **argv) 
