@@ -22,13 +22,10 @@
 
 #include <aux/ioutil.hpp>
 #include <aux/json_meter.hpp>
-
-#include "parameters.hpp"
-
-#ifdef ARB_MPI_ENABLED
-#include <mpi.h>
 #include <aux/with_mpi.hpp>
-#endif
+#include <mpi.h>
+
+#include "mpiutil.hpp"
 
 using arb::cell_gid_type;
 using arb::cell_lid_type;
@@ -36,7 +33,15 @@ using arb::cell_size_type;
 using arb::cell_member_type;
 using arb::cell_kind;
 using arb::time_type;
-using arb::cell_probe_address;
+
+//
+//  N ranks = Nn + Na
+//      Nn = number of nest ranks
+//      Na = number of arbor ranks
+//
+//  Nest  on COMM_WORLD [0, Nn)
+//  Arbor on COMM_WORLD [Nn, N)
+//
 
 int main(int argc, char** argv) {
     try {
@@ -46,36 +51,16 @@ int main(int argc, char** argv) {
         //  INITIALISE MPI
         //
 
-        // split MPI_COMM_WORLD: all nest go into split 0
-        MPI_Comm nest_comm;
-        MPI_Comm_split(MPI_COMM_WORLD, 1, 0, &nest_comm);
-
-        int global_rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &global_rank);
-
-        int arb_root = 0;
-
-        int nest_rank;
-        int nest_size;
-        MPI_Comm_rank(nest_comm, &nest_rank);
-        MPI_Comm_size(nest_comm, &nest_size);
-
-        std::cout << "NEST: " << nest_rank << " of " << nest_size << std::endl;
+        auto info = get_comm_info(false);
 
         //
         //  HAND SHAKE ARBOR-NEST
         //
 
         // Get simulation length from Arbor
-        float sim_duration;
-        float min_delay;
-        {
-            int tag = 42;
-            MPI_Status status;
-            MPI_Recv(&sim_duration, 1, MPI_FLOAT, arb_root, tag, MPI_COMM_WORLD, &status);
-            MPI_Recv(&min_delay,    1, MPI_FLOAT, arb_root, tag, MPI_COMM_WORLD, &status);
-        }
-        std::cout << "NEST: tfinal min_delay " << sim_duration << " " << min_delay << std::endl;
+        float sim_duration = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
+        float min_delay    = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
+        int num_cells      = broadcast(0,   MPI_COMM_WORLD, info.arbor_root);
 
         float delta = min_delay/2;
         unsigned steps = sim_duration/delta;
@@ -86,22 +71,17 @@ int main(int argc, char** argv) {
         //
 
         for (unsigned step=0; step<=steps; ++step) {
-            std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
+            //std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
 
-            // STEP 1: tell everyone how many spikes
-            int nspikes = step==0? 1: 0;
-            if (nspikes) std::cout << "NEST: sending " << nspikes << std::endl;
-            MPI_Bcast(&nspikes, 1, MPI_INT, global_rank, MPI_COMM_WORLD);
-            if (!nspikes) continue;
-
-            // STEP 2: allocate memory for spikes
-            std::vector<arb::spike> spikes(nspikes);
-            spikes[0].source = {10u, 0u};
-            spikes[0].time = 0.f;
-
-            // STEP 3: gather spikes
-            MPI_Bcast(spikes.data(), nspikes*sizeof(arb::spike), MPI_CHAR, global_rank, MPI_COMM_WORLD);
-            std::cout << "NEST: callback finished " << step*delta << std::endl;
+            std::vector<arb::spike> local_spikes;
+            if (!step) {
+                cell_gid_type src = num_cells + info.local_rank;
+                arb::spike s;
+                s.source = {src, 0u};
+                s.time = src;
+                local_spikes.push_back(s);
+            }
+            gather_spikes(local_spikes, MPI_COMM_WORLD);
         }
     }
     catch (std::exception& e) {

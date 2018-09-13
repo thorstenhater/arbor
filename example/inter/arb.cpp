@@ -21,13 +21,13 @@
 
 #include <aux/ioutil.hpp>
 #include <aux/json_meter.hpp>
+#include <aux/with_mpi.hpp>
+
+#include <mpi.h>
 
 #include "parameters.hpp"
+#include "mpiutil.hpp"
 
-#ifdef ARB_MPI_ENABLED
-#include <mpi.h>
-#include <aux/with_mpi.hpp>
-#endif
 
 using arb::cell_gid_type;
 using arb::cell_lid_type;
@@ -45,10 +45,11 @@ arb::mc_cell branch_cell(arb::cell_gid_type gid, const cell_parameters& params);
 
 class ring_recipe: public arb::recipe {
 public:
-    ring_recipe(unsigned num_cells, cell_parameters params, unsigned min_delay):
+    ring_recipe(unsigned num_cells, cell_parameters params, double min_delay, int num_external_ranks):
         num_cells_(num_cells),
         cell_params_(params),
-        min_delay_(min_delay)
+        min_delay_(min_delay),
+        num_external_ranks_(num_external_ranks)
     {}
 
     cell_size_type num_cells() const override {
@@ -73,19 +74,15 @@ public:
         return 1;
     }
 
-    // Each cell has one incoming connection, from cell with gid-1.
+    // Each cell has one incoming connection from an external source.
     std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        cell_gid_type src = gid? gid-1: num_cells_-1;
+        cell_gid_type src = gid % num_external_ranks_ + num_cells_; // round robin
         std::vector<arb::cell_connection> cons;
         cons.push_back({arb::cell_connection({src, 0}, {gid, 0}, event_weight_, min_delay_)});
-        if (gid==0u) {
-            cons.push_back({arb::cell_connection({num_cells_, 0}, {gid, 0}, event_weight_, min_delay_)});
-        }
         return cons;
     }
 
-    // Return one event generator on gid 0. This generates a single event that will
-    // kick start the spiking.
+    // No event generators.
     std::vector<arb::event_generator> event_generators(cell_gid_type gid) const override {
         return {};
     }
@@ -109,6 +106,7 @@ private:
     cell_parameters cell_params_;
     double min_delay_;
     float event_weight_ = 0.01;
+    int num_external_ranks_;
 };
 
 struct cell_stats {
@@ -146,79 +144,45 @@ struct cell_stats {
 
 // callback for external spikes
 struct extern_callback {
-    unsigned step = 0u;
-    arb::cell_member_type gid;
-    MPI_Comm comm;
-    int rank;
-    int size;
-    int nest_rank;
+    comm_info info;
 
-    // initialize with MPI_COMM_WORLD
-    extern_callback(arb::cell_member_type g, MPI_Comm gcomm):
-        gid(g), comm(gcomm)
-    {
-        MPI_Comm_rank(comm, &rank);
-        MPI_Comm_size(comm, &size);
-        nest_rank = size-1;
-    }
+    extern_callback(comm_info info): info(info) {}
 
     std::vector<arb::spike> operator()(arb::time_type t) {
-        std::vector<arb::spike> spikes;
+        std::vector<arb::spike> local_spikes; // arbor processes send no spikes
+        auto global_spikes = gather_spikes(local_spikes, MPI_COMM_WORLD);
 
-        std::cout << "ARB: callback " << step << " at t " << t << std::endl;
+        for (auto i=0; i<info.arbor_size; ++i) {
+            if (global_spikes.size() && i==info.local_rank) {
+                for (auto s: global_spikes) std::cout << s << " ";
+                std::cout << "\n";
+            }
+            MPI_Barrier(info.comm);
+        }
 
-        // STEP 1: determine how many spikes from source
-        //      int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm )
-        int nspikes=0;
-        MPI_Bcast(&nspikes, 1, MPI_INT, nest_rank, comm);
-        if (nspikes) std::cout << "ARBOR: receiving " << nspikes << std::endl;
-        if (nspikes==0) return {};
-
-        // STEP 2: allocate memory for spikes
-        spikes.resize(nspikes);
-
-        // STEP 3: gather spikes
-        MPI_Bcast(spikes.data(), nspikes*sizeof(arb::spike), MPI_CHAR, nest_rank, comm);
-        std::cout << "ARB: callback finished at t " << t << std::endl;
-
-        ++step;
-
-        return spikes;
+        return global_spikes;
     }
 };
+
+//
+//  N ranks = Nn + Na
+//      Nn = number of nest ranks
+//      Na = number of arbor ranks
+//
+//  Nest  on COMM_WORLD [0, Nn)
+//  Arbor on COMM_WORLD [Nn, N)
+//
 
 int main(int argc, char** argv) {
     try {
         aux::with_mpi guard(argc, argv, false);
 
-        // determine rank/size in/of comm world
-        int rank;
-        int global_size;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        MPI_Comm_size(MPI_COMM_WORLD, &global_size);
-        bool root = rank==0;
+        auto info = get_comm_info(true);
+        bool root = info.local_rank==0;
 
-        // TODO make our arbor mpi communicator
-        MPI_Comm arb_comm;
-        // split MPI_COMM_WORLD: all arbor go into split 0
-        MPI_Comm_split(MPI_COMM_WORLD, 0, rank, &arb_comm);
+        auto context = arb::make_context(arb::proc_allocation(), info.comm);
 
-        {
-            int asize, arank;
-            MPI_Comm_rank(arb_comm, &arank);
-            MPI_Comm_size(arb_comm, &asize);
-            std::cout << "ARB: " << arank << " of " << asize << std::endl;
-        }
-
-        auto context = arb::make_context(arb::proc_allocation(), arb_comm);
-
-        std::cout << aux::mask_stream(root);
-
-        // Print a banner with information about hardware configuration
-        //std::cout << "gpu:      " << (has_gpu(context)? "yes": "no") << "\n";
-        //std::cout << "threads:  " << num_threads(context) << "\n";
-        //std::cout << "mpi:      " << (has_mpi(context)? "yes": "no") << "\n";
-        //std::cout << "ranks:    " << num_ranks(context) << "\n" << std::endl;
+        //std::cout << aux::mask_stream(root);
 
         auto params = read_options(argc, argv);
 
@@ -226,26 +190,17 @@ int main(int argc, char** argv) {
         meters.start(context);
 
         // Create an instance of our recipe.
-        ring_recipe recipe(params.num_cells, params.cell, params.min_delay);
-        //cell_stats stats(recipe, arb_comm);
-        //std::cout << stats << "\n";
+        ring_recipe recipe(params.num_cells, params.cell, params.min_delay, info.nest_size);
 
         auto decomp = arb::partition_load_balance(recipe, context);
 
         // Construct the model.
         arb::simulation sim(recipe, decomp, context);
 
-        // Hand shake 
-        if (!rank) {
-            int nest_rank = global_size-1;
-
-            float sim_duration = params.duration;
-            float min_delay = sim.min_delay();
-            int tag = 42;
-            MPI_Send(&sim_duration, 1, MPI_FLOAT, nest_rank, tag, MPI_COMM_WORLD);
-            MPI_Send(&min_delay,    1, MPI_FLOAT, nest_rank, tag, MPI_COMM_WORLD);
-            std::cout << "ARB: tfinal min_delay " << sim_duration << " " << min_delay << std::endl;
-        }
+        // Hand shake
+        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
+        broadcast((float)sim.min_delay(), MPI_COMM_WORLD, info.arbor_root);
+        broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
 
         // Set up the probe that will measure voltage in the cell.
 
@@ -268,7 +223,7 @@ int main(int argc, char** argv) {
         }
 
         // Define the external spike source callback
-        sim.set_external_spike_callback(extern_callback({params.num_cells, 0u}, MPI_COMM_WORLD));
+        sim.set_external_spike_callback(extern_callback(info));
 
         meters.checkpoint("model-init", context);
 
@@ -302,8 +257,8 @@ int main(int argc, char** argv) {
         // Write the samples to a json file.
         if (root) write_trace_json(voltage);
 
-        auto report = arb::profile::make_meter_report(meters, context);
-        std::cout << report;
+        //auto report = arb::profile::make_meter_report(meters, context);
+        //std::cout << report;
     }
     catch (std::exception& e) {
         std::cerr << "exception caught in ring miniapp:\n" << e.what() << "\n";
