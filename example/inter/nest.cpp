@@ -85,15 +85,14 @@ int main(int argc, char** argv) {
         //  SEND SPIKES TO ARBOR (RUN SIMULATION)
         //
 
-        for (unsigned step=1; step<=steps; ++step) {
+        for (unsigned step=0; step<=steps; ++step) {
             std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
 
             // STEP 1: tell everyone how many spikes
-            std::cout << "NEST: getting size from " << global_rank << std::endl;
-            int nspikes = step==1? 1: 0;
+            int nspikes = step==0? 1: 0;
+            if (nspikes) std::cout << "NEST: sending " << nspikes << std::endl;
             MPI_Bcast(&nspikes, 1, MPI_INT, global_rank, MPI_COMM_WORLD);
-
-            std::cout << "NEST: broadcast size finished: " << nspikes << std::endl;
+            if (!nspikes) continue;
 
             // STEP 2: allocate memory for spikes
             std::vector<arb::spike> spikes(nspikes);
@@ -102,6 +101,7 @@ int main(int argc, char** argv) {
 
             // STEP 3: gather spikes
             MPI_Bcast(spikes.data(), nspikes*sizeof(arb::spike), MPI_CHAR, global_rank, MPI_COMM_WORLD);
+            std::cout << "NEST: callback finished " << step*delta << std::endl;
         }
     }
     catch (std::exception& e) {

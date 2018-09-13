@@ -165,21 +165,22 @@ struct extern_callback {
     std::vector<arb::spike> operator()(arb::time_type t) {
         std::vector<arb::spike> spikes;
 
-        if (!step) {
-            std::cout << "ARB: callback " << step << " at t " << t << std::endl;
+        std::cout << "ARB: callback " << step << " at t " << t << std::endl;
 
-            // STEP 1: determine how many spikes from source
-            //      int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm )
-            int nspikes=0;
-            MPI_Bcast(&nspikes, 1, MPI_INT, nest_rank, comm);
-            if (nspikes==0) return {};
+        // STEP 1: determine how many spikes from source
+        //      int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm )
+        int nspikes=0;
+        MPI_Bcast(&nspikes, 1, MPI_INT, nest_rank, comm);
+        if (nspikes) std::cout << "ARBOR: receiving " << nspikes << std::endl;
+        if (nspikes==0) return {};
 
-            // STEP 2: allocate memory for spikes
-            spikes.resize(nspikes);
+        // STEP 2: allocate memory for spikes
+        spikes.resize(nspikes);
 
-            // STEP 3: gather spikes
-            MPI_Bcast(spikes.data(), nspikes*sizeof(arb::spike), MPI_CHAR, nest_rank, comm);
-        }
+        // STEP 3: gather spikes
+        MPI_Bcast(spikes.data(), nspikes*sizeof(arb::spike), MPI_CHAR, nest_rank, comm);
+        std::cout << "ARB: callback finished at t " << t << std::endl;
+
         ++step;
 
         return spikes;
@@ -214,10 +215,10 @@ int main(int argc, char** argv) {
         std::cout << aux::mask_stream(root);
 
         // Print a banner with information about hardware configuration
-        std::cout << "gpu:      " << (has_gpu(context)? "yes": "no") << "\n";
-        std::cout << "threads:  " << num_threads(context) << "\n";
-        std::cout << "mpi:      " << (has_mpi(context)? "yes": "no") << "\n";
-        std::cout << "ranks:    " << num_ranks(context) << "\n" << std::endl;
+        //std::cout << "gpu:      " << (has_gpu(context)? "yes": "no") << "\n";
+        //std::cout << "threads:  " << num_threads(context) << "\n";
+        //std::cout << "mpi:      " << (has_mpi(context)? "yes": "no") << "\n";
+        //std::cout << "ranks:    " << num_ranks(context) << "\n" << std::endl;
 
         auto params = read_options(argc, argv);
 
@@ -226,8 +227,8 @@ int main(int argc, char** argv) {
 
         // Create an instance of our recipe.
         ring_recipe recipe(params.num_cells, params.cell, params.min_delay);
-        cell_stats stats(recipe, arb_comm);
-        std::cout << stats << "\n";
+        //cell_stats stats(recipe, arb_comm);
+        //std::cout << stats << "\n";
 
         auto decomp = arb::partition_load_balance(recipe, context);
 
@@ -271,10 +272,9 @@ int main(int argc, char** argv) {
 
         meters.checkpoint("model-init", context);
 
-        std::cout << "running simulation" << std::endl;
+        //std::cout << "running simulation" << std::endl;
         // Run the simulation for 100 ms, with time steps of 0.025 ms.
         sim.run(params.duration, 0.025);
-        std::cout << "... done!" << std::endl;
 
         meters.checkpoint("model-run", context);
 
