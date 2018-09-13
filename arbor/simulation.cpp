@@ -76,6 +76,9 @@ public:
     spike_export_function local_export_callback_;
     external_spike_function external_spike_callback_;
 
+    time_type min_delay() const;
+    time_type min_delay(time_type t);
+
 private:
     // Private helper function that sets up the event lanes for an epoch.
     // See comments on implementation for more information.
@@ -290,6 +293,15 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
     return t_;
 }
 
+time_type simulation_state::min_delay() const {
+    return min_delay_;
+}
+
+time_type simulation_state::min_delay(time_type t) {
+    min_delay_ = std::min(t, min_delay_);
+    return min_delay_;
+}
+
 template <typename Seq, typename Value, typename Less = std::less<>>
 auto split_sorted_range(Seq&& seq, const Value& v, Less cmp = Less{}) {
     auto canon = util::canonical_view(seq);
@@ -438,6 +450,14 @@ void simulation::reset() {
 
 time_type simulation::run(time_type tfinal, time_type dt) {
     return impl_->run(tfinal, dt);
+}
+
+time_type simulation::min_delay() const {
+    return impl_->min_delay();
+}
+
+time_type simulation::min_delay(time_type t) {
+    return impl_->min_delay(t);
 }
 
 sampler_association_handle simulation::add_sampler(

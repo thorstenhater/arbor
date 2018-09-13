@@ -57,6 +57,13 @@ public:
     // typically another simulator.
     void set_external_spike_callback(external_spike_function);
 
+    // Query the minimum delay of the network.
+    time_type min_delay() const;
+
+    // Set the min_delay of the network to the minimum of t
+    // and the shortest connection in the network.
+    time_type min_delay(time_type t);
+
     // Add events directly to targets.
     // Must be called before calling simulation::run, and must contain events that
     // are to be delivered at or after the current simulation time.

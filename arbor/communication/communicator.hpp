@@ -165,6 +165,9 @@ public:
         for (auto& con : connections_) {
             local_min = std::min(local_min, con.delay());
         }
+        for (auto& con : extern_connections_) {
+            local_min = std::min(local_min, con.delay());
+        }
 
         return distributed_->min(local_min);
     }
