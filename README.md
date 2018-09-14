@@ -3,7 +3,7 @@
 Uses:
 git@github.com:apeyser/nest-simulator.git
 
-cmake <path> -DCMAKE_INSTALL_PREFIX=<path> -Dwith-mpi=ON
+cmake $path -DCMAKE_INSTALL_PREFIX=$other_path -Dwith-mpi=ON
   
 export CPATH=/usr/lib/python3.7/site-packages
 export CFLAGS="-g" 
