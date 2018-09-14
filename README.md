@@ -8,6 +8,8 @@ feature/nestio/arbor
 
 cmake $path -DCMAKE_INSTALL_PREFIX=$other_path -Dwith-mpi=ON
   
+Find CPATH from python -c 'import sys; print("\n".join(sys.path))'
+
 export CPATH=/usr/lib/python3.7/site-packages
 
 export CFLAGS="-g" 
