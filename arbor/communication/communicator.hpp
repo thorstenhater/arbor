@@ -137,6 +137,7 @@ public:
                 ++pos;
             }
         }
+        util::sort(extern_connections_);
 
         // Build cell partition by group for passing events to cell groups
         index_part_ = util::make_partition(index_divisions_,
