@@ -1,2 +1,8 @@
 intercomm
 arbor_proxy
+
+# ben's vim temporary files
+*.swp
+*.swn
+*.swo
+*.swq
