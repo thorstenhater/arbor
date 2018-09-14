@@ -37,9 +37,6 @@ using arb::cell_kind;
 using arb::time_type;
 using arb::cell_probe_address;
 
-// Writes voltage trace as a json file.
-void write_trace_json(const arb::trace_data<double>& trace);
-
 // Generate a cell.
 arb::mc_cell branch_cell(arb::cell_gid_type gid, const cell_parameters& params);
 
@@ -152,16 +149,6 @@ struct extern_callback {
         std::vector<arb::spike> local_spikes; // arbor processes send no spikes
         auto global_spikes = gather_spikes(local_spikes, MPI_COMM_WORLD);
 
-            /*
-        for (auto i=0; i<info.arbor_size; ++i) {
-            if (global_spikes.size() && i==info.local_rank) {
-                for (auto s: global_spikes) std::cout << s << " ";
-                std::cout << "\n";
-            }
-            MPI_Barrier(info.comm);
-        }
-            */
-
         return global_spikes;
     }
 };
@@ -180,7 +167,7 @@ int main(int argc, char** argv) {
         aux::with_mpi guard(argc, argv, false);
 
         auto info = get_comm_info(true);
-        bool root = info.local_rank==0;
+        bool root = info.global_rank == info.arbor_root;
 
         auto context = arb::make_context(arb::proc_allocation(), info.comm);
 
@@ -196,6 +183,8 @@ int main(int argc, char** argv) {
         broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
         int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
 
+        std::cout << "ARB: nnest: " << num_nest_cells << std::endl;
+
         // Create an instance of our recipe.
         ring_recipe recipe(params.num_cells, params.cell, params.min_delay, num_nest_cells);
 
@@ -206,17 +195,6 @@ int main(int argc, char** argv) {
 
         // hand shake #2: min delay
         broadcast((float)sim.min_delay(), MPI_COMM_WORLD, info.arbor_root);
-
-        // Set up the probe that will measure voltage in the cell.
-
-        // The id of the only probe on the cell: the cell_member type points to (cell 0, probe 0)
-        auto probe_id = cell_member_type{0, 0};
-        // The schedule for sampling is 10 samples every 1 ms.
-        auto sched = arb::regular_schedule(0.1);
-        // This is where the voltage samples will be stored as (time, value) pairs
-        arb::trace_data<double> voltage;
-        // Now attach the sampler at probe_id, with sampling schedule sched, writing to voltage
-        sim.add_sampler(arb::one_probe(probe_id), sched, arb::make_simple_sampler(voltage));
 
         // Set up recording of spikes to a vector on the root process.
         std::vector<arb::spike> recorded_spikes;
@@ -259,9 +237,6 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Write the samples to a json file.
-        if (root) write_trace_json(voltage);
-
         //auto report = arb::profile::make_meter_report(meters, context);
         //std::cout << report;
     }
@@ -271,27 +246,6 @@ int main(int argc, char** argv) {
     }
 
     return 0;
-}
-
-void write_trace_json(const arb::trace_data<double>& trace) {
-    std::string path = "./voltages.json";
-
-    nlohmann::json json;
-    json["name"] = "ring demo";
-    json["units"] = "mV";
-    json["cell"] = "0.0";
-    json["probe"] = "0";
-
-    auto& jt = json["data"]["time"];
-    auto& jy = json["data"]["voltage"];
-
-    for (const auto& sample: trace) {
-        jt.push_back(sample.t);
-        jy.push_back(sample.v);
-    }
-
-    std::ofstream file(path);
-    file << std::setw(1) << json << "\n";
 }
 
 // Helper used to interpolate in branch_cell.

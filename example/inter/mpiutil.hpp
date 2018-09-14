@@ -117,16 +117,12 @@ comm_info get_comm_info(bool is_arbor) {
 
     if (info.is_arbor) {
         info.arbor_root = local_ranks.front();
-        info.nest_root = first_missing(local_ranks);
+        info.nest_root = info.arbor_root == 0 ? first_missing(local_ranks) : 0;
     }
     else {
         info.nest_root = local_ranks.front();
-        info.arbor_root = first_missing(local_ranks);
+        info.arbor_root = info.nest_root == 0 ? first_missing(local_ranks) : 0;
     }
-
-    // These are MPI_COMM_WORLD rank of the "root" process for each simulator
-    //info.arbor_root = info.nest_size;
-    //info.nest_root = 0;
 
     return info;
 }

@@ -151,6 +151,16 @@ public:
             [&](cell_size_type i) {
                 util::sort(util::subrange_view(connections_, cp[i], cp[i+1]));
             });
+
+        // print out connections
+        for (int i=0; i<distributed_->size(); ++i) {
+            if (i==distributed_->id()) {
+                for (auto& c: extern_connections_)
+                    std::cout << "[" << c.source() << "," << c.destination() << "]";
+                std::cout << std::endl;
+            }
+            distributed_->barrier();
+        }
     }
 
     /// The range of event queues that belong to cells in group i.
@@ -295,6 +305,10 @@ public:
 
     const std::vector<connection>& connections() const {
         return connections_;
+    }
+
+    const std::vector<connection>& extern_connections() const {
+        return extern_connections_;
     }
 
     void reset() {
