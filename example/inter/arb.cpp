@@ -45,11 +45,11 @@ arb::mc_cell branch_cell(arb::cell_gid_type gid, const cell_parameters& params);
 
 class ring_recipe: public arb::recipe {
 public:
-    ring_recipe(unsigned num_cells, cell_parameters params, double min_delay, int num_external_ranks):
+    ring_recipe(unsigned num_cells, cell_parameters params, double min_delay, int num_nest_cells):
         num_cells_(num_cells),
         cell_params_(params),
         min_delay_(min_delay),
-        num_external_ranks_(num_external_ranks)
+        num_nest_cells_(num_nest_cells)
     {}
 
     cell_size_type num_cells() const override {
@@ -76,7 +76,7 @@ public:
 
     // Each cell has one incoming connection from an external source.
     std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        cell_gid_type src = gid % num_external_ranks_ + num_cells_; // round robin
+        cell_gid_type src = num_cells_ + (gid%num_nest_cells_); // round robin
         std::vector<arb::cell_connection> cons;
         cons.push_back({arb::cell_connection({src, 0}, {gid, 0}, event_weight_, min_delay_)});
         return cons;
@@ -106,7 +106,7 @@ private:
     cell_parameters cell_params_;
     double min_delay_;
     float event_weight_ = 0.01;
-    int num_external_ranks_;
+    int num_nest_cells_;
 };
 
 struct cell_stats {
@@ -152,6 +152,7 @@ struct extern_callback {
         std::vector<arb::spike> local_spikes; // arbor processes send no spikes
         auto global_spikes = gather_spikes(local_spikes, MPI_COMM_WORLD);
 
+            /*
         for (auto i=0; i<info.arbor_size; ++i) {
             if (global_spikes.size() && i==info.local_rank) {
                 for (auto s: global_spikes) std::cout << s << " ";
@@ -159,6 +160,7 @@ struct extern_callback {
             }
             MPI_Barrier(info.comm);
         }
+            */
 
         return global_spikes;
     }
@@ -189,18 +191,21 @@ int main(int argc, char** argv) {
         arb::profile::meter_manager meters;
         meters.start(context);
 
+        // hand shake #1: communicate cell populations and duration
+        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
+        broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
+        int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
+
         // Create an instance of our recipe.
-        ring_recipe recipe(params.num_cells, params.cell, params.min_delay, info.nest_size);
+        ring_recipe recipe(params.num_cells, params.cell, params.min_delay, num_nest_cells);
 
         auto decomp = arb::partition_load_balance(recipe, context);
 
         // Construct the model.
         arb::simulation sim(recipe, decomp, context);
 
-        // Hand shake
-        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
+        // hand shake #2: min delay
         broadcast((float)sim.min_delay(), MPI_COMM_WORLD, info.arbor_root);
-        broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
 
         // Set up the probe that will measure voltage in the cell.
 

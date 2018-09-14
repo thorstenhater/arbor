@@ -47,41 +47,55 @@ int main(int argc, char** argv) {
     try {
         aux::with_mpi guard(argc, argv, false);
 
-        //
         //  INITIALISE MPI
-        //
 
         auto info = get_comm_info(false);
 
-        //
+        //  MODEL SETUP
+
+        int num_nest_cells = 10;
+
+
         //  HAND SHAKE ARBOR-NEST
-        //
 
         // Get simulation length from Arbor
         float sim_duration = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
+        int num_arbor_cells = broadcast(0,   MPI_COMM_WORLD, info.arbor_root);
+        broadcast(num_nest_cells,   MPI_COMM_WORLD, info.nest_root);
+
         float min_delay    = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
-        int num_cells      = broadcast(0,   MPI_COMM_WORLD, info.arbor_root);
 
         float delta = min_delay/2;
         unsigned steps = sim_duration/delta;
         if (steps*delta<sim_duration) ++steps;
 
-        //
+        int  total_cells = num_arbor_cells + num_nest_cells;
+
+        //  BUILD NEST PROXY MODEL
+        std::vector<int> local_cells;
+        for (int gid=num_arbor_cells+info.local_rank; gid<total_cells; gid+=info.nest_size) {
+            local_cells.push_back(gid);
+        }
+        print_vec_comm(local_cells, info.comm);
+
         //  SEND SPIKES TO ARBOR (RUN SIMULATION)
-        //
 
         for (unsigned step=0; step<=steps; ++step) {
             //std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
 
             std::vector<arb::spike> local_spikes;
             if (!step) {
-                cell_gid_type src = num_cells + info.local_rank;
-                arb::spike s;
-                s.source = {src, 0u};
-                s.time = src;
-                local_spikes.push_back(s);
+                for (unsigned gid: local_cells) {
+                    arb::spike s;
+                    s.source = {gid, 0u};
+                    s.time = (float)(gid-num_arbor_cells);
+                    local_spikes.push_back(s);
+                }
+                print_vec_comm(local_spikes, info.comm);
             }
-            gather_spikes(local_spikes, MPI_COMM_WORLD);
+            auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
+            if (v.size()) print_vec_comm(v, info.comm);
+
         }
     }
     catch (std::exception& e) {

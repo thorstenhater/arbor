@@ -278,16 +278,11 @@ public:
 
         auto& cons = extern_connections_;
 
-        auto cn = cons.begin();
-        auto sp = spikes.begin();
-        while (cn!=cons.end() && sp!=spikes.end()) {
-            auto targets = std::equal_range(cn, cons.end(), sp->source);
+        for (auto& sp: spikes) {
+            auto targets = std::equal_range(cons.begin(), cons.end(), sp.source);
             for (auto c: make_range(targets)) {
-                queues[c.index_on_domain()].push_back(c.make_event(*sp));
+                queues[c.index_on_domain()].push_back(c.make_event(sp));
             }
-
-            cn = targets.first;
-            ++sp;
         }
     }
 

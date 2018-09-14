@@ -39,17 +39,29 @@ int mpi_size(MPI_Comm c) {
     return result;
 }
 
+template <typename T>
+void print_vec_comm(std::vector<T>& v, MPI_Comm comm) {
+    int rank = mpi_rank(comm);
+    int size = mpi_size(comm);
+    for (int i=0; i<size; ++i) {
+        if (i==rank) {
+            std::cout << "[";
+            for (auto x: v) std::cout << x << " ";
+            std::cout << "]" << std::endl;
+        }
+        MPI_Barrier(comm);
+    }
+}
+
 int broadcast(int local, MPI_Comm comm, int root) {
     int result = local;
     MPI_Bcast(&result, 1, MPI_INT, root, comm);
-    //std::cout << "broadcast<int> " << mpi_rank(comm) << " <- " << root << " local " << local << " result " << result << std::endl;
     return result;
 }
 
 float broadcast(float local, MPI_Comm comm, int root) {
     float result = local;
     MPI_Bcast(&result, 1, MPI_FLOAT, root, comm);
-    //std::cout << "broadcast<float> " << mpi_rank(comm) << " <- " << root << " local " << local << " result " << result << std::endl;
     return result;
 }
 
@@ -81,24 +93,40 @@ comm_info get_comm_info(bool is_arbor) {
     info.is_arbor = is_arbor;
     info.is_nest = !is_arbor;
 
-    MPI_Comm_size(MPI_COMM_WORLD, &info.global_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &info.global_rank);
+    info.global_rank = mpi_rank(MPI_COMM_WORLD);
+    info.global_size = mpi_size(MPI_COMM_WORLD);
 
     // split MPI_COMM_WORLD: all arbor go into split 1
     int color = is_arbor? 1: 0;
     MPI_Comm_split(MPI_COMM_WORLD, color, info.global_rank, &info.comm);
 
-    int local_size;
-    MPI_Comm_size(info.comm, &local_size);
-    MPI_Comm_rank(info.comm, &info.local_rank);
-    info.arbor_size = is_arbor? local_size: info.global_size - local_size;
+    int local_size  = mpi_size(info.comm);
+    info.local_rank = mpi_rank(info.comm);
 
+    info.arbor_size = is_arbor? local_size: info.global_size - local_size;
     info.nest_size = info.global_size - info.arbor_size;
 
-    // assume that ranks [0:Nn) = nest
-    // assume that ranks [Nn:N) = arbor
-    info.arbor_root = info.nest_size;
-    info.nest_root = 0;
+    std::vector<int> local_ranks(local_size);
+    MPI_Allgather(&info.global_rank, 1, MPI_INT, local_ranks.data(), 1, MPI_INT, info.comm);
+    std::sort(local_ranks.begin(), local_ranks.end());
+
+    auto first_missing = [](const std::vector<int>& x) {
+        auto it = std::adjacent_find(x.begin(), x.end(), [](int l, int r){return (r-l)!=1;});
+        return it==x.end()? x.back()+1: (*it)+1;
+    };
+
+    if (info.is_arbor) {
+        info.arbor_root = local_ranks.front();
+        info.nest_root = first_missing(local_ranks);
+    }
+    else {
+        info.nest_root = local_ranks.front();
+        info.arbor_root = first_missing(local_ranks);
+    }
+
+    // These are MPI_COMM_WORLD rank of the "root" process for each simulator
+    //info.arbor_root = info.nest_size;
+    //info.nest_root = 0;
 
     return info;
 }
