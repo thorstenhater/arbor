@@ -32,9 +32,8 @@ void work(int global_rank, int global_size, int local_rank,
         std::vector< int > rbuf_offset;
         rbuf_offset.reserve(global_size);
         for (int i = 0, c_offset = 0; i < global_size; i++) {
-            const auto c_size = rbuf_lengths[i];
             rbuf_offset.push_back(c_offset);
-            c_offset += c_size;
+            c_offset += rbuf_lengths[i];
         }
 
         // spikes
