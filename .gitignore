@@ -1,7 +1,14 @@
 intercomm
 arbor_proxy
 
-# ben's vim temporary files
+
+# build and install files generated when building simulators
+simulators/build/
+simulators/install/
+simulators/config/
+
+
+# vim temporary files
 *.swp
 *.swn
 *.swo

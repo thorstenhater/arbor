@@ -1,5 +1,7 @@
 nest_repo_path=$build_path/nest
 nest_build_path=$nest_repo_path/build
+echo ==== repo  $nest_repo_path
+echo ==== build $nest_build_path
 
 # clear log file from previous builds
 out="$build_path/log_nest"
@@ -17,10 +19,8 @@ then
 
     cd $nest_repo_path
 
-    #nest_version="v2.14.0"
-    #msg "NEST: checkout version $nest_version"
-    #git checkout tags/"$nest_version" &>> $out
-    git checkout feature/nestio/arbor
+    msg "NEST: checkout alex's branch feature/nestio/arbor"
+    git checkout feature/nestio/arbor &>> $out
     [ $? != 0 ] && err "see ${out}" && return 1
 else
     msg "NEST: repository has already been checked out"
@@ -36,7 +36,6 @@ sed 's|^add_subdirectory( doc )|#add_subdirectory( doc )|g' "$nest_repo_path/CMa
 # only configure build if not already configured
 if [ ! -d "$nest_build_path" ]
 then
-    # TODO: mpi
     msg "NEST: configure build"
     mkdir -p "$nest_build_path"
     cd "$nest_build_path"
@@ -44,7 +43,8 @@ then
     if [ "$with_mpi" = "true" ]; then
         nest_cmake_flags="$nest_cmake_flags -Dwith-mpi=ON";
     fi
-    cmake .. -DCMAKE_INSTALL_PREFIX:PATH="$install_path" -Dwith-mpi=ON &>> ${out}}
+    nest_cmake_flags="$nest_cmake_flags -Dwith-ltdl=OFF";
+    cmake .. $nest_cmake_flags -DPYTHON_EXECUTABLE=/usr/bin/python3 &>> ${out}
     [ $? != 0 ] && err "see ${out}" && return 1
 fi
 
