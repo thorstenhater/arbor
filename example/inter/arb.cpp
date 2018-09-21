@@ -215,7 +215,7 @@ int main(int argc, char** argv) {
         on_local_rank_zero(info, [&] {
             sim.set_global_spike_callback(
                 [&](const std::vector<arb::spike>& spikes) {
-                    print_vec_comm("ARB", spikes, info.comm);
+                    print_vec_comm("ARB", spikes);
                     recorded_spikes.insert(recorded_spikes.end(), spikes.begin(), spikes.end());
                 });
         });

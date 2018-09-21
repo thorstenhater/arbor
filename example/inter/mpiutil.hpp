@@ -40,14 +40,19 @@ int mpi_size(MPI_Comm c) {
 }
 
 template <typename T>
+void print_vec_comm(std::string&& src, const std::vector<T>& v) {
+    std::cout << src << ": [";
+    for (auto x: v) std::cout << x << " ";
+    std::cout << "]" << std::endl;
+}
+
+template <typename T>
 void print_vec_comm(std::string&& src, const std::vector<T>& v, MPI_Comm comm) {
     int rank = mpi_rank(comm);
     int size = mpi_size(comm);
     for (int i=0; i<size; ++i) {
         if (i==rank) {
-            std::cout << src << ": [";
-            for (auto x: v) std::cout << x << " ";
-            std::cout << "]" << std::endl;
+            print_vec_comm(std::move(src), v);
         }
         MPI_Barrier(comm);
     }
