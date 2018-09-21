@@ -147,7 +147,9 @@ struct extern_callback {
 
     std::vector<arb::spike> operator()(arb::time_type t) {
         std::vector<arb::spike> local_spikes; // arbor processes send no spikes
+        print_vec_comm("ARB-send", local_spikes, info.comm);
         auto global_spikes = gather_spikes(local_spikes, MPI_COMM_WORLD);
+        print_vec_comm("ARB-recv", global_spikes, info.comm);
 
         return global_spikes;
     }
@@ -167,7 +169,7 @@ int main(int argc, char** argv) {
         aux::with_mpi guard(argc, argv, false);
 
         auto info = get_comm_info(true);
-        bool root = info.global_rank == info.arbor_root;
+        //bool root = info.global_rank == info.arbor_root;
 
         auto context = arb::make_context(arb::proc_allocation(), info.comm);
 
@@ -178,12 +180,18 @@ int main(int argc, char** argv) {
         arb::profile::meter_manager meters;
         meters.start(context);
 
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: starting handshake" << std::endl;
+        });
+
         // hand shake #1: communicate cell populations and duration
         broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
         broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
         int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
 
-        std::cout << "ARB: nnest: " << num_nest_cells << std::endl;
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: num_nest_cells: " << num_nest_cells << std::endl;
+        });
 
         // Create an instance of our recipe.
         ring_recipe recipe(params.num_cells, params.cell, params.min_delay, num_nest_cells);
@@ -194,23 +202,30 @@ int main(int argc, char** argv) {
         arb::simulation sim(recipe, decomp, context);
 
         // hand shake #2: min delay
-        broadcast((float)sim.min_delay(), MPI_COMM_WORLD, info.arbor_root);
+        float arb_comm_time = sim.min_delay()/2;
+        broadcast(arb_comm_time, MPI_COMM_WORLD, info.arbor_root);
+        float nest_comm_time = broadcast(0.f, MPI_COMM_WORLD, info.nest_root);
+        sim.min_delay(nest_comm_time*2);
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: min_delay=" << sim.min_delay() << std::endl;
+        });
 
         // Set up recording of spikes to a vector on the root process.
         std::vector<arb::spike> recorded_spikes;
-        if (root) {
+        on_local_rank_zero(info, [&] {
             sim.set_global_spike_callback(
-                [&recorded_spikes](const std::vector<arb::spike>& spikes) {
+                [&](const std::vector<arb::spike>& spikes) {
+                    print_vec_comm("ARB", spikes, info.comm);
                     recorded_spikes.insert(recorded_spikes.end(), spikes.begin(), spikes.end());
                 });
-        }
+        });
 
         // Define the external spike source callback
         sim.set_external_spike_callback(extern_callback(info));
 
         meters.checkpoint("model-init", context);
 
-        //std::cout << "running simulation" << std::endl;
+        std::cout << "ARB: running simulation" << std::endl;
         // Run the simulation for 100 ms, with time steps of 0.025 ms.
         sim.run(params.duration, 0.025);
 
@@ -219,12 +234,12 @@ int main(int argc, char** argv) {
         auto ns = sim.num_spikes();
 
         // Write spikes to file
-        if (root) {
-            std::cout << "\n" << ns << " spikes generated at rate of "
+        on_local_rank_zero(info, [&] {
+            std::cout << "\nARB: " << ns << " spikes generated at rate of "
                       << params.duration/ns << " ms between spikes\n";
             std::ofstream fid("spikes.gdf");
             if (!fid.good()) {
-                std::cerr << "Warning: unable to open file spikes.gdf for spike output\n";
+                std::cerr << "ARB: Warning: unable to open file spikes.gdf for spike output\n";
             }
             else {
                 char linebuf[45];
@@ -235,7 +250,7 @@ int main(int argc, char** argv) {
                     fid.write(linebuf, n);
                 }
             }
-        }
+        });
 
         //auto report = arb::profile::make_meter_report(meters, context);
         //std::cout << report;

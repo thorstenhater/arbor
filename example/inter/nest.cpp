@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <algorithm>
 
 #include <nlohmann/json.hpp>
 
@@ -26,6 +27,7 @@
 #include <mpi.h>
 
 #include "mpiutil.hpp"
+#include "parameters-nest.hpp"
 
 using arb::cell_gid_type;
 using arb::cell_lid_type;
@@ -52,36 +54,59 @@ int main(int argc, char** argv) {
         auto info = get_comm_info(false);
 
         //  MODEL SETUP
+        auto params = read_options_nest(argc, argv);
 
-        int num_nest_cells = 10;
+        int num_nest_cells = params.num_cells;
+        float nest_min_delay = params.min_delay;
 
 
         //  HAND SHAKE ARBOR-NEST
+
+        on_local_rank_zero(info, [&] {
+                std::cout << "NEST: starting handshake" << std::endl;
+        });
 
         // Get simulation length from Arbor
         float sim_duration = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
         int num_arbor_cells = broadcast(0,   MPI_COMM_WORLD, info.arbor_root);
         broadcast(num_nest_cells,   MPI_COMM_WORLD, info.nest_root);
 
-        float min_delay    = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
+        float arb_comm_time = broadcast(0.f, MPI_COMM_WORLD, info.arbor_root);
+        float nest_comm_time = nest_min_delay;
+        broadcast(nest_comm_time, MPI_COMM_WORLD, info.nest_root);
+        float min_delay = std::min(nest_comm_time, arb_comm_time);
+        
+        on_local_rank_zero(info, [&] {
+                std::cout << "NEST: received sim_duration=" << sim_duration << ", "
+                          << "num_arbor_cells=" << num_arbor_cells << ", "
+                          << "min_delay=" << min_delay << std::endl;
+        });
 
-        float delta = min_delay/2;
+
+        float delta = min_delay;
         unsigned steps = sim_duration/delta;
         if (steps*delta<sim_duration) ++steps;
 
         int  total_cells = num_arbor_cells + num_nest_cells;
+        on_local_rank_zero(info, [&] {
+                std::cout << "NEST: delta=" << delta << ", "
+                          << "steps=" << steps << ", "
+                          << "total_cells=" << total_cells << std::endl;
+        });
 
         //  BUILD NEST PROXY MODEL
         std::vector<int> local_cells;
         for (int gid=num_arbor_cells+info.local_rank; gid<total_cells; gid+=info.nest_size) {
             local_cells.push_back(gid);
         }
-        print_vec_comm(local_cells, info.comm);
+        print_vec_comm("NEST", local_cells, info.comm);
 
         //  SEND SPIKES TO ARBOR (RUN SIMULATION)
 
         for (unsigned step=0; step<=steps; ++step) {
-            //std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
+            on_local_rank_zero(info, [&] {
+                    std::cout << "NEST: callback " << step << " at t " << step*delta << std::endl;
+            });
 
             std::vector<arb::spike> local_spikes;
             if (!step) {
@@ -91,12 +116,15 @@ int main(int argc, char** argv) {
                     s.time = (float)(gid-num_arbor_cells);
                     local_spikes.push_back(s);
                 }
-                print_vec_comm(local_spikes, info.comm);
             }
+            print_vec_comm("NEST-send", local_spikes, info.comm);
             auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
-            if (v.size()) print_vec_comm(v, info.comm);
-
+            if (v.size()) print_vec_comm("NEST-recv", v, info.comm);
         }
+
+        on_local_rank_zero(info, [&] {
+                std::cout << "NEST: reached end" << std::endl;
+        });
     }
     catch (std::exception& e) {
         std::cerr << "exception caught in ring miniapp:\n" << e.what() << "\n";

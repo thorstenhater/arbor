@@ -40,12 +40,12 @@ int mpi_size(MPI_Comm c) {
 }
 
 template <typename T>
-void print_vec_comm(std::vector<T>& v, MPI_Comm comm) {
+void print_vec_comm(std::string&& src, const std::vector<T>& v, MPI_Comm comm) {
     int rank = mpi_rank(comm);
     int size = mpi_size(comm);
     for (int i=0; i<size; ++i) {
         if (i==rank) {
-            std::cout << "[";
+            std::cout << src << ": [";
             for (auto x: v) std::cout << x << " ";
             std::cout << "]" << std::endl;
         }
@@ -127,3 +127,8 @@ comm_info get_comm_info(bool is_arbor) {
     return info;
 }
 
+template<typename F>
+void on_local_rank_zero(comm_info& info, F func) {
+    if (info.local_rank != 0) return;
+    func();
+}
