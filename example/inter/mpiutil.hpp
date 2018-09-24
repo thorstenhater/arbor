@@ -65,6 +65,13 @@ int broadcast(int local, MPI_Comm comm, int root) {
     return result;
 }
 
+unsigned broadcast(unsigned local, MPI_Comm comm, int root) {
+    int result = local;
+    MPI_Bcast(&result, 1, MPI_UNSIGNED, root, comm);
+    return result;
+}
+
+
 float broadcast(float local, MPI_Comm comm, int root) {
     float result = local;
     MPI_Bcast(&result, 1, MPI_FLOAT, root, comm);

@@ -35,11 +35,10 @@ int main(int argc, char **argv)
                 std::cout << "ARB: starting handshake" << std::endl;
         });
 
-        // hand shake #1: communicate cell populations and duration
-        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
-        broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
-        int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
+        // hand shake #1: communicate cell populations
         int num_arbor_cells = params.num_cells;
+        broadcast(num_arbor_cells, MPI_COMM_WORLD, info.arbor_root);
+        int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
         int total_cells = num_nest_cells + num_arbor_cells;
 
         on_local_rank_zero(info, [&] {
@@ -53,15 +52,22 @@ int main(int argc, char **argv)
         float arb_comm_time = params.min_delay/2;
         broadcast(arb_comm_time, MPI_COMM_WORLD, info.arbor_root);
         float nest_comm_time = broadcast(0.f, MPI_COMM_WORLD, info.nest_root);
-        float min_delay = nest_comm_time*2;
-        
+        float min_delay = 2*std::min(nest_comm_time, arb_comm_time);
+
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: min_delay: " << min_delay << std::endl;
+        });
+
         float delta = min_delay/2;
         float sim_duration = params.duration;
         unsigned steps = sim_duration/delta;
+        if (steps*delta < sim_duration) ++steps;
+        
+        //hand shake #3: steps
+        broadcast(steps, MPI_COMM_WORLD, info.arbor_root);
 
         on_local_rank_zero(info, [&] {
-                std::cout << "ARB: min_delay=" << min_delay << ", "
-                          << "delta=" << delta << ", "
+                std::cout << "ARB: delta=" << delta << ", "
                           << "sim_duration=" << sim_duration << ", "
                           << "steps=" << steps
                           << std::endl;
@@ -74,6 +80,7 @@ int main(int argc, char **argv)
             });
 
             std::vector<arb::spike> local_spikes;
+            print_vec_comm("ARB-send", local_spikes, info.comm);
             auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
             if (v.size()) print_vec_comm("ARB-recv", v, info.comm);
         }

@@ -10,6 +10,7 @@
 struct nest_params {
     nest_params() = default;
 
+    float duration = 100;
     unsigned num_cells = 10;
     double min_delay = 7;
 };
