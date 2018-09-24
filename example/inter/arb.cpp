@@ -184,8 +184,7 @@ int main(int argc, char** argv) {
                 std::cout << "ARB: starting handshake" << std::endl;
         });
 
-        // hand shake #1: communicate cell populations and duration
-        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
+        // hand shake #1: communicate cell populations
         broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
         int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
 
@@ -209,6 +208,14 @@ int main(int argc, char** argv) {
         on_local_rank_zero(info, [&] {
                 std::cout << "ARB: min_delay=" << sim.min_delay() << std::endl;
         });
+
+        float delta = sim.min_delay()/2;
+        float sim_duration = params.duration;
+        unsigned steps = sim_duration/delta;
+        if (steps*delta < sim_duration) ++steps;
+
+        //hand shake #3: steps
+        broadcast(steps, MPI_COMM_WORLD, info.arbor_root);
 
         // Set up recording of spikes to a vector on the root process.
         std::vector<arb::spike> recorded_spikes;
