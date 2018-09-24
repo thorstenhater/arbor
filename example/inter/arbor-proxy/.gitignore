@@ -1,0 +1,15 @@
+intercomm
+arbor_proxy
+
+
+# build and install files generated when building simulators
+simulators/build/
+simulators/install/
+simulators/config/
+
+
+# vim temporary files
+*.swp
+*.swn
+*.swo
+*.swq
