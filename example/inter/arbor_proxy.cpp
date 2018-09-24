@@ -1,89 +1,91 @@
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <algorithm>
+
+#include <nlohmann/json.hpp>
+
+#include <arbor/assert_macro.hpp>
+#include <arbor/common_types.hpp>
+#include <arbor/context.hpp>
+#include <arbor/load_balance.hpp>
+#include <arbor/mc_cell.hpp>
+#include <arbor/profile/meter_manager.hpp>
+#include <arbor/profile/profiler.hpp>
+#include <arbor/simple_sampler.hpp>
+#include <arbor/simulation.hpp>
+#include <arbor/recipe.hpp>
+#include <arbor/version.hpp>
+
+#include <aux/ioutil.hpp>
+#include <aux/json_meter.hpp>
+#include <aux/with_mpi.hpp>
 #include <mpi.h>
 
-#include <iostream>
-#include <vector>
-#include <cstdlib>
-#include <cstdint>
-#include <numeric>
-
-#include "glue.hpp"
 #include "mpiutil.hpp"
+#include "parameters.hpp"
 
-void work(int global_rank, int global_size, int local_rank,
-        float min_delay, float run_time)
-{
-    const int sbuf_length = 0;
-    std::vector<int> rbuf_lengths(global_size);
-    std::vector<proxy_spike> rbuf;
-    const std::vector<int> sbuf(1);
-
-    for (; run_time > 0; run_time -= min_delay) {
-        if (local_rank == 0) {
-            std::cerr << "Time left: " << run_time << std::endl;
-        }
-
-        MPI_Allgather(&sbuf_length, 1, MPI_INT,
-                &rbuf_lengths[0], 1, MPI_INT,
-                MPI_COMM_WORLD);
-
-        auto total_chars = std::accumulate(rbuf_lengths.begin(),
-                rbuf_lengths.end(),
-                0);
-        std::vector< int > rbuf_offset;
-        rbuf_offset.reserve(global_size);
-        for (int i = 0, c_offset = 0; i < global_size; i++) {
-            rbuf_offset.push_back(c_offset);
-            c_offset += rbuf_lengths[i];
-        }
-
-        // spikes
-        rbuf.resize(total_chars/sizeof(proxy_spike));
-        MPI_Allgatherv(
-                &sbuf[0], sbuf_length, MPI_CHAR,
-                &rbuf[0], &rbuf_lengths[0], &rbuf_offset[0], MPI_CHAR,
-                MPI_COMM_WORLD);
-
-        if (local_rank == 0) {
-            for (auto spike: rbuf) {
-                auto gid = spike.gid;
-                auto time = spike.time;
-
-                std::cerr << "Gid: " << gid << ", Time: " << time << std::endl;
-            }
-        }
-    }
-}
-
-// argv[1] = min delay
-// argv[2] = run time
 int main(int argc, char **argv)
 {
-    float min_delay = std::stof(argv[1]);
-    float run_time = std::stof(argv[2]);
+    try {
+        aux::with_mpi guard(argc, argv, false);
+        auto info = get_comm_info(true);
+        auto params = read_options(argc, argv);
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: starting handshake" << std::endl;
+        });
 
-    int rank, size;
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+        // hand shake #1: communicate cell populations and duration
+        broadcast((float)params.duration, MPI_COMM_WORLD, info.arbor_root);
+        broadcast((int)params.num_cells, MPI_COMM_WORLD, info.arbor_root);
+        int num_nest_cells = broadcast(0,  MPI_COMM_WORLD, info.nest_root);
+        int num_arbor_cells = params.num_cells;
+        int total_cells = num_nest_cells + num_arbor_cells;
 
-    /* Build intra-communicator for local sub-group */
-    MPI_Comm   intracomm;  /* intra-communicator of local sub-group */ 
-    MPI_Comm_split(MPI_COMM_WORLD, 0, rank, &intracomm);
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: num_nest_cells: " << num_nest_cells << ", "
+                          << "num_arbor_cells: " << num_arbor_cells << ", "
+                          << "total_cells: " << total_cells
+                          << std::endl;
+        });
 
-    int lrank, lsize;
-    MPI_Comm_rank(intracomm, &lrank);
-    MPI_Comm_size(intracomm, &lsize);
-    if (lrank == 0) {
-        std::cerr << "Starting arbor_proxy: size=" << size << ", min_delay=" << min_delay << ", run_time=" << run_time << std::endl;
-        std::cerr << "Local size: " << lsize << std::endl;
+        // hand shake #2: min delay
+        float arb_comm_time = params.min_delay/2;
+        broadcast(arb_comm_time, MPI_COMM_WORLD, info.arbor_root);
+        float nest_comm_time = broadcast(0.f, MPI_COMM_WORLD, info.nest_root);
+        float min_delay = nest_comm_time*2;
+        
+        float delta = min_delay/2;
+        float sim_duration = params.duration;
+        unsigned steps = sim_duration/delta;
+
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: min_delay=" << min_delay << ", "
+                          << "delta=" << delta << ", "
+                          << "sim_duration=" << sim_duration << ", "
+                          << "steps=" << steps
+                          << std::endl;
+        });
+
+        std::cout << "ARB: running simulation" << std::endl;
+        for (unsigned step = 0; step <= steps; ++step) {
+            on_local_rank_zero(info, [&] {
+                    std::cout << "ARB: callback " << step << " at t " << step*delta << std::endl;
+            });
+
+            std::vector<arb::spike> local_spikes;
+            auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
+            if (v.size()) print_vec_comm("ARB-recv", v, info.comm);
+        }
+
+        on_local_rank_zero(info, [&] {
+                std::cout << "ARB: reached end" << std::endl;
+        });
     }
-
-    // work
-    work(rank, size, lrank, min_delay, run_time);
-
-    // cleanup
-    MPI_Comm_free(&intracomm);
-    MPI_Finalize();
+    catch (std::exception& e) {
+        std::cerr << "exception caught in arbor-proxy:\n" << e.what() << "\n";
+        return 1;
+    }
 
     return 0;
 }

@@ -5,5 +5,5 @@ add_executable(intercomm intercomm.cpp)
 
 target_link_libraries(arb_inter PRIVATE arbor arbor-aux ext-json)
 target_link_libraries(nest_inter PRIVATE arbor arbor-aux ext-json)
-target_link_libraries(arbor_proxy PRIVATE arbor)
+target_link_libraries(arbor_proxy PRIVATE arbor arbor-aux ext-json)
 target_link_libraries(intercomm PRIVATE arbor)
