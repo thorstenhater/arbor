@@ -102,6 +102,8 @@ std::ostream& operator<<(std::ostream& o, comm_info i) {
 }
 
 comm_info get_comm_info(bool is_arbor) {
+    static_assert((sizeof(arb::spike) % alignof(arb::spike)) == 0);
+
     comm_info info;
     info.is_arbor = is_arbor;
     info.is_nest = !is_arbor;
