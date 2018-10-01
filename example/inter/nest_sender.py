@@ -1,11 +1,17 @@
 #! /usr/bin/python
 
+from sys import argv
+argv.append('--quiet')
+
+print("Getting comm")
 from mpi4py import MPI
 comm = MPI.COMM_WORLD.Split(1)
 
+print("Getting nest")
 import nest
 nest.set_communicator(comm)
 
+print("Building network")
 pg = nest.Create('poisson_generator', params={'rate': 10.0})
 parrots = nest.Create('parrot_neuron', 100)
 nest.Connect(pg, parrots)
@@ -22,4 +28,7 @@ nest.Connect(parrots, sd)
 #                       'max_delay': status['max_delay']})
 # status = nest.GetKernelStatus()
 # print('min_delay: ', status['min_delay'], ", max_delay: ", status['max_delay'])
+
+print("Simulate")
 nest.Simulate(100.0)
+print("Done")
