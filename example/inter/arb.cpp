@@ -148,6 +148,8 @@ struct extern_callback {
     std::vector<arb::spike> operator()(arb::time_type t) {
         std::vector<arb::spike> local_spikes; // arbor processes send no spikes
         print_vec_comm("ARB-send", local_spikes, info.comm);
+        static int step = 0;
+        std::cerr << "ARB: step " << step++ << std::endl;
         auto global_spikes = gather_spikes(local_spikes, MPI_COMM_WORLD);
         print_vec_comm("ARB-recv", global_spikes, info.comm);
 

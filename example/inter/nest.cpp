@@ -130,6 +130,8 @@ int main(int argc, char** argv) {
                 }
             }
             print_vec_comm("NEST-send", local_spikes, info.comm);
+            static int stepn = 0;
+            std::cerr << "NEST: step " << stepn++ << std::endl;
             auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
             if (v.size()) print_vec_comm("NEST-recv", v, info.comm);
         }
