@@ -74,15 +74,18 @@ int main(int argc, char **argv)
         });
 
         std::cout << "ARB: running simulation" << std::endl;
-        for (unsigned step = 0; step <= steps; ++step) {
+        for (unsigned step = 0; step < steps; ++step) {
             on_local_rank_zero(info, [&] {
                     std::cout << "ARB: callback " << step << " at t " << step*delta << std::endl;
             });
 
             std::vector<arb::spike> local_spikes;
+            static int stepn = 0;
+            std::cerr << "ARB n: " << stepn++ << std::endl;
             print_vec_comm("ARB-send", local_spikes, info.comm);
             auto v = gather_spikes(local_spikes, MPI_COMM_WORLD);
-            if (v.size()) print_vec_comm("ARB-recv", v, info.comm);
+            //if (v.size()) print_vec_comm("ARB-recv", v, info.comm);
+            print_vec_comm("ARB-recv", v, info.comm);
         }
 
         on_local_rank_zero(info, [&] {

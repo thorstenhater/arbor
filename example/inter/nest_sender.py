@@ -5,7 +5,7 @@ argv.append('--quiet')
 
 print("Getting comm")
 from mpi4py import MPI
-comm = MPI.COMM_WORLD.Split(1)
+comm = MPI.COMM_WORLD.Split(0) # is nest
 
 print("Getting nest")
 import nest

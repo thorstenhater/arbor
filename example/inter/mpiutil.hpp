@@ -42,9 +42,9 @@ int mpi_size(MPI_Comm c) {
 
 template <typename T>
 void print_vec_comm(const std::string& src, const std::vector<T>& v) {
-    std::cout << src << ": [";
-    for (auto x: v) std::cout << x << " ";
-    std::cout << "]" << std::endl;
+    std::cerr << src << ": [";
+    for (auto x: v) std::cerr << x << " ";
+    std::cerr << "]" << std::endl;
 }
 
 template <typename T>

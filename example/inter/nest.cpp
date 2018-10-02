@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
         print_vec_comm("NEST", local_cells, info.comm);
 
         //  SEND SPIKES TO ARBOR (RUN SIMULATION)
-        for (unsigned step=0; step<=steps; ++step) {
+        for (unsigned step=0; step<steps; ++step) {
             if (step > steps_arbor) {
                 throw std::runtime_error(std::string("Bad step: ") + std::to_string(step) + " > " + std::to_string(steps_arbor));
             }
