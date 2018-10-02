@@ -74,7 +74,7 @@ int main(int argc, char **argv)
         });
 
         std::cout << "ARB: running simulation" << std::endl;
-        for (unsigned step = 0; step < steps; ++step) {
+        for (unsigned step = 0; step <= steps; ++step) {
             on_local_rank_zero(info, [&] {
                     std::cout << "ARB: callback " << step << " at t " << step*delta << std::endl;
             });
