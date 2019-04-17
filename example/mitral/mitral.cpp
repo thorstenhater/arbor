@@ -99,7 +99,7 @@ public:
     std::vector<arb::gap_junction_connection> gap_junctions_on(cell_gid_type gid) const override{
         std::vector<arb::gap_junction_connection> conns;
         for (unsigned i = 0 ; i < num_gj_; i++) {
-            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, 0.00000));
+            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, 0.00037));
         }
         return conns;
     }
@@ -357,7 +357,7 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
     for(unsigned i = 0; i < num_gj; i++) {
         auto tuft = cell.add_cable(1, arb::section_kind::dendrite, 0.4/2.0, 0.4/2.0, 300); //cable 6
         tuft->set_compartments(30);
-        set_reg_params(tuft);
+        set_reg_params(tuft, tweak);
 
         /*arb::i_clamp stim(delay, duration, 0.02);
         cell.add_stimulus({6 + i, 0.25}, stim);*/
