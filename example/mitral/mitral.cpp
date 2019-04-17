@@ -99,7 +99,7 @@ public:
     std::vector<arb::gap_junction_connection> gap_junctions_on(cell_gid_type gid) const override{
         std::vector<arb::gap_junction_connection> conns;
         for (unsigned i = 0 ; i < num_gj_; i++) {
-            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, 0.00037));
+            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, 0.00000));
         }
         return conns;
     }
@@ -286,30 +286,40 @@ void write_trace_json(const std::vector<arb::trace_data<double>>& trace) {
 arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool tweak) {
     arb::cable_cell cell;
 
-    arb::mechanism_desc nax("nax");
-    arb::mechanism_desc kdrmt("kdrmt");
-    arb::mechanism_desc kamt("kamt");
-    arb::mechanism_desc pas("pas");
+    auto set_reg_params = [](auto seg, bool change_nax=false) {
+        arb::mechanism_desc nax("nax");
+        arb::mechanism_desc kdrmt("kdrmt");
+        arb::mechanism_desc kamt("kamt");
+        arb::mechanism_desc pas("pas");
 
-    auto set_reg_params = [&]() {
-        nax["gbar"] = 0.04;
+        nax["gbar"] = change_nax ? 0.0 : 0.04;
         nax["sh"] = 10;
         kdrmt["gbar"] = 0.0001;
         kamt["gbar"] = 0.004;
         pas["g"] =  1.0/12000.0;
         pas["e"] =  -61.772335;
+
+        seg->rL = 150;
+        seg->cm = 0.018;
+        seg->add_mechanism(nax);
+        seg->add_mechanism(kdrmt);
+        seg->add_mechanism(kamt);
+        seg->add_mechanism(pas);
     };
 
-    auto set_axon_params = [&]() {
+    auto set_axon_params = [&](auto seg) {
+        arb::mechanism_desc nax("nax");
+        arb::mechanism_desc kdrmt("kdrmt");
+        arb::mechanism_desc kamt("kamt");
+        arb::mechanism_desc pas("pas");
+
         nax["gbar"] = 0.4;
         nax["sh"] = 0;
         kdrmt["gbar"] = 0.0001;
         kamt["gbar"] = 0.04;
         pas["g"] = 1.0/1000.0;
         pas["e"] =  -62.953635;
-    };
 
-    auto setup_seg = [&](auto seg) {
         seg->rL = 150;
         seg->cm = 0.018;
         seg->add_mechanism(nax);
@@ -319,43 +329,38 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
     };
 
     auto soma = cell.add_soma(22.360679775/2.0);
-    set_reg_params();
-    setup_seg(soma);
+    set_reg_params(soma);
+
+    arb::i_clamp stim(delay, duration, 0.2);
+    cell.add_stimulus({0, 0.25}, stim);
 
     auto dend = cell.add_cable(0, arb::section_kind::dendrite, 3.0/2.0, 3.0/2.0, 300); //cable 1
     dend->set_compartments(5);
-    set_reg_params();
-    setup_seg(dend);
+    set_reg_params(dend);
 
     auto dend_min0 = cell.add_cable(0, arb::section_kind::dendrite, 2.0/2.0, 2.0/2.0, 100); //cable 2
     dend_min0->set_compartments(4);
-    set_reg_params();
-    setup_seg(dend_min0);
+    set_reg_params(dend_min0);
 
     auto dend_min1 = cell.add_cable(0, arb::section_kind::dendrite, 2.0/2.0, 2.0/2.0, 100); //cable 3
     dend_min1->set_compartments(4);
-    set_reg_params();
-    setup_seg(dend_min1);
+    set_reg_params(dend_min1);
 
-    auto hillock = cell.add_cable(0, arb::section_kind::dendrite, 20.0/2.0, 1.5/2.0, 5); //cable 4
+    auto hillock = cell.add_cable(0, arb::section_kind::dendrite, 20/2.0, 20.0/2.0, 5); //cable 4
     hillock->set_compartments(3);
-    set_reg_params();
-    setup_seg(hillock);
+    set_reg_params(hillock);
 
-    auto init_seg = cell.add_cable(4, arb::section_kind::dendrite, 1.5/2.0, 1.5/2.0, 30); //cable 5
+    auto init_seg = cell.add_cable(4, arb::section_kind::axon, 1.5/2.0, 1.5/2.0, 30); //cable 5
     init_seg->set_compartments(3);
-    set_axon_params();
-    setup_seg(init_seg);
+    set_reg_params(init_seg);
 
     for(unsigned i = 0; i < num_gj; i++) {
         auto tuft = cell.add_cable(1, arb::section_kind::dendrite, 0.4/2.0, 0.4/2.0, 300); //cable 6
         tuft->set_compartments(30);
-        set_reg_params();
-        nax["gbar"] = tweak==true ? 0.0 : 0.04;
-        setup_seg(tuft);
+        set_reg_params(tuft);
 
-        arb::i_clamp stim(delay, duration, 0.02);
-        cell.add_stimulus({6 + i, 0.25}, stim);
+        /*arb::i_clamp stim(delay, duration, 0.02);
+        cell.add_stimulus({6 + i, 0.25}, stim);*/
 
         cell.add_gap_junction({6 + i, 0.95});
     }
