@@ -94,6 +94,14 @@ void ion_state::nernst(fvm_value_type temperature_K) {
     }
 }
 
+void ion_state::nernst_set(double value) {
+
+    for (std::size_t i=0; i<Xi_.size(); i+=simd_width) {
+        simd_value_type ex(value);
+        ex.copy_to(eX_.data()+i);
+    }
+}
+
 void ion_state::init_concentration() {
     for (std::size_t i=0u; i<Xi_.size(); i+=simd_width) {
         simd_value_type weight_xi(weight_Xi_.data()+i);
@@ -185,7 +193,13 @@ void shared_state::ions_init_concentration() {
 
 void shared_state::ions_nernst_reversal_potential(fvm_value_type temperature_K) {
     for (auto& i: ion_data) {
-        i.second.nernst(temperature_K);
+        if(i.first == ionKind::k) {
+            i.second.nernst_set(-90);
+        } else if (i.first == ionKind::na) {
+            i.second.nernst_set(50);
+        } else {
+            i.second.nernst(temperature_K);
+        }
     }
 }
 

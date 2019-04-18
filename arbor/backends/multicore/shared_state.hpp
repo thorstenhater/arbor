@@ -66,6 +66,7 @@ struct ion_state {
 
     // Calculate the reversal potential eX (mV) using Nernst equation
     void nernst(fvm_value_type temperature_K);
+    void nernst_set(double value);
 
     // Set ion concentrations to weighted proportion of default concentrations.
     void init_concentration();
