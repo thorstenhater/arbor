@@ -16,6 +16,8 @@ struct gap_params {
     unsigned num_cells = 2;
     double duration = 300;
     unsigned num_gj = 20;
+    bool tweak = false;
+    bool gj = false;
 };
 
 gap_params read_options(int argc, char** argv) {
@@ -43,6 +45,8 @@ gap_params read_options(int argc, char** argv) {
 
     param_from_json(params.name, "name", json);
     param_from_json(params.duration, "duration", json);
+    param_from_json(params.tweak, "tweak", json);
+    param_from_json(params.gj, "gap-junctions", json);
 
     if (!json.empty()) {
         for (auto it=json.begin(); it!=json.end(); ++it) {

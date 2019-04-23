@@ -48,7 +48,7 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
 class gj_recipe: public arb::recipe {
 public:
     gj_recipe(gap_params params):
-        num_cells_(params.num_cells), num_gj_(params.num_gj), duration_(params.duration)
+        num_cells_(params.num_cells), num_gj_(params.num_gj), duration_(params.duration), gj_(params.gj), tweak_(params.tweak)
     {}
 
     cell_size_type num_cells() const override {
@@ -59,7 +59,7 @@ public:
         if (gid == 0) {
             return branch_cell(num_gj_, 0.0, duration_, false);
         } else {
-            return branch_cell(num_gj_, 10.0, duration_, true);
+            return branch_cell(num_gj_, 10.0, duration_, tweak_);
         }
     }
 
@@ -99,7 +99,7 @@ public:
     std::vector<arb::gap_junction_connection> gap_junctions_on(cell_gid_type gid) const override{
         std::vector<arb::gap_junction_connection> conns;
         for (unsigned i = 0 ; i < num_gj_; i++) {
-            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, 0.00037));
+            conns.push_back(arb::gap_junction_connection({gid, i}, {(gid + 1) % num_cells_, i}, gj_*0.00037));
         }
         return conns;
     }
@@ -108,6 +108,8 @@ private:
     cell_size_type num_cells_;
     cell_size_type num_gj_;
     double duration_;
+    bool gj_;
+    bool tweak_;
 };
 
 struct cell_stats {
@@ -347,12 +349,12 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
     set_reg_params(dend_min1);
 
     auto hillock = cell.add_cable(0, arb::section_kind::dendrite, 20/2.0, 20.0/2.0, 5); //cable 4
-    hillock->set_compartments(3);
+    hillock->set_compartments(300);
     set_reg_params(hillock);
 
     auto init_seg = cell.add_cable(4, arb::section_kind::axon, 1.5/2.0, 1.5/2.0, 30); //cable 5
-    init_seg->set_compartments(3);
-    set_reg_params(init_seg);
+    init_seg->set_compartments(300);
+    set_axon_params(init_seg);
 
     for(unsigned i = 0; i < num_gj; i++) {
         auto tuft = cell.add_cable(1, arb::section_kind::dendrite, 0.4/2.0, 0.4/2.0, 300); //cable 6
