@@ -333,8 +333,8 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
     auto soma = cell.add_soma(22.360679775/2.0);
     set_reg_params(soma);
 
-    arb::i_clamp stim(delay, duration, 0.2);
-    cell.add_stimulus({0, 0.25}, stim);
+    /*arb::i_clamp stim(delay, duration, 0.2);
+    cell.add_stimulus({0, 0.25}, stim);*/
 
     auto dend = cell.add_cable(0, arb::section_kind::dendrite, 3.0/2.0, 3.0/2.0, 300); //cable 1
     dend->set_compartments(5);
@@ -361,8 +361,8 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
         tuft->set_compartments(30);
         set_reg_params(tuft, tweak);
 
-        /*arb::i_clamp stim(delay, duration, 0.02);
-        cell.add_stimulus({6 + i, 0.25}, stim);*/
+        arb::i_clamp stim(delay, duration, 0.02);
+        cell.add_stimulus({6 + i, 0.25}, stim);
 
         cell.add_gap_junction({6 + i, 0.95});
     }
