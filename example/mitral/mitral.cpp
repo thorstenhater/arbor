@@ -267,7 +267,7 @@ void write_trace_json(const std::vector<arb::trace_data<double>>& trace) {
         std::string path = "./voltages_imp" + std::to_string(i) + ".json";
 
         nlohmann::json json;
-        json["name"] = "gj demo: cell " + std::to_string(i);
+        json["name"] = "arbor";
         json["units"] = "mV";
         json["cell"] = std::to_string(i);
         json["probe"] = "0";
@@ -299,7 +299,7 @@ arb::cable_cell branch_cell(unsigned num_gj, double delay, double duration, bool
         kdrmt["gbar"] = 0.0001;
         kamt["gbar"] = 0.004;
         pas["g"] =  1.0/12000.0;
-        pas["e"] =  -61.772335;
+        pas["e"] = change_nax ? -61.759276 : -61.772335;
 
         seg->rL = 150;
         seg->cm = 0.018;
