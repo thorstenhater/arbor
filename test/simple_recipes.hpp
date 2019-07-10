@@ -57,9 +57,6 @@ public:
     }
 
     void nernst_ion(const std::string& ion_name) {
-        if (!catalogue_.has("nernst/"+ion_name)) {
-            parameterize_over_ion(catalogue_, "nernst", ion_name);
-        }
         cell_gprop_.default_parameters.reversal_potential_method[ion_name] = "nernst/"+ion_name;
     }
 

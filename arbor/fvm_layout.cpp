@@ -414,7 +414,7 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
     struct revpot_mech_data {
         std::map<size_type, const mechanism_desc*> cells;
         string_set paramset;
-        const mechanism_info* info = nullptr;
+        std::shared_ptr<mechanism_info> info = nullptr;
     };
     std::unordered_map<std::string, revpot_mech_data> revpot_mech_table;
 
@@ -461,27 +461,6 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
 
     std::unordered_map<std::string, std::unordered_map<size_type, std::set<size_type>>> ion_revpot_segments;
 
-    auto update_paramset_and_validate =
-        [&catalogue]
-        (const mechanism_desc& desc, std::shared_ptr<mechanism_info>& info, string_set& paramset)
-    {
-        auto& name = desc.name();
-        if (!info) {
-            info.reset(new mechanism_info(catalogue[name]));
-        }
-        for (const auto& pv: desc.values()) {
-            if (!paramset.count(pv.first)) {
-                if (!info->parameters.count(pv.first)) {
-                    throw no_such_parameter(name, pv.first);
-                }
-                if (!info->parameters.at(pv.first).valid(pv.second)) {
-                    throw invalid_parameter_value(name, pv.first, pv.second);
-                }
-                paramset.insert(pv.first);
-            }
-        }
-    };
-
     auto verify_ion_usage =
         [&gprop](const std::string& mech_name, const mechanism_info* info)
     {
@@ -507,12 +486,12 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
 
     auto update_paramset_and_validate =
         [&catalogue,&verify_ion_usage]
-        (const mechanism_desc& desc, const mechanism_info*& info, string_set& paramset)
+        (const mechanism_desc& desc, std::shared_ptr<mechanism_info>& info, string_set& paramset)
     {
         auto& name = desc.name();
         if (!info) {
-            info = &catalogue[name];
-            verify_ion_usage(name, info);
+            info.reset(new mechanism_info(catalogue[name]));
+            verify_ion_usage(name, info.get());
         }
         for (const auto& pv: desc.values()) {
             if (!paramset.count(pv.first)) {
@@ -669,14 +648,6 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
         }
     }
 
-    for (auto& entry: density_mech_table) {
-        verify_ion_usage(entry.first, entry.second.info.get());
-    }
-
-    for (auto& entry: point_mech_table) {
-        verify_ion_usage(entry.first, entry.second.info.get());
-    }
-
 
     // II. Build ion and mechanism configs.
 
@@ -753,7 +724,7 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
         fvm_mechanism_config& config = mechdata.mechanisms[name];
         config.kind = mechanismKind::revpot;
 
-        auto nparam = build_param_data(entry.second.paramset, entry.second.info);
+        auto nparam = build_param_data(entry.second.paramset, &info);
         config.param_values.resize(nparam);
         for (auto pidx: make_span(nparam)) {
             config.param_values[pidx].first = param_name[pidx];
