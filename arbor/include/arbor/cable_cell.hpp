@@ -131,6 +131,7 @@ public:
     bool has_soma() const;
 
     class segment* segment(index_type index);
+    const class segment* parent(index_type index) const;
     const class segment* segment(index_type index) const;
 
     /// access pointer to the soma
