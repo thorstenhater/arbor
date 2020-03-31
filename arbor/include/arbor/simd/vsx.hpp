@@ -1,7 +1,6 @@
 #pragma once
 
 // VSX SIMD intrinsics implementation.
-#define __VEC__
 #if defined(__VEC__) || defined(__ALTIVEC__) || defined(__VSX__)
 #include <altivec.h>
 #include <cmath>
@@ -10,6 +9,18 @@
 #include <iostream>
 #include <arbor/simd/approx.hpp>
 #include <arbor/simd/implbase.hpp>
+
+#define VM_PI       3.14159265358979323846           // pi
+#define VM_PI_2     1.57079632679489661923           // pi / 2
+#define VM_PI_4     0.785398163397448309616          // pi / 4
+#define VM_SQRT2    1.41421356237309504880           // sqrt(2)
+#define VM_LOG2E    1.44269504088896340736           // 1/log(2)
+#define VM_LOG10E   0.434294481903251827651          // 1/log(10)
+#define VM_LOG210   3.321928094887362347808          // log2(10)
+#define VM_LN2      0.693147180559945309417          // log(2)
+#define VM_LN10     2.30258509299404568402           // log(10)
+#define VM_SMALLEST_NORMAL  2.2250738585072014E-308  // smallest normal number, double
+#define VM_SMALLEST_NORMALF 1.17549435E-38f          // smallest normal number, float
 
 namespace arb {
     namespace simd {
@@ -37,13 +48,20 @@ namespace arb {
             };
 
             template <>
+            struct simd_traits<vsx_int2x2> {
+                static constexpr unsigned width = 4;
+  	        using scalar_type = long long;
+	        using vector_type = std::array<vector long long, 2>;
+                using mask_impl   = vsx_int4;
+            };
+
+            template <>
             struct simd_traits<vsx_bool2x2> {
                 static constexpr unsigned width = 4;
                 using scalar_type = bool;
                 using vector_type = std::array<vector bool long long, 2>;
                 using mask_impl   = vsx_bool2x2;
             };
-
 
             struct vsx_int4 : implbase<vsx_int4> {
                 using array = vector int;
@@ -205,6 +223,27 @@ namespace arb {
                     auto k = (i >> 1) & 1;
                     v[k][s] = x ? (~0) : 0;
                 }
+
+                static array band(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_and(a[0], b[0]);
+                    result[1] = vec_and(a[1], b[1]);
+                    return result;
+                }
+
+                static array bor(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_or(a[0], b[0]);
+                    result[1] = vec_or(a[1], b[1]);
+                    return result;
+                }
+
+                static array bxor(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_xor(a[0], b[0]);
+                    result[1] = vec_xor(a[1], b[1]);
+                    return result;
+                }
             };
 
             struct vsx_int2x2 : implbase<vsx_int2x2> {
@@ -234,6 +273,7 @@ namespace arb {
                     return result;
                 }
 
+
                 static array add(const array& a, const array& b) {
                     array result;
                     result[0] = a[0] + b[0];
@@ -254,6 +294,21 @@ namespace arb {
                     result[1] = a[1] * b[1];
                     return result;
                 }
+
+                static array shift_l(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_sl(a[0], (vector unsigned long) b[0]);
+		    result[1] = vec_sl(a[1], (vector unsigned long) b[1]);
+                    return result;
+                }
+
+                static array shift_r(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_sr(a[0], (vector unsigned long) b[0]);
+		    result[1] = vec_sr(a[1], (vector unsigned long) b[1]);
+                    return result;
+                }
+
 
                 static array div(const array& a, const array& b) {
                     array result;
@@ -482,6 +537,21 @@ namespace arb {
                     return result;
                 }
 
+	        static i64x2x2 reinterpret_i(const array& a) {
+		    i64x2x2 result;
+                    result[0] = reinterpret_cast<vector long long>(a[0]);
+                    result[1] = reinterpret_cast<vector long long>(a[1]);
+                    return result;
+	        }
+
+	        static array reinterpret_d(const i64x2x2& a) {
+		    array result;
+                    result[0] = reinterpret_cast<vector double>(a[0]);
+                    result[1] = reinterpret_cast<vector double>(a[1]);
+                    return result;
+	        }
+
+
                 static bools cmp_gt(const array& a, const array& b) {
                     bools result;
                     result[0] = vec_cmpgt(a[0], b[0]);
@@ -514,13 +584,13 @@ namespace arb {
 
                 static array round(const array& a) {
                     array result;
-                    result[0] = vec_cts(a[0], 0);
-                    result[1] = vec_cts(a[1], 0);
+                    result[0] = vec_round(a[0]);
+                    result[1] = vec_round(a[1]);
                     return result;
                 }
 
                 static i64x2x2 roundi(const array& a) {
-                    array result;
+                    i64x2x2 result;
                     result[0] = vec_cts(a[0], 0);
                     result[1] = vec_cts(a[1], 0);
                     return result;
@@ -642,7 +712,7 @@ namespace arb {
                                          broadcast(HUGE_VAL)));
                 }
 
-                static array pow(const array& b, const array& e) {
+                static array pow(const array& x0, const array& y) {
                     // Taken from Agner Fog's Vector Class Library (VCL) version 2.
                     // define constants
                     const double ln2d_hi = 0.693145751953125;           // log(2) in extra precision, high bits
@@ -696,11 +766,11 @@ namespace arb {
 
                     // Pade approximation
                     // Higher precision than in log function. Still higher precision wanted
-                    x = sub(x, one);
+                    x = sub(x, c1);
                     const auto x2 = mul(x, x);
-                    auto px = polynomial6(x, P0logl, P1logl, P2logl, P3logl, P4logl, P5logl, P6logl);
+                    auto px = polynomial_6(x, P0logl, P1logl, P2logl, P3logl, P4logl, P5logl, P6logl);
                     px = mul(px, mul(x, x2));
-                    const auto qx = polynomial6n(x, Q0logl, Q1logl, Q2logl, Q3logl, Q4logl, Q5logl);
+                    const auto qx = polynomial_6n(x, Q0logl, Q1logl, Q2logl, Q3logl, Q4logl, Q5logl);
                     const auto lg1 = div(px, qx);
 
                     // extract exponent
@@ -717,15 +787,15 @@ namespace arb {
                     const auto lg = add(nmadd(ci2, x2, x), lg1);             // lg = (x - 0.5 * x2) + lg1;
                     // calculate rounding errors in lg
                     // rounding error in multiplication 0.5*x*x
-                    const auto x2err = mul_sub_x(mul(ci2, x), x, mul(ci2, x2));
+                    const auto x2err = msub(mul(ci2, x), x, mul(ci2, x2));
                     // rounding error in additions and subtractions
                     const auto lgerr = sub(madd(ci2, x2, sub(lg, x)), lg1);      // lgerr = ((lg - x) + 0.5 * x2) - lg1;
 
                     // extract something for the exponent
                     const auto e2 = round(mul(mul(lg, y), broadcast(VM_LOG2E)));
                     // subtract this from lg, with extra precision
-                    auto v = msub(lg, y, mul(e2, ln2d_hi)); // We use msub here since we know that fused instruction are implemented
-                    v = nmadd(e2, ln2d_lo, v);                // v -= e2 * ln2d_lo;
+                    auto v = msub(lg, y, mul(e2, broadcast(ln2d_hi))); // We use msub here since we know that fused instruction are implemented
+                    v = nmadd(e2, broadcast(ln2d_lo), v);                // v -= e2 * ln2d_lo;
                     // add remainder from ef * y
                     v = madd(yr, broadcast(VM_LN2), v);                  // v += yr * VM_LN2;
                     // correct for previous rounding errors
@@ -746,23 +816,23 @@ namespace arb {
                     // 2 x 2 x f64 -> 4 x i32
                     const auto ei = roundi(ee);
                     // biased exponent of result:
-                    const auto ej = bor(ei, shift_r((reinterpret_cast<>(z)), 52));
+                    const auto ej = vsx_int2x2::bor(ei, vsx_int2x2::shift_r((reinterpret_i(z)), vsx_int2x2::broadcast(52)));
                     // check exponent for overflow and underflow
-                    const auto overflow  = bor(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
+                    const auto overflow  = vsx_bool2x2::bor(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
                                               cmp_gt(ee, broadcast( 3000.0)));
-                    const auto underflow = bor(vsx_int2x2::cmp_gt(vsx_int2x2::broadcast(0x0000), ej),
+                    const auto underflow = vsx_bool2x2::bor(vsx_int2x2::cmp_gt(vsx_int2x2::broadcast(0x0000), ej),
                                               cmp_lt(ee, broadcast(-3000.0)));
 
                     // add exponent by integer addition
-                    const auto z = reinterpret_cast<array>(add(reinterpret_cast<i64x2x2>(z), shift_l(ei, 52)));
+                    z = reinterpret_d(vsx_int2x2::add(reinterpret_i(z), vsx_int2x2::shift_l(ei, vsx_int2x2::broadcast(52))));
 
                     // check for special cases
+		    /*
                     const auto xfinite   = is_finite(x0);
                     const auto yfinite   = is_finite(y);
                     const auto efinite   = is_finite(ee);
                     const auto xzero     = is_zero_or_subnormal(x0);
                     const auto xsign     = sign_bit(x0);  // sign of x0. include -0.
-
                     // check for overflow and underflow
                     if (any(bor(overflow, underflow))) {
                         // handle errors
@@ -862,8 +932,9 @@ namespace arb {
                     z = ifelse(underflow, c0, z);
                     z = ifelse(overflow, broadcast(NAN), z);
                 }
+	      */
+		    return c1;
             }
-
             protected:
 
             static inline array polynomial_6(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6) {
@@ -906,9 +977,9 @@ namespace arb {
 
             static inline array polynomial_13(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6, double c7, double c8, double c9, double c10, double c11, double c12, double c13) {
                 // calculates polynomial c13*x^13 + c12*x^12 + ... + c1*x + c0
-                array x2 = x  * x;
-                array x4 = x2 * x2;
-                array x8 = x4 * x4;
+	        array x2 = mul(x, x);
+	        array x4 = mul(x2, x2);
+	        array x8 = mul(x4, x4);
                 return madd(
                     madd(
                         madd(broadcast(c13), x, broadcast(c12)), x4,
@@ -942,14 +1013,14 @@ namespace arb {
                 return res;
             }
 
-            array exponent_f(const array& a) {
+            static array exponent_f(const array& a) {
                 const vector double pow2_52 {4503599627370496.0, 4503599627370496.0 };   // 2^52
                 const vector double bias { 1023.0, 1023.0};
                 const auto a_l = reinterpret_cast<vector long long>(a[0]) >> 52;
                 const auto a_h = reinterpret_cast<vector long long>(a[1]) >> 52;
 
-                const auto b_l = a[0] | reinterpret_cast<vector long long>(pow2_52);
-                const auto b_h = a[1] | reinterpret_cast<vector long long>(pow2_52);
+                const auto b_l = a_l | reinterpret_cast<vector long long>(pow2_52);
+                const auto b_h = a_h | reinterpret_cast<vector long long>(pow2_52);
 
                 array result;
                 result[0] = reinterpret_cast<vector double>(b_l) - (pow2_52 + bias);
