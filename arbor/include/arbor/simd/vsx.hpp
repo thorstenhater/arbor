@@ -207,7 +207,7 @@ namespace arb {
                 }
             };
 
-            struct vsx_double4 : implbase<vsx_int2x2> {
+            struct vsx_int2x2 : implbase<vsx_int2x2> {
                 using f64x2x2 = std::array<vector double, 2>;
                 using i64x2x2 = std::array<vector long long, 2>;
                 using u64x2x2 = std::array<vector unsigned long, 2>;
@@ -241,24 +241,10 @@ namespace arb {
                     return result;
                 }
 
-                static array madd(const array& a, const array& b, const array& c) {
-                    array result;
-                    result[0] = vec_madd(a[0], b[0], c[0]);
-                    result[1] = vec_madd(a[1], b[1], c[1]);
-                    return result;
-                }
-
                 static array sub(const array& a, const array& b) {
                     array result;
                     result[0] = a[0] - b[0];
                     result[1] = a[1] - b[1];
-                    return result;
-                }
-
-                static array msub(const array& a, const array& b, const array& c) {
-                    array result;
-                    result[0] = vec_msub(a[0], b[0], c[0]);
-                    result[1] = vec_msub(a[1], b[1], c[1]);
                     return result;
                 }
 
@@ -397,6 +383,14 @@ namespace arb {
                     return result;
                 }
 
+
+                static array nmadd(const array& a, const array& b, const array& c) {
+                    array result;
+                    result[0] = vec_nmadd(a[0], b[0], c[0]);
+                    result[1] = vec_nmadd(a[1], b[1], c[1]);
+                    return result;
+                }
+
                 static array sub(const array& a, const array& b) {
                     array result;
                     result[0] = a[0] - b[0];
@@ -405,6 +399,13 @@ namespace arb {
                 }
 
                 static array msub(const array& a, const array& b, const array& c) {
+                    array result;
+                    result[0] = vec_msub(a[0], b[0], c[0]);
+                    result[1] = vec_msub(a[1], b[1], c[1]);
+                    return result;
+                }
+
+                static array nmsub(const array& a, const array& b, const array& c) {
                     array result;
                     result[0] = vec_msub(a[0], b[0], c[0]);
                     result[1] = vec_msub(a[1], b[1], c[1]);
