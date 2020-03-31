@@ -110,19 +110,19 @@ namespace arb {
                     return result;
                 }
 
-                static array and(const array& a, const array& b) {
+                static array band(const array& a, const array& b) {
                     array result;
                     result = a & b;
                     return result;
                 }
 
-                static array or(const array& a, const array& b) {
+                static array bor(const array& a, const array& b) {
                     array result;
                     result = a | b;
                     return result;
                 }
 
-                static array xor(const array& a, const array& b) {
+                static array bxor(const array& a, const array& b) {
                     array result;
                     result = a ^ b;
                     return result;
@@ -206,6 +206,155 @@ namespace arb {
                     v[k][s] = x ? (~0) : 0;
                 }
             };
+
+            struct vsx_double4 : implbase<vsx_int2x2> {
+                using f64x2x2 = std::array<vector double, 2>;
+                using i64x2x2 = std::array<vector long long, 2>;
+                using u64x2x2 = std::array<vector unsigned long, 2>;
+                using b64x2x2 = std::array<vector bool long long, 2>;
+                using i32x4   = vector int;
+
+                using array = i64x2x2;
+                using ints  = i32x4;
+                using bools = b64x2x2;
+
+                static void copy_to(const array& v, long long* p) {
+                    p[0] = v[0][0];
+                    p[1] = v[0][1];
+                    p[2] = v[1][0];
+                    p[3] = v[1][1];
+                }
+
+                static array copy_from(const long long* p) {
+                    array result;
+                    result[0][0] = p[0];
+                    result[0][1] = p[1];
+                    result[1][0] = p[2];
+                    result[1][1] = p[3];
+                    return result;
+                }
+
+                static array add(const array& a, const array& b) {
+                    array result;
+                    result[0] = a[0] + b[0];
+                    result[1] = a[1] + b[1];
+                    return result;
+                }
+
+                static array madd(const array& a, const array& b, const array& c) {
+                    array result;
+                    result[0] = vec_madd(a[0], b[0], c[0]);
+                    result[1] = vec_madd(a[1], b[1], c[1]);
+                    return result;
+                }
+
+                static array sub(const array& a, const array& b) {
+                    array result;
+                    result[0] = a[0] - b[0];
+                    result[1] = a[1] - b[1];
+                    return result;
+                }
+
+                static array msub(const array& a, const array& b, const array& c) {
+                    array result;
+                    result[0] = vec_msub(a[0], b[0], c[0]);
+                    result[1] = vec_msub(a[1], b[1], c[1]);
+                    return result;
+                }
+
+                static array mul(const array& a, const array& b) {
+                    array result;
+                    result[0] = a[0] * b[0];
+                    result[1] = a[1] * b[1];
+                    return result;
+                }
+
+                static array div(const array& a, const array& b) {
+                    array result;
+                    result[0] = a[0] / b[0];
+                    result[1] = a[1] / b[1];
+                    return result;
+                }
+
+                static array min(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_min(a[0], b[0]);
+                    result[1] = vec_min(a[1], b[1]);
+                    return result;
+                }
+
+                static array band(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_and(a[0], b[0]);
+                    result[1] = vec_and(a[1], b[1]);
+                    return result;
+                }
+
+                static array bor(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_or(a[0], b[0]);
+                    result[1] = vec_or(a[1], b[1]);
+                    return result;
+                }
+
+                static array bxor(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_xor(a[0], b[0]);
+                    result[1] = vec_xor(a[1], b[1]);
+                    return result;
+                }
+
+                static array max(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_max(a[0], b[0]);
+                    result[1] = vec_max(a[1], b[1]);
+                    return result;
+                }
+
+                static array abs(const array& a) {
+                    array result;
+                    result[0] = vec_abs(a[0]);
+                    result[1] = vec_abs(a[1]);
+                    return result;
+                }
+
+                static bools cmp_eq(const array& a, const array& b) {
+                    bools result;
+                    result[0] = vec_cmpeq(a[0], b[0]);
+                    result[1] = vec_cmpeq(a[1], b[1]);
+                    return result;
+                }
+
+                static bools cmp_lt(const array& a, const array& b) {
+                    bools result;
+                    result[0] = vec_cmplt(a[0], b[0]);
+                    result[1] = vec_cmplt(a[1], b[1]);
+                    return result;
+                }
+
+                static bools cmp_gt(const array& a, const array& b) {
+                    bools result;
+                    result[0] = vec_cmpgt(a[0], b[0]);
+                    result[1] = vec_cmpgt(a[1], b[1]);
+                    return result;
+                }
+
+                static array broadcast(const long long v) {
+                    array result;
+                    result[0] = vec_splats(v);
+                    result[1] = vec_splats(v);
+                    return result;
+                }
+
+                static array ifelse(const bools& m,
+                                    const array& u,
+                                    const array& v) {
+                    array result;
+                    result[0] = vec_sel(v[0], u[0], m[0]);
+                    result[1] = vec_sel(v[1], u[1], m[1]);
+                    return result;
+                }
+            };
             
             struct vsx_double4 : implbase<vsx_double4> {
                 using f64x2x2 = std::array<vector double, 2>;
@@ -283,21 +432,21 @@ namespace arb {
                     return result;
                 }
 
-                static array and(const array& a, const array& b) {
+                static array band(const array& a, const array& b) {
                     array result;
                     result[0] = vec_and(a[0], b[0]);
                     result[1] = vec_and(a[1], b[1]);
                     return result;
                 }
 
-                static array or(const array& a, const array& b) {
+                static array bor(const array& a, const array& b) {
                     array result;
                     result[0] = vec_or(a[0], b[0]);
                     result[1] = vec_or(a[1], b[1]);
                     return result;
                 }
 
-                static array xor(const array& a, const array& b) {
+                static array bxor(const array& a, const array& b) {
                     array result;
                     result[0] = vec_xor(a[0], b[0]);
                     result[1] = vec_xor(a[1], b[1]);
@@ -596,11 +745,11 @@ namespace arb {
                     // 2 x 2 x f64 -> 4 x i32
                     const auto ei = roundi(ee);
                     // biased exponent of result:
-                    const auto ej = or(ei, shift_r((reinterpret_cast<>(z)), 52));
+                    const auto ej = bor(ei, shift_r((reinterpret_cast<>(z)), 52));
                     // check exponent for overflow and underflow
-                    const auto overflow  = or(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
+                    const auto overflow  = bor(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
                                               cmp_gt(ee, broadcast( 3000.0)));
-                    const auto underflow = or(vsx_int2x2::cmp_gt(vsx_int2x2::broadcast(0x0000), ej),
+                    const auto underflow = bor(vsx_int2x2::cmp_gt(vsx_int2x2::broadcast(0x0000), ej),
                                               cmp_lt(ee, broadcast(-3000.0)));
 
                     // add exponent by integer addition
@@ -614,7 +763,7 @@ namespace arb {
                     const auto xsign     = sign_bit(x0);  // sign of x0. include -0.
 
                     // check for overflow and underflow
-                    if (any(or(overflow, underflow))) {
+                    if (any(bor(overflow, underflow))) {
                         // handle errors
                         z = ifelse(underflow, c0, z);
                         z = ifelse(overflow, HUGE_VAL, z);
@@ -640,7 +789,7 @@ namespace arb {
                         // this will be 0 if overflow
                         yodd = reinterpret_cast<array>(shift_l(roundi(y), 63));
                         z1 = ifelse(yinteger,
-                                    or(z, yodd),                    // y is integer. get sign if y is odd
+                                    bor(z, yodd),                    // y is integer. get sign if y is odd
                                     select(x0 == 0.,
                                            z,
                                            broadcast(NAN))); // NAN unless x0 == -0.
@@ -649,16 +798,16 @@ namespace arb {
                     }
 
                     // check for range errors; fast return if no special cases
-                    if (all(and(and(xfinite, yfinite), or(efinite, xzero)))) {
+                    if (all(band(band(xfinite, yfinite), bor(efinite, xzero)))) {
                         return z;
                     }
 
                     // handle special error cases: y infinite
-                    z1 = ifelse(or(yfinite, efinite),
+                    z1 = ifelse(bor(yfinite, efinite),
                                 z,
                                 ifelse(cmp_eq(x1, c1),
                                        c1,
-                                       ifelse(xor(cmp_gt(x1, c1), sign_bit(y)),
+                                       ifelse(bxor(cmp_gt(x1, c1), sign_bit(y)),
                                               broadcast(HUGE_VAL)
                                               c0)));
 
@@ -668,12 +817,12 @@ namespace arb {
                                 ifelse(cmp_eq(y, c0),
                                        c1,
                                        ifelse(cmp_lt(y, c0),
-                                              and(yodd, z),                  // 0.0 with the sign of z from above
-                                              or(abs(x0), and(x0, yodd))))); // get sign of x0 only if y is odd integer
+                                              band(yodd, z),                  // 0.0 with the sign of z from above
+                                              bor(abs(x0), band(x0, yodd))))); // get sign of x0 only if y is odd integer
 
                     // Always propagate nan:
                     // Deliberately differing from the IEEE-754 standard which has pow(0,nan)=1, and pow(1,nan)=1
-                    return ifelse(or(is_nan(x0), is_nan(y)),
+                    return ifelse(bor(is_nan(x0), is_nan(y)),
                                 add(x0, y),
                                 z1);
                 }
@@ -707,7 +856,7 @@ namespace arb {
                 xsign     = sign_bit(x0);  // sign of x0. include -0.
 
                 // check for overflow and underflow
-                if (any(or(overflow, underflow))) {
+                if (any(bor(overflow, underflow))) {
                     // handle errors
                     z = ifelse(underflow, c0, z);
                     z = ifelse(overflow, broadcast(NAN), z);
