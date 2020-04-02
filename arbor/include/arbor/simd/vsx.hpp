@@ -826,7 +826,7 @@ namespace arb {
                     // exp function
                     // extract something for the exponent if possible
                     x = v;
-                    const auto e3 = round(mul(x, broadcast(log2e)));
+                    const auto e3 = round(mul(x, broadcast(ln2inv)));
                     // high precision multiplication not needed here because abs(e3) <= 1
                     x = nmsub(e3, broadcast(ln2), x);                 // x -= e3 * VM_LN2;
 
