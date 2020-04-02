@@ -3,24 +3,11 @@
 // VSX SIMD intrinsics implementation.
 #if defined(__VEC__) || defined(__ALTIVEC__) || defined(__VSX__)
 #include <altivec.h>
-#include <cmath>
 #include <cstdint>
 
 #include <iostream>
 #include <arbor/simd/approx.hpp>
 #include <arbor/simd/implbase.hpp>
-
-#define VM_PI       3.14159265358979323846           // pi
-#define VM_PI_2     1.57079632679489661923           // pi / 2
-#define VM_PI_4     0.785398163397448309616          // pi / 4
-#define VM_SQRT2    1.41421356237309504880           // sqrt(2)
-#define VM_LOG2E    1.44269504088896340736           // 1/log(2)
-#define VM_LOG10E   0.434294481903251827651          // 1/log(10)
-#define VM_LOG210   3.321928094887362347808          // log2(10)
-#define VM_LN2      0.693147180559945309417          // log(2)
-#define VM_LN10     2.30258509299404568402           // log(10)
-#define VM_SMALLEST_NORMAL  2.2250738585072014E-308  // smallest normal number, double
-#define VM_SMALLEST_NORMALF 1.17549435E-38f          // smallest normal number, float
 
 namespace arb {
     namespace simd {
@@ -50,8 +37,8 @@ namespace arb {
             template <>
             struct simd_traits<vsx_int2x2> {
                 static constexpr unsigned width = 4;
-  	        using scalar_type = long long;
-	        using vector_type = std::array<vector long long, 2>;
+                using scalar_type = long long;
+                using vector_type = std::array<vector long long, 2>;
                 using mask_impl   = vsx_int4;
             };
 
@@ -203,15 +190,15 @@ namespace arb {
                     p[3] = v[1][1];
                 }
 
-  	        static bool any(const array& b) {
-		  vector bool long long zero{0x0, 0x0};
-		  return vec_any_ne(b[0], zero) || vec_any_ne(b[1], zero);
-	        }
+                static bool any(const array& b) {
+                    vector bool long long zero{0x0, 0x0};
+                    return vec_any_ne(b[0], zero) || vec_any_ne(b[1], zero);
+                }
 
-  	        static bool all(const array& b) {
-		  vector bool long long zero{0x0, 0x0};
-		  return vec_all_ne(b[0], zero) && vec_all_ne(b[1], zero);
-	        }
+                static bool all(const array& b) {
+                    vector bool long long zero{0x0, 0x0};
+                    return vec_all_ne(b[0], zero) && vec_all_ne(b[1], zero);
+                }
 
                 static array mask_copy_from(const bool* p) {
                     array result;
@@ -308,21 +295,21 @@ namespace arb {
                 static array shift_l(const array& a, const array& b) {
                     array result;
                     result[0] = vec_sl(a[0], (vector unsigned long) b[0]);
-		    result[1] = vec_sl(a[1], (vector unsigned long) b[1]);
+                    result[1] = vec_sl(a[1], (vector unsigned long) b[1]);
                     return result;
                 }
 
                 static array shift_r(const array& a, const array& b) {
                     array result;
                     result[0] = vec_sr(a[0], (vector unsigned long) b[0]);
-		    result[1] = vec_sr(a[1], (vector unsigned long) b[1]);
+                    result[1] = vec_sr(a[1], (vector unsigned long) b[1]);
                     return result;
                 }
 
                 static array shift_ra(const array& a, const array& b) {
                     array result;
                     result[0] = vec_sra(a[0], (vector unsigned long) b[0]);
-		    result[1] = vec_sra(a[1], (vector unsigned long) b[1]);
+                    result[1] = vec_sra(a[1], (vector unsigned long) b[1]);
                     return result;
                 }
 
@@ -461,10 +448,10 @@ namespace arb {
                     return result;
                 }
 
-  	        static bool any(const array& b) {
-		  vector bool long long zero{0x0, 0x0};
-		  return vec_any_ne(reinterpret_cast<vector bool long long>(b[0]), zero) | vec_any_ne(reinterpret_cast<vector bool long long>(b[1]), zero);
-	        }
+                static bool any(const array& b) {
+                    vector bool long long zero{0x0, 0x0};
+                    return vec_any_ne(reinterpret_cast<vector bool long long>(b[0]), zero) | vec_any_ne(reinterpret_cast<vector bool long long>(b[1]), zero);
+                }
 
                 static array nmadd(const array& a, const array& b, const array& c) {
                     array result;
@@ -564,26 +551,26 @@ namespace arb {
                     return result;
                 }
 
-	        static i64x2x2 reinterpret_i(const array& a) {
-		    i64x2x2 result;
+                static i64x2x2 reinterpret_i(const array& a) {
+                    i64x2x2 result;
                     result[0] = reinterpret_cast<vector long long>(a[0]);
                     result[1] = reinterpret_cast<vector long long>(a[1]);
                     return result;
-	        }
+                }
 
-	        static array reinterpret_d(const i64x2x2& a) {
-		    array result;
+                static array reinterpret_d(const i64x2x2& a) {
+                    array result;
                     result[0] = reinterpret_cast<vector double>(a[0]);
                     result[1] = reinterpret_cast<vector double>(a[1]);
                     return result;
-	        }
+                }
 
-	        static bools reinterpret_b(const array& a) {
-		    bools result;
+                static bools reinterpret_b(const array& a) {
+                    bools result;
                     result[0] = reinterpret_cast<vector bool long long>(a[0]);
                     result[1] = reinterpret_cast<vector bool long long>(a[1]);
                     return result;
-	        }
+                }
 
                 static bools cmp_gt(const array& a, const array& b) {
                     bools result;
@@ -745,12 +732,13 @@ namespace arb {
                                          broadcast(HUGE_VAL)));
                 }
 
+                /* Vectorised power function, one-to-one ported from Agner Fog's vector class library v2.
+                */
                 static array pow(const array& x0, const array& y) {
-                    // Taken from Agner Fog's Vector Class Library (VCL) version 2.
                     // define constants
                     const double ln2d_hi = 0.693145751953125;           // log(2) in extra precision, high bits
                     const double ln2d_lo = 1.42860682030941723212E-6;   // low bits of log(2)
-                    const double log2e   = VM_LOG2E;                    // 1/log(2)
+                    const double ln2     = 0.693147180559945309417;     // log(2)
 
                     // coefficients for Pade polynomials
                     const double P0logl =  2.0039553499201281259648E1;
@@ -791,127 +779,59 @@ namespace arb {
                     // Separate mantissa from exponent
                     // This gives the mantissa * 0.5
                     auto x = fraction_2(x1);
-		    printf("./pow %f %f %f %f %f %f %f %f\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1]);
-
-		    printf("# [POW::X] base={%f %f %f %f} exp={%f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   x[0][0], x[0][1], x[1][0], x[1][1]);
 
                     // reduce range of x = +/- sqrt(2)/2
-                    const auto blend = cmp_gt(x, broadcast(VM_SQRT2*0.5));
+                    const auto blend = cmp_gt(x, broadcast(sqrt2*0.5));
                     // conditional add
                     x = add(x, ifelse(blend, c0, x));
-
-		    printf("# [POW::X + 1] base={%f %f %f %f} exp={%f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   x[0][0], x[0][1], x[1][0], x[1][1]);
-
 
                     // Pade approximation
                     // Higher precision than in log function. Still higher precision wanted
                     x = sub(x, c1);
                     const auto x2 = mul(x, x);
-		    printf("# [POW::X2] args={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   x2[0][0], x2[0][1], x2[1][0], x2[1][1]);
-
                     auto px = polynomial_6(x, P0logl, P1logl, P2logl, P3logl, P4logl, P5logl, P6logl);
                     px = mul(px, mul(x, x2));
                     const auto qx = polynomial_6n(x, Q0logl, Q1logl, Q2logl, Q3logl, Q4logl, Q5logl);
                     const auto lg1 = div(px, qx);
-		    printf("# [POW::LG1] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   lg1[0][0], lg1[0][1], lg1[1][0], lg1[1][1]);
 
                     // extract exponent
                     auto ef = exponent_f(x1);
-		    printf("# [POW::EF] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   ef[0][0], ef[0][1], ef[1][0], ef[1][1]);
-
                     ef = add(ef, ifelse(blend, c1, c0));                  // conditional add
-		    printf("# [POW::EF + 1] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   ef[0][0], ef[0][1], ef[1][0], ef[1][1]);
 
                     // multiply exponent by y
                     // nearest integer e1 goes into exponent of result, remainder yr is added to log
                     const auto e1 = round(mul(ef, y));
                     // NB. we know fms exists, so we are fine?!
                     const auto yr = msub(ef, y, e1);                   // calculate remainder yr. precision very important here
-		    printf("#  [POW::YR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   yr[0][0], yr[0][1], yr[1][0], yr[1][1]);
 
                     // add initial terms to Pade expansion
-		    // lg = (x - 0.5 * x2) + lg1;
-		    const auto lg = nmsub(ci2, x2, add(x, lg1));
-		    printf("#  [POW::LG] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   lg[0][0], lg[0][1], lg[1][0], lg[1][1]);
+                    // lg = (x - 0.5 * x2) + lg1;
+                    const auto lg = nmsub(ci2, x2, add(x, lg1));
                     // calculate rounding errors in lg
                     // rounding error in multiplication 0.5*x*x
                     const auto x2err = msub(mul(ci2, x), x, mul(ci2, x2));
                     // rounding error in additions and subtractions
                     const auto lgerr = sub(madd(ci2, x2, sub(lg, x)), lg1);      // lgerr = ((lg - x) + 0.5 * x2) - lg1;
-		    printf("#  [POW::X2ERR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   x2err[0][0], x2err[0][1], x2err[1][0], x2err[1][1]);
-		    printf("#  [POW::LGERR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   lgerr[0][0], lgerr[0][1], lgerr[1][0], lgerr[1][1]);
 
                     // extract something for the exponent
-                    const auto e2 = round(mul(mul(lg, y), broadcast(VM_LOG2E)));
+                    const auto e2 = round(mul(mul(lg, y), broadcast(ln2inv)));
                     // subtract this from lg, with extra precision
                     auto v = msub(lg, y, mul(e2, broadcast(ln2d_hi))); // We use msub here since we know that fused instruction are implemented
                     v = nmsub(e2, broadcast(ln2d_lo), v);                // v -= e2 * ln2d_lo;
                     // add remainder from ef * y
-                    v = madd(yr, broadcast(VM_LN2), v);                  // v += yr * VM_LN2;
+                    v = madd(yr, broadcast(ln2), v);                  // v += yr * VM_LN2;
                     // correct for previous rounding errors
                     v = nmsub(add(lgerr, x2err), y, v);           // v -= (lgerr + x2err) * y;
-
-		    printf("# [POW::log] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   v[0][0], v[0][1], v[1][0], v[1][1]);
 
                     // exp function
                     // extract something for the exponent if possible
                     x = v;
                     const auto e3 = round(mul(x, broadcast(log2e)));
                     // high precision multiplication not needed here because abs(e3) <= 1
-                    x = nmsub(e3, broadcast(VM_LN2), x);                 // x -= e3 * VM_LN2;
-
-		    printf("# [POW::e3] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   e3[0][0], e3[0][1], e3[1][0], e3[1][1]);
-
-		    printf("# [POW::X'] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   x[0][0], x[0][1], x[1][0], x[1][1]);
+                    x = nmsub(e3, broadcast(ln2), x);                 // x -= e3 * VM_LN2;
 
                     auto z = polynomial_13m(x, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
                     z = add(z, c1);
-
-		    printf("# [POW::Z'] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   z[0][0], z[0][1], z[1][0], z[1][1]);
 
                     // contributions to exponent
                     const auto ee = add(e1, add(e2, e3));
@@ -922,17 +842,12 @@ namespace arb {
                     const auto ej = vsx_int2x2::add(ei, vsx_int2x2::shift_r((reinterpret_i(z)), vsx_int2x2::broadcast(52)));
                     // check exponent for overflow and underflow
                     const auto overflow  = vsx_bool2x2::bor(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
-                                              cmp_gt(ee, broadcast( 3000.0)));
+                                                            cmp_gt(ee, broadcast( 3000.0)));
                     const auto underflow = vsx_bool2x2::bor(vsx_int2x2::cmp_gt(vsx_int2x2::broadcast(0x0000), ej),
-                                              cmp_lt(ee, broadcast(-3000.0)));
+                                                            cmp_lt(ee, broadcast(-3000.0)));
 
                     // add exponent by integer addition
                     z = reinterpret_d(vsx_int2x2::add(reinterpret_i(z), vsx_int2x2::shift_l(ei, vsx_int2x2::broadcast(52))));
-
-		    printf("# [POW::Z] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   z[0][0], z[0][1], z[1][0], z[1][1]);
 
                     // check for special cases
                     const auto xfinite   = is_finite(x0);
@@ -940,33 +855,6 @@ namespace arb {
                     const auto efinite   = is_finite(ee);
                     const auto xzero     = is_zero_or_subnormal(x0);
                     const auto xsign     = sign_bit(x0);  // sign of x0. include -0.
-
-		    printf("# [POW::EJ] base={%f %f %f %f %f %f %f %f} result={%lld %lld %d %lld}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   ej[0][0], ej[0][1], ej[1][0], ej[1][1]);
-
-		    printf("# [POW::EI] base={%f %f %f %f %f %f %f %f} result={%lld %lld %lld %lld}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   ei[0][0], ei[0][1], ei[1][0], ei[1][1]);
-
-
-		    printf("# [POW::EE] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   ee[0][0], ee[0][1], ee[1][0], ee[1][1]);
-
-		    printf("# [POW::UNDERFLOW] base={%f %f %f %f %f %f %f %f} result={%lu %lu %lu %lu}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   underflow[0][0], underflow[0][1], underflow[1][0], underflow[1][1]);
-
-		    printf("# [POW::OVERFLOW] base={%f %f %f %f %f %f %f %f} result={%lu %lu %lu %lu}\n", 
-			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			   y[0][0], y[0][1], y[1][0], y[1][1],
-			   overflow[0][0], overflow[0][1], overflow[1][0], overflow[1][1]);
-
 
                     // check for overflow and underflow
                     if (vsx_bool2x2::any(vsx_bool2x2::bor(overflow, underflow))) {
@@ -1005,11 +893,6 @@ namespace arb {
 
                     // check for range errors; fast return if no special cases
                     if (vsx_bool2x2::all(vsx_bool2x2::band(vsx_bool2x2::band(xfinite, yfinite), vsx_bool2x2::bor(efinite, xzero)))) {
-		      printf("#  [POW::fast return] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f} std={%f %f %f %f}\n", 
-			     x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			     y[0][0], y[0][1], y[1][0], y[1][1],
-			     z[0][0], z[0][1], z[1][0], z[1][1],
-			     std::pow(x0[0][0], y[0][0]), std::pow(x0[0][1], y[0][1]), std::pow(x0[1][0], y[1][0]), std::pow(x0[1][1], y[1][1]));
                         return z;
                     }
 
@@ -1034,225 +917,221 @@ namespace arb {
                     // Always propagate nan:
                     // Deliberately differing from the IEEE-754 standard which has pow(0,nan)=1, and pow(1,nan)=1
                     z1 = ifelse(vsx_bool2x2::bor(is_nan(x0), is_nan(y)),
-				add(x0, y),
-				z1);
-		    printf("#  [POW::slow return] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
-			     x0[0][0], x0[0][1], x0[1][0], x0[1][1],
-			     y[0][0], y[0][1], y[1][0], y[1][1],
-			     z1[0][0], z[0][1], z1[1][0], z1[1][1]);
-		    return z1;
-            }
+                                add(x0, y),
+                                z1);
+                    return z1;
+                }
 
-            protected:
+                protected:
 
-	      static inline array sign_bit(const array& a) {
-		const auto t1 = reinterpret_i(a);    // reinterpret as 64-bit integer
-		const auto t2 = vsx_int2x2::shift_ra(t1, vsx_int2x2::broadcast(63));               // extend sign bit
-		return reinterpret_d(t2);       // reinterpret as 64-bit Boolean
-	      }
+                    static inline array sign_bit(const array& a) {
+                        const auto t1 = reinterpret_i(a);    // reinterpret as 64-bit integer
+                        const auto t2 = vsx_int2x2::shift_ra(t1, vsx_int2x2::broadcast(63));               // extend sign bit
+                        return reinterpret_d(t2);       // reinterpret as 64-bit Boolean
+                    }
 
-	      static bools is_nan(const array& a) {
-		return cmp_neq(a, a);
-	      }
+                    static bools is_nan(const array& a) {
+                        return cmp_neq(a, a);
+                    }
 
-	      static bools is_finite(const array& a) {
-		const auto t1 = reinterpret_i(a);    // reinterpret as integer
-		const auto t2 = vsx_int2x2::shift_l(t1, vsx_int2x2::broadcast(1));                // shift out sign bit
-		const auto t3 = vsx_int2x2::broadcast(0xFFE0000000000000ll);   // exponent mask
-		return vsx_int2x2::cmp_neq(vsx_int2x2::band(t2, t3), t3);  // exponent field is not all 1s
-	      }
+                    static bools is_finite(const array& a) {
+                        const auto t1 = reinterpret_i(a);    // reinterpret as integer
+                        const auto t2 = vsx_int2x2::shift_l(t1, vsx_int2x2::broadcast(1));                // shift out sign bit
+                        const auto t3 = vsx_int2x2::broadcast(0xFFE0000000000000ll);   // exponent mask
+                        return vsx_int2x2::cmp_neq(vsx_int2x2::band(t2, t3), t3);  // exponent field is not all 1s
+                    }
 
-	      static inline bools is_zero_or_subnormal(const array& a) {
-		const auto mask = (vector unsigned long) {0x7FF0000000000000ll, 0x7FF0000000000000ll};
-		const auto zero = (vector unsigned long) {0x0, 0x0};
-		vector unsigned long t_l = (reinterpret_cast<vector unsigned long>(a[0]) & mask) == zero;
-		vector unsigned long t_h = (reinterpret_cast<vector unsigned long>(a[1]) & mask) == zero;
-		bools result;
-		result[0] = (vector bool long long) t_l;
-		result[1] = (vector bool long long) t_h;
-		return result;
-	      }
+                    static inline bools is_zero_or_subnormal(const array& a) {
+                        const auto mask = (vector unsigned long) {0x7FF0000000000000ll, 0x7FF0000000000000ll};
+                        const auto zero = (vector unsigned long) {0x0, 0x0};
+                        vector unsigned long t_l = (reinterpret_cast<vector unsigned long>(a[0]) & mask) == zero;
+                        vector unsigned long t_h = (reinterpret_cast<vector unsigned long>(a[1]) & mask) == zero;
+                        bools result;
+                        result[0] = (vector bool long long) t_l;
+                        result[1] = (vector bool long long) t_h;
+                        return result;
+                    }
 
-            static inline array polynomial_6(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6) {
-                // calculates polynomial c6*x^6 + c5*x^5 + c4*x^4 + c3*x^3 + c2*x^2 + c1*x + c0
-                array x2 = mul(x, x);
-                array x4 = mul(x2, x2);
-                //return  (c4+c5*x+c6*x2)*x4 + ((c2+c3*x)*x2 + (c0+c1*x));
-                return madd(madd(broadcast(c6),
-                                 x2,
-                                 madd(broadcast(c5),
-                                      x,
-                                      broadcast(c4))),
-                            x4,
-                            madd(madd(broadcast(c3),
-                                      x,
-                                      broadcast(c2)),
-                                 x2,
-                                 madd(broadcast(c1),
-                                      x,
-                                      broadcast(c0))));
-            }
+                    static inline array polynomial_6(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6) {
+                        // calculates polynomial c6*x^6 + c5*x^5 + c4*x^4 + c3*x^3 + c2*x^2 + c1*x + c0
+                        array x2 = mul(x, x);
+                        array x4 = mul(x2, x2);
+                        //return  (c4+c5*x+c6*x2)*x4 + ((c2+c3*x)*x2 + (c0+c1*x));
+                        return madd(madd(broadcast(c6),
+                                         x2,
+                                         madd(broadcast(c5),
+                                              x,
+                                              broadcast(c4))),
+                                    x4,
+                                    madd(madd(broadcast(c3),
+                                              x,
+                                              broadcast(c2)),
+                                         x2,
+                                         madd(broadcast(c1),
+                                              x,
+                                              broadcast(c0))));
+                    }
 
-            static inline array polynomial_6n(array const x, double c0, double c1, double c2, double c3, double c4, double c5) {
-                // calculates polynomial 1*x^6 + c5*x^5 + c4*x^4 + c3*x^3 + c2*x^2 + c1*x + c0
-                array x2 = mul(x, x);
-                array x4 = mul(x2, x2);
-                // (c4+c5*x+x2)*x4 + ((c2+c3*x)*x2 + (c0+c1*x));
-                return madd(madd(broadcast(c5),           // (c5*x + x2 + c4)*x4
-                                 x,
-                                 add(broadcast(c4), x2)),
-                            x4,
-                            madd(madd(broadcast(c3),
-                                      x,
-                                      broadcast(c2)),
-                                 x2,
-                                 madd(broadcast(c1),
-                                      x,
-                                      broadcast(c0))));
-            }
+                    static inline array polynomial_6n(array const x, double c0, double c1, double c2, double c3, double c4, double c5) {
+                        // calculates polynomial 1*x^6 + c5*x^5 + c4*x^4 + c3*x^3 + c2*x^2 + c1*x + c0
+                        array x2 = mul(x, x);
+                        array x4 = mul(x2, x2);
+                        // (c4+c5*x+x2)*x4 + ((c2+c3*x)*x2 + (c0+c1*x));
+                        return madd(madd(broadcast(c5),           // (c5*x + x2 + c4)*x4
+                                         x,
+                                         add(broadcast(c4), x2)),
+                                    x4,
+                                    madd(madd(broadcast(c3),
+                                              x,
+                                              broadcast(c2)),
+                                         x2,
+                                         madd(broadcast(c1),
+                                              x,
+                                              broadcast(c0))));
+                    }
 
-	      static inline array polynomial_13m(array const& x, double c2, double c3, double c4, double c5, double c6, double c7, double c8, double c9, double c10, double c11, double c12, double c13) {
-		// calculates polynomial c13*x^13 + c12*x^12 + ... + x + 0
-		// ARRAY may be a vector type, double is a scalar type
-		array x2 = mul(x , x);
-		array x4 = mul(x2, x2);
-		array x8 = mul(x4, x4);
-		// return  ((c8+c9*x) + (c10+c11*x)*x2 + (c12+c13*x)*x4)*x8 + (((c6+c7*x)*x2 + (c4+c5*x))*x4 + ((c2+c3*x)*x2 + x));
-		return madd(
-			       madd(madd(broadcast(c13), x, broadcast(c12)), x4, madd(madd(broadcast(c11), x, broadcast(c10)), x2, madd(broadcast(c9), x, broadcast(c8)))), x8,
-			       madd(madd(madd(broadcast(c7), x, broadcast(c6)), x2, madd(broadcast(c5), x, broadcast(c4))), x4, madd(madd(broadcast(c3), x, broadcast(c2)), x2, x)));
-	      }
+                    static inline array polynomial_13m(array const& x, double c2, double c3, double c4, double c5, double c6, double c7, double c8, double c9, double c10, double c11, double c12, double c13) {
+                        // calculates polynomial c13*x^13 + c12*x^12 + ... + x + 0
+                        // ARRAY may be a vector type, double is a scalar type
+                        array x2 = mul(x , x);
+                        array x4 = mul(x2, x2);
+                        array x8 = mul(x4, x4);
+                        // return  ((c8+c9*x) + (c10+c11*x)*x2 + (c12+c13*x)*x4)*x8 + (((c6+c7*x)*x2 + (c4+c5*x))*x4 + ((c2+c3*x)*x2 + x));
+                        return madd(
+                            madd(madd(broadcast(c13), x, broadcast(c12)), x4, madd(madd(broadcast(c11), x, broadcast(c10)), x2, madd(broadcast(c9), x, broadcast(c8)))), x8,
+                            madd(madd(madd(broadcast(c7), x, broadcast(c6)), x2, madd(broadcast(c5), x, broadcast(c4))), x4, madd(madd(broadcast(c3), x, broadcast(c2)), x2, x)));
+                    }
 
-            static inline array horner(const array& x, const double a0) { return broadcast(a0); }
+                    static inline array horner(const array& x, const double a0) { return broadcast(a0); }
 
-            template <typename... T>
-            static array horner(const array& x, const double a0, T... tail) { return madd(x, horner(x, tail...), broadcast(a0)); }
+                    template <typename... T>
+                    static array horner(const array& x, const double a0, T... tail) { return madd(x, horner(x, tail...), broadcast(a0)); }
 
-            static inline array horner1(const array& x, const double a0) { return add(x, broadcast(a0)); }
+                    static inline array horner1(const array& x, const double a0) { return add(x, broadcast(a0)); }
 
-            template <typename... T>
-            static array horner1(const array& x, const double a0, T... tail) { return madd(x, horner1(x, tail...), broadcast(a0)); }
+                    template <typename... T>
+                    static array horner1(const array& x, const double a0, T... tail) { return madd(x, horner1(x, tail...), broadcast(a0)); }
 
-            // Compute 2^n·x
-            static array ldexp_positive(const array &x, const ints n) {
-                const auto nshift_l = vec_vupkhsw(n) << 52; // the unpack *high* unpacks indices 0 and 1. BigEndian, I guess
-                const auto nshift_h = vec_vupklsw(n) << 52;
-                const auto x_l = reinterpret_cast<vector long long>(x[0]);
-                const auto x_h = reinterpret_cast<vector long long>(x[1]);
-                const auto s_l = x_l + nshift_l;
-                const auto s_h = x_h + nshift_h;
-                array res;
-                res[0] = reinterpret_cast<vector double>(s_l);
-                res[1] = reinterpret_cast<vector double>(s_h);
-                return res;
-            }
+                    // Compute 2^n·x
+                    static array ldexp_positive(const array &x, const ints n) {
+                        const auto nshift_l = vec_vupkhsw(n) << 52; // the unpack *high* unpacks indices 0 and 1. BigEndian, I guess
+                        const auto nshift_h = vec_vupklsw(n) << 52;
+                        const auto x_l = reinterpret_cast<vector long long>(x[0]);
+                        const auto x_h = reinterpret_cast<vector long long>(x[1]);
+                        const auto s_l = x_l + nshift_l;
+                        const auto s_h = x_h + nshift_h;
+                        array res;
+                        res[0] = reinterpret_cast<vector double>(s_l);
+                        res[1] = reinterpret_cast<vector double>(s_h);
+                        return res;
+                    }
 
-            static array exponent_f(const array& a) {
-                const vector double pow2_52 {4503599627370496.0, 4503599627370496.0 };   // 2^52
-                const vector double bias { 1023.0, 1023.0};
-                const auto a_l = reinterpret_cast<vector long long>(a[0]) >> 52;
-                const auto a_h = reinterpret_cast<vector long long>(a[1]) >> 52;
+                    static array exponent_f(const array& a) {
+                        const vector double pow2_52 {4503599627370496.0, 4503599627370496.0 };   // 2^52
+                        const vector double bias { 1023.0, 1023.0};
+                        const auto a_l = reinterpret_cast<vector long long>(a[0]) >> 52;
+                        const auto a_h = reinterpret_cast<vector long long>(a[1]) >> 52;
 
-                const auto b_l = a_l | reinterpret_cast<vector long long>(pow2_52);
-                const auto b_h = a_h | reinterpret_cast<vector long long>(pow2_52);
+                        const auto b_l = a_l | reinterpret_cast<vector long long>(pow2_52);
+                        const auto b_h = a_h | reinterpret_cast<vector long long>(pow2_52);
 
-                array result;
-                result[0] = reinterpret_cast<vector double>(b_l) - (pow2_52 + bias);
-                result[1] = reinterpret_cast<vector double>(b_h) - (pow2_52 + bias);
-                return result;
-            }
+                        array result;
+                        result[0] = reinterpret_cast<vector double>(b_l) - (pow2_52 + bias);
+                        result[1] = reinterpret_cast<vector double>(b_h) - (pow2_52 + bias);
+                        return result;
+                    }
 
-            // Compute n and f such that x = 2^n·f, with |f| ∈ [1,2), given x is finite
-            static array logb_normal(const array& x) {
-                auto xw = vec_perm(reinterpret_cast<vector unsigned>(x[0]),
-                                   reinterpret_cast<vector unsigned>(x[1]),
-                                   (vector unsigned char) {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31});
-                auto mask = (vector unsigned) { 0x7ff00000,
-                                                0x7ff00000,
-                                                0x7ff00000,
-                                                0x7ff00000 };
-                auto c1023 = (vector int) { 1023,
-                                            1023,
-                                            1023,
-                                            1023 };
-                auto res = reinterpret_cast<vector int>((xw & mask) >> 20) - c1023;
-                array r;
-                r[0][0] = res[0];
-                r[0][1] = res[1];
-                r[1][0] = res[2];
-                r[1][1] = res[3];
-                return r;
-            }
+                    // Compute n and f such that x = 2^n·f, with |f| ∈ [1,2), given x is finite
+                    static array logb_normal(const array& x) {
+                        auto xw = vec_perm(reinterpret_cast<vector unsigned>(x[0]),
+                                           reinterpret_cast<vector unsigned>(x[1]),
+                                           (vector unsigned char) {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31});
+                        auto mask = (vector unsigned) { 0x7ff00000,
+                                                        0x7ff00000,
+                                                        0x7ff00000,
+                                                        0x7ff00000 };
+                        auto c1023 = (vector int) { 1023,
+                                                    1023,
+                                                    1023,
+                                                    1023 };
+                        auto res = reinterpret_cast<vector int>((xw & mask) >> 20) - c1023;
+                        array r;
+                        r[0][0] = res[0];
+                        r[0][1] = res[1];
+                        r[1][0] = res[2];
+                        r[1][1] = res[3];
+                        return r;
+                    }
 
-            static array fraction_normal(const array& x) {
-                const auto mask = (vector long long) { -0x7ff0000000000001ll, -0x7ff0000000000001ll };
-                const auto bias = (vector long long) {  0x3ff0000000000000ll,  0x3ff0000000000000ll };
-                const auto x_l = reinterpret_cast<vector long long>(x[0]);
-                const auto x_h = reinterpret_cast<vector long long>(x[1]);
-                array result;
-                result[0] = reinterpret_cast<vector double>(bias | (mask & x_l));
-                result[1] = reinterpret_cast<vector double>(bias | (mask & x_h));
-                return result;
-            }
+                    static array fraction_normal(const array& x) {
+                        const auto mask = (vector long long) { -0x7ff0000000000001ll, -0x7ff0000000000001ll };
+                        const auto bias = (vector long long) {  0x3ff0000000000000ll,  0x3ff0000000000000ll };
+                        const auto x_l = reinterpret_cast<vector long long>(x[0]);
+                        const auto x_h = reinterpret_cast<vector long long>(x[1]);
+                        array result;
+                        result[0] = reinterpret_cast<vector double>(bias | (mask & x_l));
+                        result[1] = reinterpret_cast<vector double>(bias | (mask & x_h));
+                        return result;
+                    }
 
-            static inline array fraction_2(const array& a) {
-                const auto mask = (vector long long) { 0x000FFFFFFFFFFFFFll, 0x000FFFFFFFFFFFFFll };
-                const auto bias = (vector long long) { 0x3FE0000000000000ll, 0x3FE0000000000000ll };
-                const auto x_l = reinterpret_cast<vector long long>(a[0]);
-                const auto x_h = reinterpret_cast<vector long long>(a[1]);
-                array result;
-                result[0] = reinterpret_cast<vector double>(bias | (mask & x_l));
-                result[1] = reinterpret_cast<vector double>(bias | (mask & x_h));
-                return result;
-            }
+                    static inline array fraction_2(const array& a) {
+                        const auto mask = (vector long long) { 0x000FFFFFFFFFFFFFll, 0x000FFFFFFFFFFFFFll };
+                        const auto bias = (vector long long) { 0x3FE0000000000000ll, 0x3FE0000000000000ll };
+                        const auto x_l = reinterpret_cast<vector long long>(a[0]);
+                        const auto x_h = reinterpret_cast<vector long long>(a[1]);
+                        array result;
+                        result[0] = reinterpret_cast<vector double>(bias | (mask & x_l));
+                        result[1] = reinterpret_cast<vector double>(bias | (mask & x_h));
+                        return result;
+                    }
 
-            // Compute 2^n*x when both x and 2^n*x are normal and finite.
-            static array ldexp_normal(const array& x, const ints n) {
-                const auto x_l = reinterpret_cast<vector long long>(x[0]);
-                const auto x_h = reinterpret_cast<vector long long>(x[1]);
-                const auto smask = (vector long long) { 0x7fffffffffffffffll,
-                                                        0x7fffffffffffffffll };
-                const auto sbits_l = (~smask) & x_l;
-                const auto sbits_h = (~smask) & x_h;
-                const auto nshift_l = vec_vupkhsw(n) << 52; // the unpack *high* unpacks indices 0 and 1. BigEndian, I guess
-                const auto nshift_h = vec_vupklsw(n) << 52;
-                const auto s_l = x_l + nshift_l;
-                const auto s_h = x_h + nshift_h;
-                const auto nzans_l = (s_l & smask) | sbits_l;
-                const auto nzans_h = (s_h & smask) | sbits_h;
-                array result;
-                result[0] = reinterpret_cast<vector double>(nzans_l);
-                result[1] = reinterpret_cast<vector double>(nzans_h);
-                return ifelse(cmp_eq(x,
-                                     broadcast(0.0)),
-                              broadcast(0.0),
-                              result);
-            }
+                    // Compute 2^n*x when both x and 2^n*x are normal and finite.
+                    static array ldexp_normal(const array& x, const ints n) {
+                        const auto x_l = reinterpret_cast<vector long long>(x[0]);
+                        const auto x_h = reinterpret_cast<vector long long>(x[1]);
+                        const auto smask = (vector long long) { 0x7fffffffffffffffll,
+                                                                0x7fffffffffffffffll };
+                        const auto sbits_l = (~smask) & x_l;
+                        const auto sbits_h = (~smask) & x_h;
+                        const auto nshift_l = vec_vupkhsw(n) << 52; // the unpack *high* unpacks indices 0 and 1. BigEndian, I guess
+                        const auto nshift_h = vec_vupklsw(n) << 52;
+                        const auto s_l = x_l + nshift_l;
+                        const auto s_h = x_h + nshift_h;
+                        const auto nzans_l = (s_l & smask) | sbits_l;
+                        const auto nzans_h = (s_h & smask) | sbits_h;
+                        array result;
+                        result[0] = reinterpret_cast<vector double>(nzans_l);
+                        result[1] = reinterpret_cast<vector double>(nzans_h);
+                        return ifelse(cmp_eq(x,
+                                             broadcast(0.0)),
+                                      broadcast(0.0),
+                                      result);
+                    }
 
-            static array exp2int(const ints n) { return ldexp_positive(broadcast(1.0), n); }
+                    static array exp2int(const ints n) { return ldexp_positive(broadcast(1.0), n); }
 
-            static ints cfti(const array& v) {
-                return (ints) { static_cast<int>(v[0][0]), static_cast<int>(v[0][1]), static_cast<int>(v[1][0]), static_cast<int>(v[1][1]) };
-            }
-        };
-    }  // namespace detail
+                    static ints cfti(const array& v) {
+                        return (ints) { static_cast<int>(v[0][0]), static_cast<int>(v[0][1]), static_cast<int>(v[1][0]), static_cast<int>(v[1][1]) };
+                    }
+            };
+        }  // namespace detail
 
-    namespace simd_abi {
-        template <typename T, unsigned N>
-        struct vsx;
+        namespace simd_abi {
+            template <typename T, unsigned N>
+            struct vsx;
 
-        template <>
-        struct vsx<double, 4> {
-            using type = detail::vsx_double4;
-        };
+            template <>
+            struct vsx<double, 4> {
+                using type = detail::vsx_double4;
+            };
 
-        template <>
-        struct vsx<int, 4> {
-            using type = detail::vsx_int4;
-        };
-    }  // namespace simd_abi
+            template <>
+            struct vsx<int, 4> {
+                using type = detail::vsx_int4;
+            };
+        }  // namespace simd_abi
 
-}  // namespace simd
+    }  // namespace simd
 }  // namespace arb
 
 #endif  // def __VSX
