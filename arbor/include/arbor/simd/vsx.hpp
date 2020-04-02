@@ -203,6 +203,16 @@ namespace arb {
                     p[3] = v[1][1];
                 }
 
+  	        static bool any(const array& b) {
+		  vector bool long long zero{0x0, 0x0};
+		  return vec_any_ne(b[0], zero) || vec_any_ne(b[1], zero);
+	        }
+
+  	        static bool all(const array& b) {
+		  vector bool long long zero{0x0, 0x0};
+		  return vec_all_ne(b[0], zero) && vec_all_ne(b[1], zero);
+	        }
+
                 static array mask_copy_from(const bool* p) {
                     array result;
                     result[0][0] = p[0] ? (~0) : 0;
@@ -309,6 +319,12 @@ namespace arb {
                     return result;
                 }
 
+                static array shift_ra(const array& a, const array& b) {
+                    array result;
+                    result[0] = vec_sra(a[0], (vector unsigned long) b[0]);
+		    result[1] = vec_sra(a[1], (vector unsigned long) b[1]);
+                    return result;
+                }
 
                 static array div(const array& a, const array& b) {
                     array result;
@@ -363,6 +379,13 @@ namespace arb {
                     bools result;
                     result[0] = vec_cmpeq(a[0], b[0]);
                     result[1] = vec_cmpeq(a[1], b[1]);
+                    return result;
+                }
+
+                static bools cmp_neq(const array& a, const array& b) {
+                    bools result;
+                    result[0] = vec_cmpne(a[0], b[0]);
+                    result[1] = vec_cmpne(a[1], b[1]);
                     return result;
                 }
 
@@ -438,6 +461,10 @@ namespace arb {
                     return result;
                 }
 
+  	        static bool any(const array& b) {
+		  vector bool long long zero{0x0, 0x0};
+		  return vec_any_ne(reinterpret_cast<vector bool long long>(b[0]), zero) | vec_any_ne(reinterpret_cast<vector bool long long>(b[1]), zero);
+	        }
 
                 static array nmadd(const array& a, const array& b, const array& c) {
                     array result;
@@ -462,8 +489,8 @@ namespace arb {
 
                 static array nmsub(const array& a, const array& b, const array& c) {
                     array result;
-                    result[0] = vec_msub(a[0], b[0], c[0]);
-                    result[1] = vec_msub(a[1], b[1], c[1]);
+                    result[0] = vec_nmsub(a[0], b[0], c[0]);
+                    result[1] = vec_nmsub(a[1], b[1], c[1]);
                     return result;
                 }
 
@@ -551,6 +578,12 @@ namespace arb {
                     return result;
 	        }
 
+	        static bools reinterpret_b(const array& a) {
+		    bools result;
+                    result[0] = reinterpret_cast<vector bool long long>(a[0]);
+                    result[1] = reinterpret_cast<vector bool long long>(a[1]);
+                    return result;
+	        }
 
                 static bools cmp_gt(const array& a, const array& b) {
                     bools result;
@@ -757,66 +790,136 @@ namespace arb {
 
                     // Separate mantissa from exponent
                     // This gives the mantissa * 0.5
-                    auto x = fraction_normal(x1); // x must be multiplied by 0.5?!
+                    auto x = fraction_2(x1);
+		    printf("./pow %f %f %f %f %f %f %f %f\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1]);
+
+		    printf("# [POW::X] base={%f %f %f %f} exp={%f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   x[0][0], x[0][1], x[1][0], x[1][1]);
 
                     // reduce range of x = +/- sqrt(2)/2
                     const auto blend = cmp_gt(x, broadcast(VM_SQRT2*0.5));
                     // conditional add
-                    x = add(x, ifelse(blend, x, c0));
+                    x = add(x, ifelse(blend, c0, x));
+
+		    printf("# [POW::X + 1] base={%f %f %f %f} exp={%f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   x[0][0], x[0][1], x[1][0], x[1][1]);
+
 
                     // Pade approximation
                     // Higher precision than in log function. Still higher precision wanted
                     x = sub(x, c1);
                     const auto x2 = mul(x, x);
+		    printf("# [POW::X2] args={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   x2[0][0], x2[0][1], x2[1][0], x2[1][1]);
+
                     auto px = polynomial_6(x, P0logl, P1logl, P2logl, P3logl, P4logl, P5logl, P6logl);
                     px = mul(px, mul(x, x2));
                     const auto qx = polynomial_6n(x, Q0logl, Q1logl, Q2logl, Q3logl, Q4logl, Q5logl);
                     const auto lg1 = div(px, qx);
+		    printf("# [POW::LG1] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   lg1[0][0], lg1[0][1], lg1[1][0], lg1[1][1]);
 
                     // extract exponent
                     auto ef = exponent_f(x1);
+		    printf("# [POW::EF] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   ef[0][0], ef[0][1], ef[1][0], ef[1][1]);
+
                     ef = add(ef, ifelse(blend, c1, c0));                  // conditional add
+		    printf("# [POW::EF + 1] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   ef[0][0], ef[0][1], ef[1][0], ef[1][1]);
 
                     // multiply exponent by y
                     // nearest integer e1 goes into exponent of result, remainder yr is added to log
                     const auto e1 = round(mul(ef, y));
                     // NB. we know fms exists, so we are fine?!
                     const auto yr = msub(ef, y, e1);                   // calculate remainder yr. precision very important here
+		    printf("#  [POW::YR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   yr[0][0], yr[0][1], yr[1][0], yr[1][1]);
 
                     // add initial terms to Pade expansion
-                    const auto lg = add(nmadd(ci2, x2, x), lg1);             // lg = (x - 0.5 * x2) + lg1;
+		    // lg = (x - 0.5 * x2) + lg1;
+		    const auto lg = nmsub(ci2, x2, add(x, lg1));
+		    printf("#  [POW::LG] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   lg[0][0], lg[0][1], lg[1][0], lg[1][1]);
                     // calculate rounding errors in lg
                     // rounding error in multiplication 0.5*x*x
                     const auto x2err = msub(mul(ci2, x), x, mul(ci2, x2));
                     // rounding error in additions and subtractions
                     const auto lgerr = sub(madd(ci2, x2, sub(lg, x)), lg1);      // lgerr = ((lg - x) + 0.5 * x2) - lg1;
+		    printf("#  [POW::X2ERR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   x2err[0][0], x2err[0][1], x2err[1][0], x2err[1][1]);
+		    printf("#  [POW::LGERR] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   lgerr[0][0], lgerr[0][1], lgerr[1][0], lgerr[1][1]);
 
                     // extract something for the exponent
                     const auto e2 = round(mul(mul(lg, y), broadcast(VM_LOG2E)));
                     // subtract this from lg, with extra precision
                     auto v = msub(lg, y, mul(e2, broadcast(ln2d_hi))); // We use msub here since we know that fused instruction are implemented
-                    v = nmadd(e2, broadcast(ln2d_lo), v);                // v -= e2 * ln2d_lo;
+                    v = nmsub(e2, broadcast(ln2d_lo), v);                // v -= e2 * ln2d_lo;
                     // add remainder from ef * y
                     v = madd(yr, broadcast(VM_LN2), v);                  // v += yr * VM_LN2;
                     // correct for previous rounding errors
-                    v = nmadd(add(lgerr, x2err), y, v);           // v -= (lgerr + x2err) * y;
+                    v = nmsub(add(lgerr, x2err), y, v);           // v -= (lgerr + x2err) * y;
+
+		    printf("# [POW::log] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   v[0][0], v[0][1], v[1][0], v[1][1]);
 
                     // exp function
                     // extract something for the exponent if possible
                     x = v;
                     const auto e3 = round(mul(x, broadcast(log2e)));
                     // high precision multiplication not needed here because abs(e3) <= 1
-                    x = nmadd(e3, broadcast(VM_LN2), x);                 // x -= e3 * VM_LN2;
+                    x = nmsub(e3, broadcast(VM_LN2), x);                 // x -= e3 * VM_LN2;
 
-                    auto z = horner(x, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
+		    printf("# [POW::e3] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   e3[0][0], e3[0][1], e3[1][0], e3[1][1]);
+
+		    printf("# [POW::X'] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   x[0][0], x[0][1], x[1][0], x[1][1]);
+
+                    auto z = polynomial_13m(x, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
                     z = add(z, c1);
+
+		    printf("# [POW::Z'] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   z[0][0], z[0][1], z[1][0], z[1][1]);
 
                     // contributions to exponent
                     const auto ee = add(e1, add(e2, e3));
+
                     // 2 x 2 x f64 -> 4 x i32
                     const auto ei = roundi(ee);
                     // biased exponent of result:
-                    const auto ej = vsx_int2x2::bor(ei, vsx_int2x2::shift_r((reinterpret_i(z)), vsx_int2x2::broadcast(52)));
+                    const auto ej = vsx_int2x2::add(ei, vsx_int2x2::shift_r((reinterpret_i(z)), vsx_int2x2::broadcast(52)));
                     // check exponent for overflow and underflow
                     const auto overflow  = vsx_bool2x2::bor(vsx_int2x2::cmp_lt(vsx_int2x2::broadcast(0x07FF), ej),
                                               cmp_gt(ee, broadcast( 3000.0)));
@@ -826,22 +929,53 @@ namespace arb {
                     // add exponent by integer addition
                     z = reinterpret_d(vsx_int2x2::add(reinterpret_i(z), vsx_int2x2::shift_l(ei, vsx_int2x2::broadcast(52))));
 
+		    printf("# [POW::Z] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   z[0][0], z[0][1], z[1][0], z[1][1]);
+
                     // check for special cases
-		    /*
                     const auto xfinite   = is_finite(x0);
                     const auto yfinite   = is_finite(y);
                     const auto efinite   = is_finite(ee);
                     const auto xzero     = is_zero_or_subnormal(x0);
                     const auto xsign     = sign_bit(x0);  // sign of x0. include -0.
+
+		    printf("# [POW::EJ] base={%f %f %f %f %f %f %f %f} result={%lld %lld %d %lld}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   ej[0][0], ej[0][1], ej[1][0], ej[1][1]);
+
+		    printf("# [POW::EI] base={%f %f %f %f %f %f %f %f} result={%lld %lld %lld %lld}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   ei[0][0], ei[0][1], ei[1][0], ei[1][1]);
+
+
+		    printf("# [POW::EE] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   ee[0][0], ee[0][1], ee[1][0], ee[1][1]);
+
+		    printf("# [POW::UNDERFLOW] base={%f %f %f %f %f %f %f %f} result={%lu %lu %lu %lu}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   underflow[0][0], underflow[0][1], underflow[1][0], underflow[1][1]);
+
+		    printf("# [POW::OVERFLOW] base={%f %f %f %f %f %f %f %f} result={%lu %lu %lu %lu}\n", 
+			   x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			   y[0][0], y[0][1], y[1][0], y[1][1],
+			   overflow[0][0], overflow[0][1], overflow[1][0], overflow[1][1]);
+
+
                     // check for overflow and underflow
-                    if (any(bor(overflow, underflow))) {
+                    if (vsx_bool2x2::any(vsx_bool2x2::bor(overflow, underflow))) {
                         // handle errors
                         z = ifelse(underflow, c0, z);
-                        z = ifelse(overflow, HUGE_VAL, z);
+                        z = ifelse(overflow, broadcast(HUGE_VAL), z);
                     }
 
                     // check for x == 0
-                    z = wm_pow_case_x0(xzero, y, z);
                     z = ifelse(xzero,
                                ifelse(cmp_lt(y, c0),
                                       broadcast(NAN),
@@ -851,6 +985,7 @@ namespace arb {
                                z);
 
                     // check for sign of x (include -0.). y must be integer
+
                     array z1;
                     array yodd;
                     if (any(xsign)) {
@@ -858,28 +993,33 @@ namespace arb {
                         auto yinteger = cmp_eq(y, round(y));
                         // test if y is odd: convert to int and shift bit 0 into position of sign bit.
                         // this will be 0 if overflow
-                        yodd = reinterpret_cast<array>(shift_l(roundi(y), 63));
+                        yodd = reinterpret_d(vsx_int2x2::shift_l(roundi(y), vsx_int2x2::broadcast(63)));
                         z1 = ifelse(yinteger,
                                     bor(z, yodd),                    // y is integer. get sign if y is odd
-                                    select(x0 == 0.,
+                                    ifelse(cmp_eq(x0, c0),
                                            z,
                                            broadcast(NAN))); // NAN unless x0 == -0.
-                        yodd = select(yinteger, yodd, 0.);                 // yodd used below. only if y is integer
-                        z = select(xsign, z1, z);
+                        yodd = ifelse(yinteger, yodd, c0);                 // yodd used below. only if y is integer
+                        z = ifelse(reinterpret_b(xsign), z1, z);
                     }
 
                     // check for range errors; fast return if no special cases
-                    if (all(band(band(xfinite, yfinite), bor(efinite, xzero)))) {
+                    if (vsx_bool2x2::all(vsx_bool2x2::band(vsx_bool2x2::band(xfinite, yfinite), vsx_bool2x2::bor(efinite, xzero)))) {
+		      printf("#  [POW::fast return] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f} std={%f %f %f %f}\n", 
+			     x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			     y[0][0], y[0][1], y[1][0], y[1][1],
+			     z[0][0], z[0][1], z[1][0], z[1][1],
+			     std::pow(x0[0][0], y[0][0]), std::pow(x0[0][1], y[0][1]), std::pow(x0[1][0], y[1][0]), std::pow(x0[1][1], y[1][1]));
                         return z;
                     }
 
                     // handle special error cases: y infinite
-                    z1 = ifelse(bor(yfinite, efinite),
+                    z1 = ifelse(vsx_bool2x2::bor(yfinite, efinite),
                                 z,
                                 ifelse(cmp_eq(x1, c1),
                                        c1,
-                                       ifelse(bxor(cmp_gt(x1, c1), sign_bit(y)),
-                                              broadcast(HUGE_VAL)
+                                       ifelse(vsx_bool2x2::bxor(cmp_gt(x1, c1), reinterpret_b(sign_bit(y))),
+                                              broadcast(HUGE_VAL),
                                               c0)));
 
                     // handle x infinite
@@ -893,49 +1033,45 @@ namespace arb {
 
                     // Always propagate nan:
                     // Deliberately differing from the IEEE-754 standard which has pow(0,nan)=1, and pow(1,nan)=1
-                    return ifelse(bor(is_nan(x0), is_nan(y)),
-                                add(x0, y),
-                                z1);
-                }
-
-                // extract something for the exponent if possible
-                x = v;
-                e3 = round(x*log2e);
-                // high precision multiplication not needed here because abs(e3) <= 1
-                x = nmadd(e3, broadcast(VM_LN2), x);                 // x -= e3 * VM_LN2;
-
-                z = horner(x, c0, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
-                z = add(z, c1);
-                
-                // contributions to exponent
-                ee = add(add(e1, e2), e3);
-                ei = roundi(ee);
-                // biased exponent of result:
-                ej = ei + shift_r(reinterpret_cast<i64x2x2>(z), 52);
-                // check exponent for overflow and underflow
-                overflow  = BVTYPE(ej >= 0x07FF) | (ee >  3000.);
-                underflow = BVTYPE(ej <= 0x0000) | (ee < -3000.);
-
-                // add exponent by integer addition
-                z = reinterpret_cast<f64x2x2>(add(reinterpret_cast<i64x2x2>(z), shift_l(ei, 52)));
-
-                // check for special cases
-                xfinite   = is_finite(x0);
-                yfinite   = is_finite(y);
-                efinite   = is_finite(ee);
-                xzero     = is_zero_or_subnormal(x0);
-                xsign     = sign_bit(x0);  // sign of x0. include -0.
-
-                // check for overflow and underflow
-                if (any(bor(overflow, underflow))) {
-                    // handle errors
-                    z = ifelse(underflow, c0, z);
-                    z = ifelse(overflow, broadcast(NAN), z);
-                }
-	      */
-		    return c1;
+                    z1 = ifelse(vsx_bool2x2::bor(is_nan(x0), is_nan(y)),
+				add(x0, y),
+				z1);
+		    printf("#  [POW::slow return] base={%f %f %f %f %f %f %f %f} result={%f %f %f %f}\n", 
+			     x0[0][0], x0[0][1], x0[1][0], x0[1][1],
+			     y[0][0], y[0][1], y[1][0], y[1][1],
+			     z1[0][0], z[0][1], z1[1][0], z1[1][1]);
+		    return z1;
             }
+
             protected:
+
+	      static inline array sign_bit(const array& a) {
+		const auto t1 = reinterpret_i(a);    // reinterpret as 64-bit integer
+		const auto t2 = vsx_int2x2::shift_ra(t1, vsx_int2x2::broadcast(63));               // extend sign bit
+		return reinterpret_d(t2);       // reinterpret as 64-bit Boolean
+	      }
+
+	      static bools is_nan(const array& a) {
+		return cmp_neq(a, a);
+	      }
+
+	      static bools is_finite(const array& a) {
+		const auto t1 = reinterpret_i(a);    // reinterpret as integer
+		const auto t2 = vsx_int2x2::shift_l(t1, vsx_int2x2::broadcast(1));                // shift out sign bit
+		const auto t3 = vsx_int2x2::broadcast(0xFFE0000000000000ll);   // exponent mask
+		return vsx_int2x2::cmp_neq(vsx_int2x2::band(t2, t3), t3);  // exponent field is not all 1s
+	      }
+
+	      static inline bools is_zero_or_subnormal(const array& a) {
+		const auto mask = (vector unsigned long) {0x7FF0000000000000ll, 0x7FF0000000000000ll};
+		const auto zero = (vector unsigned long) {0x0, 0x0};
+		vector unsigned long t_l = (reinterpret_cast<vector unsigned long>(a[0]) & mask) == zero;
+		vector unsigned long t_h = (reinterpret_cast<vector unsigned long>(a[1]) & mask) == zero;
+		bools result;
+		result[0] = (vector bool long long) t_l;
+		result[1] = (vector bool long long) t_h;
+		return result;
+	      }
 
             static inline array polynomial_6(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6) {
                 // calculates polynomial c6*x^6 + c5*x^5 + c4*x^4 + c3*x^3 + c2*x^2 + c1*x + c0
@@ -975,19 +1111,17 @@ namespace arb {
                                       broadcast(c0))));
             }
 
-            static inline array polynomial_13(array const x, double c0, double c1, double c2, double c3, double c4, double c5, double c6, double c7, double c8, double c9, double c10, double c11, double c12, double c13) {
-                // calculates polynomial c13*x^13 + c12*x^12 + ... + c1*x + c0
-	        array x2 = mul(x, x);
-	        array x4 = mul(x2, x2);
-	        array x8 = mul(x4, x4);
-                return madd(
-                    madd(
-                        madd(broadcast(c13), x, broadcast(c12)), x4,
-                        madd(madd(broadcast(c11), x, broadcast(c10)), x2, madd(broadcast(c9), x, broadcast(c8)))), x8,
-                    madd(
-                        madd(madd(broadcast(c7), x, broadcast(c6)), x2, madd(broadcast(c5), x, broadcast(c4))), x4,
-                        madd(madd(broadcast(c3), x, broadcast(c2)), x2, madd(broadcast(c1), x, broadcast(c0)))));
-            }
+	      static inline array polynomial_13m(array const& x, double c2, double c3, double c4, double c5, double c6, double c7, double c8, double c9, double c10, double c11, double c12, double c13) {
+		// calculates polynomial c13*x^13 + c12*x^12 + ... + x + 0
+		// ARRAY may be a vector type, double is a scalar type
+		array x2 = mul(x , x);
+		array x4 = mul(x2, x2);
+		array x8 = mul(x4, x4);
+		// return  ((c8+c9*x) + (c10+c11*x)*x2 + (c12+c13*x)*x4)*x8 + (((c6+c7*x)*x2 + (c4+c5*x))*x4 + ((c2+c3*x)*x2 + x));
+		return madd(
+			       madd(madd(broadcast(c13), x, broadcast(c12)), x4, madd(madd(broadcast(c11), x, broadcast(c10)), x2, madd(broadcast(c9), x, broadcast(c8)))), x8,
+			       madd(madd(madd(broadcast(c7), x, broadcast(c6)), x2, madd(broadcast(c5), x, broadcast(c4))), x4, madd(madd(broadcast(c3), x, broadcast(c2)), x2, x)));
+	      }
 
             static inline array horner(const array& x, const double a0) { return broadcast(a0); }
 
