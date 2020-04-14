@@ -42,21 +42,15 @@ __global__ void add_scalar(unsigned n, T* x, fvm_value_type v) {
     }
 }
 
-// Vector minus: x = y - z
-template <typename T>
-__global__ void vec_minus(unsigned n, T* x, const T* y, const T* z) {
-    unsigned i = threadIdx.x+blockIdx.x*blockDim.x;
-    if (i<n) {
-        x[i] = y[i]-z[i];
-    }
-}
-
-// Vector gather: x[i] = y[index[i]]
 template <typename T, typename I>
-__global__ void gather(unsigned n, T* x, const T* y, const I* index) {
+__global__ void set_dt_impl_kernel(const unsigned nintdom, T * dt_intdom, const T* time_to, const T* time,
+                                   const unsigned ncomp, T * dt_comp, const I* cv_to_intdom) {
     unsigned i = threadIdx.x+blockIdx.x*blockDim.x;
-    if (i<n) {
-        x[i] = y[index[i]];
+    if (i < nintdom) {
+        dt_intdom[i] = time_to[i] - time[i];
+    }
+    if (i < ncomp) {
+        ncomp[i] = dt_intdom[cv_to_intdom[i]];
     }
 }
 
@@ -105,11 +99,9 @@ void set_dt_impl(
     if (!nintdom || !ncomp) return;
 
     constexpr int block_dim = 128;
-    int nblock = block_count(nintdom, block_dim);
-    kernel::vec_minus<<<nblock, block_dim>>>(nintdom, dt_intdom, time_to, time);
-
-    nblock = block_count(ncomp, block_dim);
-    kernel::gather<<<nblock, block_dim>>>(ncomp, dt_comp, dt_intdom, cv_to_intdom);
+    int nblock = std::max(block_count(nintdom, block_dim),
+                          block_count(ncomp, block_dim));
+    kernel::set_dt_impl<<<nblock, block_dim>>>(nintdom, dt_intdom, time_to, time, ncomp, dt_comp, cv_to_intdom);
 }
 
 void add_gj_current_impl(
