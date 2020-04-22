@@ -66,6 +66,11 @@ public:
         state_.solve();
     }
 
+    template<typename VTo>
+    void solve(VTo& to) {
+        state_.solve(to);
+    }
+
     /// Assemble the matrix for given dt
     void assemble(const array& dt_cell, const array& voltage, const array& current, const array& conductivity) {
         state_.assemble(dt_cell, voltage, current, conductivity);

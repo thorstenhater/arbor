@@ -2,6 +2,7 @@
 
 #include <util/partition.hpp>
 #include <util/span.hpp>
+#include <memory/memory.hpp>
 
 #include "multicore_common.hpp"
 
@@ -129,6 +130,12 @@ public:
                 }
             }
         }
+    }
+
+    template<typename VTo>
+    void solve(VTo& to) {
+        solve();
+        memory::copy(to, rhs);
     }
 
 private:
