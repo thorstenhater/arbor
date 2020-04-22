@@ -60,28 +60,25 @@ void assemble_matrix_fine(
         unsigned n)
 {
     const unsigned tid = threadIdx.x + blockDim.x*blockIdx.x;
+    if (tid < n) {
+        // The 1e-3 is a constant of proportionality required to ensure that the
+        // conductance (gi) values have units μS (micro-Siemens).
+        // See the model documentation in docs/model for more information.
+        const auto dt = dt_intdom[cell_to_intdom[cv_to_cell[tid]]];
+        const auto p = dt > 0;
+        const auto pid = perm[tid];
+        const auto u = voltage[tid];
+        const auto i = current[tid];
+        const auto a = T(1e-3)*area[tid];
+        const auto s = conductivity[tid];
+        const auto c = cv_capacitance[tid];
+        const auto D = invariant_d[tid];
+        const auto gi = T(1e-3)*c/dt + a*s;
+        const auto r_d = gi + D;
+        const auto r_rhs = gi*u - a*i;
 
-    if (tid<n) {
-        auto cid = cv_to_cell[tid];
-        auto dt = dt_intdom[cell_to_intdom[cid]];
-
-        if (dt>0) {
-            // The 1e-3 is a constant of proportionality required to ensure that the
-            // conductance (gi) values have units μS (micro-Siemens).
-            // See the model documentation in docs/model for more information.
-            T oodt_factor = T(1e-3)/dt;
-            T area_factor = T(1e-3)*area[tid];
-
-            const auto gi = oodt_factor*cv_capacitance[tid] + area_factor*conductivity[tid];
-            const auto pid = perm[tid];
-            d[pid] = gi + invariant_d[tid];
-            rhs[pid] = gi*voltage[tid] - area_factor*current[tid];
-        }
-        else {
-            const auto pid = perm[tid];
-            d[pid] = 0;
-            rhs[pid] = voltage[tid];
-        }
+        d[pid]   = p ? r_d : 0;
+        rhs[pid] = p ? r_rhs : u;
     }
 }
 
