@@ -17,7 +17,7 @@ namespace kernels {
 // to[i] = from[p[i]]
 template <typename T, typename I>
 __global__
-void gather(const T* from, T* to, const I* p, unsigned n) {
+void gather(const T* from, T* __restrict__ to, const I* p, unsigned n) {
     unsigned i = threadIdx.x + blockDim.x*blockIdx.x;
 
     if (i<n) {
@@ -28,7 +28,7 @@ void gather(const T* from, T* to, const I* p, unsigned n) {
 // to[p[i]] = from[i]
 template <typename T, typename I>
 __global__
-void scatter(const T* from, T* to, const I* p, unsigned n) {
+void scatter(const T* from, T* __restrict__ to, const I* p, unsigned n) {
     unsigned i = threadIdx.x + blockDim.x*blockIdx.x;
 
     if (i<n) {
@@ -45,8 +45,8 @@ void scatter(const T* from, T* to, const I* p, unsigned n) {
 template <typename T, typename I>
 __global__
 void assemble_matrix_fine(
-        T* d,
-        T* rhs,
+        T* __restrict__ d,
+        T* __restrict__ rhs,
         const T* invariant_d,
         const T* voltage,
         const T* current,
@@ -94,15 +94,15 @@ void assemble_matrix_fine(
 template <typename T>
 __global__
 void solve_matrix_fine(
-    T* rhs,
-    T* d,
+    T* __restrict__ rhs,
+    T* __restrict__ d,
     const T* u,
     const level_metadata* level_meta,
     const fvm_index_type* level_lengths,
     const fvm_index_type* level_parents,
     const fvm_index_type* block_index,
-    fvm_index_type* num_matrix, // number of packed matrices = number of cells
-    fvm_index_type* padded_size)
+    fvm_index_type* __restrict__ num_matrix, // number of packed matrices = number of cells
+    fvm_index_type* __restrict__ padded_size)
 {
     const auto tid = threadIdx.x;
     const auto bid = blockIdx.x;
