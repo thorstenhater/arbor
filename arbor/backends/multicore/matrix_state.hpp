@@ -135,7 +135,7 @@ public:
     template<typename VTo>
     void solve(VTo& to) {
         solve();
-        memory::copy(to, rhs);
+        memory::copy(rhs, to);
     }
 
 private:
