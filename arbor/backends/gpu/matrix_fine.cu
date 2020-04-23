@@ -142,7 +142,7 @@ void solve_matrix_fine(
             // `0` on the diagonal to mark that it should not be solved for.
             if (d[pos0] != 0) {
                 // each branch perform substitution
-                for (unsigned pos = pos0; pos < posN; pos += width) {
+                for (int pos = pos0; pos < posN; pos += width) {
                     const T factor = u[pos] / d[pos];
                     d[pos + width]   -= factor * u[pos];
                     rhs[pos + width] -= factor * rhs[pos];
@@ -166,13 +166,13 @@ void solve_matrix_fine(
         const unsigned width = num_matrix[bid];
 
         if (tid < width) {
-            const unsigned len = lvl_lengths[tid];
-            const auto pos0 = last_lvl_meta.matrix_data_index + tid;
-            const auto posN = pos0 + width*(len - 1);
+            const int len = lvl_lengths[tid];
+            const int pos0 = last_lvl_meta.matrix_data_index + tid;
+            const int posN = pos0 + width*(len - 1);
 
             if (d[pos0] != 0) {
                 // backward
-                for (unsigned pos = pos0; pos < posN; pos += width) {
+                for (int  pos = pos0; pos < posN; pos += width) {
                     const T factor = u[pos] / d[pos];
                     d[pos + width]   -= factor * u[pos];
                     rhs[pos + width] -= factor * rhs[pos];
@@ -181,7 +181,7 @@ void solve_matrix_fine(
                 // forward
                 auto rhsp = rhs[posN] / d[posN];
                 rhs[posN] = rhsp;
-                for (unsigned pos = posN - width; pos >= pos0; pos -= width) {
+                for (int pos = posN - width; pos > pos0; pos -= width) {
                     rhsp = (rhs[pos] - u[pos]*rhsp)/d[pos];
                     rhs[pos] = rhsp;
                 }
