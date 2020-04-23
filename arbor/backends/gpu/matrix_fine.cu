@@ -111,27 +111,27 @@ void solve_matrix_fine(
     const auto num_levels  = block_index[bid + 1] - first_level;
 
     const auto block_level_meta = &level_meta[first_level];
-
+    const auto& last_lvl_meta = block_level_meta[num_levels - 1];
     // backward substitution
 
-    for (unsigned l=0; l<num_levels-1; ++l) {
-        // Metadata for this level and the next level
+    for (unsigned l = 0; l < num_levels - 1; ++l) {
+        // Metadata for this level
         const auto& lvl_meta = block_level_meta[l];
-        const auto& next_lvl_meta = block_level_meta[l+1];
-
         // Addresses of the first elements of level_lengths and level_parents
         // that belong to this level
-        const auto lvl_lengths = level_lengths + lvl_meta.level_data_index;
-        const auto lvl_parents = level_parents + lvl_meta.level_data_index;
+        const auto lvl_lengths    = level_lengths + lvl_meta.level_data_index;
+        const auto lvl_parents    = level_parents + lvl_meta.level_data_index;
+        const auto lvl_data_index = lvl_meta.matrix_data_index;
+        const auto width          = lvl_meta.num_branches;
 
-        const unsigned width = lvl_meta.num_branches;
-
+        // Parent node data elements
+        const auto parent_index = block_level_meta[l+1].matrix_data_index;
         // Perform backward substitution for each branch on this level.
         // One thread per branch.
         if (tid < width) {
-            const unsigned len = lvl_lengths[tid];
-            unsigned pos = lvl_meta.matrix_data_index + tid;
-
+            const auto p = parent_index + lvl_parents[tid];
+            const auto pos0 = lvl_data_index + tid;
+            const auto posN = pos0 + width*(lvl_lengths[tid] - 1);
             // Zero diagonal term implies dt==0; just leave rhs (for whole matrix)
             // alone in that case.
 
@@ -140,28 +140,20 @@ void solve_matrix_fine(
             // cells require more time steps than others, but we have to solve
             // all the matrices at the same time. When a cell finishes, we put a
             // `0` on the diagonal to mark that it should not be solved for.
-            if (d[pos]!=0) {
-
+            if (d[pos0] != 0) {
                 // each branch perform substitution
-                T factor = u[pos] / d[pos];
-                for (unsigned i=0; i<len-1; ++i) {
-                    const unsigned next_pos = pos + width;
-                    d[next_pos]   -= factor * u[pos];
-                    rhs[next_pos] -= factor * rhs[pos];
-
-                    factor = u[next_pos] / d[next_pos];
-                    pos = next_pos;
+                for (unsigned pos = pos0; pos < posN; pos += width) {
+                    const T factor = u[pos] / d[pos];
+                    d[pos + width]   -= factor * u[pos];
+                    rhs[pos + width] -= factor * rhs[pos];
                 }
 
                 // Update d and rhs at the parent node of this branch.
                 // A parent may have more than one contributing to it, so we use
                 // atomic updates to avoid races conditions.
-                const unsigned parent_index = next_lvl_meta.matrix_data_index;
-                const unsigned p = parent_index + lvl_parents[tid];
-                //d[p]   -= factor * u[pos];
-                cuda_atomic_add(d  +p, -factor*u[pos]);
-                //rhs[p] -= factor * rhs[pos];
-                cuda_atomic_add(rhs+p, -factor*rhs[pos]);
+                const T factor = -u[posN] / d[posN];
+                cuda_atomic_add(d   + p, factor*u[posN]);
+                cuda_atomic_add(rhs + p, factor*rhs[posN]);
             }
         }
         __syncthreads();
@@ -169,37 +161,29 @@ void solve_matrix_fine(
 
     {
         // The levels are sorted such that the root is the last level
-        const auto& last_lvl_meta = block_level_meta[num_levels-1];
         const auto lvl_lengths = level_lengths + last_lvl_meta.level_data_index;
 
         const unsigned width = num_matrix[bid];
 
         if (tid < width) {
             const unsigned len = lvl_lengths[tid];
-            unsigned pos = last_lvl_meta.matrix_data_index + tid;
+            const auto pos0 = last_lvl_meta.matrix_data_index + tid;
+            const auto posN = pos0 + width*(len - 1);
 
-            if (d[pos]!=0) {
-
+            if (d[pos0] != 0) {
                 // backward
-                for (unsigned i=0; i<len-1; ++i) {
-                    T factor = u[pos] / d[pos];
-                    const unsigned next_pos = pos + width;
-                    d[next_pos]   -= factor * u[pos];
-                    rhs[next_pos] -= factor * rhs[pos];
-
-                    pos = next_pos;
+                for (unsigned pos = pos0; pos < posN; pos += width) {
+                    const T factor = u[pos] / d[pos];
+                    d[pos + width]   -= factor * u[pos];
+                    rhs[pos + width] -= factor * rhs[pos];
                 }
 
-                auto rhsp = rhs[pos] / d[pos];
-                rhs[pos] = rhsp;
-                pos -= width;
-
                 // forward
-                for (unsigned i=0; i<len-1; ++i) {
-                    rhsp = rhs[pos] - u[pos]*rhsp;
-                    rhsp /= d[pos];
+                auto rhsp = rhs[posN] / d[posN];
+                rhs[posN] = rhsp;
+                for (unsigned pos = posN - width; pos >= pos0; pos -= width) {
+                    rhsp = (rhs[pos] - u[pos]*rhsp)/d[pos];
                     rhs[pos] = rhsp;
-                    pos -= width;
                 }
             }
         }
@@ -215,7 +199,7 @@ void solve_matrix_fine(
         // that belong to this level
         const auto lvl_lengths = level_lengths + lvl_meta.level_data_index;
         const auto lvl_parents = level_parents + lvl_meta.level_data_index;
-
+        const auto lvl_data_index = lvl_meta.matrix_data_index;
         const unsigned width = lvl_meta.num_branches;
         const unsigned parent_index = block_level_meta[l].matrix_data_index;
 
@@ -229,16 +213,15 @@ void solve_matrix_fine(
             T rhsp = rhs[p];
 
             // Find the index of the first node in this branch.
-            const unsigned len = lvl_lengths[tid];
-            unsigned pos = lvl_meta.matrix_data_index + (len-1)*width + tid;
+            const int  len = lvl_lengths[tid];
+            const int pos0 = lvl_data_index + tid;
+            const int posN = pos0 + (len-1)*width;
 
-            if (d[pos]!=0) {
+            if (d[pos0]!=0) {
                 // each branch perform substitution
-                for (unsigned i=0; i<len; ++i) {
-                    rhsp = rhs[pos] - u[pos]*rhsp;
-                    rhsp /= d[pos];
+                for (int pos = posN; pos >= pos0; pos -= width) {
+                    rhsp = (rhs[pos] - u[pos]*rhsp)/d[pos];
                     rhs[pos] = rhsp;
-                    pos -= width;
                 }
             }
         }
