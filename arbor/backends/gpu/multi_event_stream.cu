@@ -11,7 +11,7 @@ namespace kernels {
     template <typename T, typename I>
     __global__ void mark_until_after(
         unsigned n,
-        I* mark,
+        I* __restrict__ mark,
         const I* span_end,
         const T* ev_time,
         const T* t_until)
@@ -31,7 +31,7 @@ namespace kernels {
     template <typename T, typename I>
     __global__ void mark_until(
         unsigned n,
-        I* mark,
+        I* __restrict__ mark,
         const I* span_end,
         const T* ev_time,
         const T* t_until)
@@ -51,8 +51,8 @@ namespace kernels {
     template <typename I>
     __global__ void drop_marked_events(
         unsigned n,
-        I* n_nonempty,
-        I* span_begin,
+        I* __restrict__ n_nonempty,
+        I* __restrict__ span_begin,
         const I* span_end,
         const I* mark)
     {
@@ -72,7 +72,7 @@ namespace kernels {
         const I* span_begin,
         const I* span_end,
         const T* ev_time,
-        T* t_until)
+        T* __restrict__ t_until)
     {
         unsigned i = threadIdx.x+blockIdx.x*blockDim.x;
         if (i<n) {
