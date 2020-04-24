@@ -32,7 +32,7 @@ void test_thresholds_impl(
     int size,
     const fvm_index_type* cv_to_intdom, const fvm_value_type* t_after, const fvm_value_type* t_before,
     stack_storage<threshold_crossing>& stack,
-    fvm_index_type* is_crossed, fvm_value_type* prev_values,
+    fvm_index_type* __restrict__ is_crossed, fvm_value_type* __restrict__ prev_values,
     const fvm_index_type* cv_index, const fvm_value_type* values, const fvm_value_type* thresholds)
 {
     int i = threadIdx.x + blockIdx.x*blockDim.x;
