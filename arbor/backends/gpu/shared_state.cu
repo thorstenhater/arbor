@@ -26,10 +26,11 @@ template <typename T, typename I>
 __global__ void add_gj_current_impl(unsigned n, const T* __restrict__ gj_info, const I* voltage, I* __restrict__  current_density) {
     unsigned i = threadIdx.x+blockIdx.x*blockDim.x;
     if (i<n) {
-        auto gj = gj_info[i];
-        auto curr = gj.weight * (voltage[gj.loc.second] - voltage[gj.loc.first]); // nA
-
-        cuda_atomic_sub(current_density + gj.loc.first, curr);
+        const auto gj = gj_info[i];
+        const auto idx0 = gj.loc.first;
+        const auto idx1 = gj.loc.second;
+        const auto curr = gj.weight*(voltage[idx1] - voltage[idx0]); // nA
+        cuda_atomic_sub(current_density + idx0, curr);
     }
 }
 
@@ -55,7 +56,6 @@ __global__ void set_dt_impl(      T* __restrict__ dt_intdom,
         const auto dt = time_to[ind] - time[ind];
         dt_intdom[ind] = dt;
         dt_comp[idx] = dt;
-        idx += blockDim.x*gridDim.x;
     }
 }
 
@@ -66,11 +66,14 @@ __global__ void take_samples_impl(
 {
     unsigned i = threadIdx.x+blockIdx.x*blockDim.x;
     if (i<s.n) {
-        auto begin = s.ev_data+s.begin_offset[i];
-        auto end = s.ev_data+s.end_offset[i];
+        const auto t = time[i];
+        const auto begin = s.ev_data + s.begin_offset[i];
+        const auto end   = s.ev_data + s.end_offset[i];
         for (auto p = begin; p!=end; ++p) {
-            sample_time[p->offset] = time[i];
-            sample_value[p->offset] = *p->handle;
+            const auto off = p->offset;
+            const auto handle = *p->handle;
+            sample_time[off] = t;
+            sample_value[off] = handle;
         }
     }
 }
