@@ -522,6 +522,16 @@ public:
         gather(from.data(), to.data(), perm.data(), perm.size());
     }
 
+    void get_solution(const_view dt_intdom,
+                      const_view voltage,
+                      const_view current_density,
+                      const_view conductivity,
+                      array& output) {
+        assemble(dt_intdom, voltage, current_density, conductivity);
+        solve();
+        memory::copy(solution_, output);
+    }
+
 private:
     std::size_t size() const {
         return matrix_size;

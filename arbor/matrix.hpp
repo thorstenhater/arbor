@@ -76,6 +76,16 @@ public:
         return state_.solution();
     }
 
+    void get_solution(const array& dt_intdom,
+                      const array& voltage,
+                      const array& current_density,
+                      const array& conductivity,
+                      array& output) {
+        state_.get_solution(dt_intdom, voltage, current_density, conductivity, output);
+    }
+
+
+
 private:
     /// the parent indice that describe matrix structure
     iarray parent_index_;

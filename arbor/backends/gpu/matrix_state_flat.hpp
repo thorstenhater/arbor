@@ -142,6 +142,17 @@ struct matrix_state_flat {
         return parent_index.size();
     }
 
+    template<typename Output>
+    void get_solution(const_view dt_intdom,
+                      const_view voltage,
+                      const_view current_density,
+                      const_view conductivity,
+                      Output& output) {
+        assemble(dt_intdom, voltage, current_density, conductivity);
+        solve();
+        memory::copy(rhs, output);
+    }
+
 private:
     unsigned num_matrices() const {
         return cell_cv_divs.size()-1;
