@@ -3,6 +3,7 @@
 #include <util/partition.hpp>
 #include <util/span.hpp>
 
+#include "memory/memory.hpp"
 #include "multicore_common.hpp"
 
 namespace arb {
@@ -131,6 +132,17 @@ public:
                 }
             }
         }
+    }
+
+    template<typename Output>
+    void get_solution(const_view dt_intdom,
+                      const_view voltage,
+                      const_view current_density,
+                      const_view conductivity,
+                      Output& output) {
+        assemble(dt_intdom, voltage, current_density, conductivity);
+        solve();
+        memory::copy(rhs, output);
     }
 
 private:
