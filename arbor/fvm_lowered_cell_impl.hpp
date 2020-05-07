@@ -224,21 +224,18 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
 
     while (remaining_steps) {
         // Update any required reversal potentials based on ionic concs.
-
         for (auto& m: revpot_mechanisms_) {
             m->nrn_current();
         }
 
-
         // Deliver events and accumulate mechanism current contributions.
-
         PE(advance_integrate_events);
         state_->deliverable_events.mark_until_after(state_->time);
         PL();
 
-        PE(advance_integrate_current_zero);
+        PE(advance_integrate_current);
         state_->zero_currents();
-        PL();
+
         for (auto& m: mechanisms_) {
             m->deliver_events();
             m->nrn_current();
@@ -246,19 +243,14 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
 
         // Add current contribution from gap_junctions
         state_->add_gj_current();
-
-        PE(advance_integrate_events);
-        state_->deliverable_events.drop_marked_events();
+        PL();
 
         // Update event list and integration step times.
-
-        state_->update_time_to(dt_max, tfinal);
-        state_->deliverable_events.event_time_if_before(state_->time_to);
-        state_->set_dt();
+        PE(advance_integrate_events);
+        state_->process_events(dt_max, tfinal);
         PL();
 
         // Take samples at cell time if sample time in this step interval.
-
         PE(advance_integrate_samples);
         sample_events_.mark_until(state_->time_to);
         state_->take_samples(sample_events_.marked_events(), sample_time_, sample_value_);
@@ -267,49 +259,40 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
 
         // Integrate voltage by matrix solve.
 
-        PE(advance_integrate_matrix_build);
-        matrix_.assemble(state_->dt_intdom, state_->voltage, state_->current_density, state_->conductivity);
-        PL();
-        PE(advance_integrate_matrix_solve);
-        matrix_.solve();
-        memory::copy(matrix_.solution(), state_->voltage);
+        PE(matrix_solve);
+        matrix_.get_solution(state_->dt_intdom, state_->voltage, state_->current_density, state_->conductivity, state_->voltage);
         PL();
 
         // Integrate mechanism state.
-
         for (auto& m: mechanisms_) {
             m->nrn_state();
         }
 
         // Update ion concentrations.
-
-        PE(advance_integrate_ionupdate);
+        // PE(advance_integrate_ionupdate);
         update_ion_state();
-        PL();
+        // PL();
 
         // Update time and test for spike threshold crossings.
-
-        PE(advance_integrate_threshold);
+        // PE(advance_integrate_threshold);
         threshold_watcher_.test();
         memory::copy(state_->time_to, state_->time);
-        PL();
+        // PL();
 
         // Check for non-physical solutions:
-
+        // PE(advance_integrate_physicalcheck);
         if (check_voltage_mV>0) {
-            PE(advance_integrate_physicalcheck);
             assert_voltage_bounded(check_voltage_mV);
-            PL();
         }
+        // PL();
 
         // Check for end of integration.
-
-        PE(advance_integrate_stepsupdate);
+        // PE(advance_integrate_stepsupdate);
         if (!--remaining_steps) {
             tmin_ = state_->time_bounds().first;
             remaining_steps = dt_steps(tmin_, tfinal, dt_max);
         }
-        PL();
+        // PL();
     }
 
     set_tmin(tfinal);
