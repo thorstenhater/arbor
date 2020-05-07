@@ -47,9 +47,9 @@ TEST(matrix, solve_host)
         fill(state.u, -1);
         fill(state.rhs,1);
 
-        m.solve();
+        state.solve();
 
-        EXPECT_EQ(m.solution()[0], 0.5);
+        EXPECT_EQ(state.solution()[0], 0.5);
     }
 
     // matrices in the range of 2x2 to 1000x1000
@@ -68,9 +68,9 @@ TEST(matrix, solve_host)
             fill(A.u, -1);
             fill(A.rhs,1);
 
-            m.solve();
+            A.solve();
 
-            auto x = m.solution();
+            auto x = A.solution();
             auto err = math::square(std::fabs(2.*x[0] - x[1] - 1.));
             for(auto i : make_span(1,n-1)) {
                 err += math::square(std::fabs(2.*x[i] - x[i-1] - x[i+1] - 1.));
@@ -108,8 +108,8 @@ TEST(matrix, zero_diagonal)
     // Expected solution:
     std::vector<value_type> expected = {4, 5, 6, 7, 8, 9, 10};
 
-    m.solve();
-    auto x = m.solution();
+    A.solve();
+    auto x = A.solution();
 
     EXPECT_TRUE(testing::seq_almost_eq<double>(expected, x));
 }
@@ -156,14 +156,11 @@ TEST(matrix, zero_diagonal_assembled)
     //
     // Expected solution:
     // x = [ 4 5 6 7 8 9 10 ]
-
-    matrix_type m(p, c, Cm, g, area, s);
-    m.assemble(dt, v, i, mg);
-    m.solve();
-
-    vvec x;
-    assign(x, m.solution());
     std::vector<value_type> expected = {4, 5, 6, 7, 8, 9, 10};
+    array x = {0, 0, 0, 0, 0, 0, 0};
+    matrix_type m(p, c, Cm, g, area, s);
+    m.get_solution(dt, v, i, mg, x);
+
 
     EXPECT_TRUE(testing::seq_almost_eq<double>(expected, x));
 
@@ -173,10 +170,8 @@ TEST(matrix, zero_diagonal_assembled)
     dt[1] = 0;
     v[3] = -20;
     v[4] = -30;
-    m.assemble(dt, v, i, mg);
-    m.solve();
+    m.get_solution(dt, v, i, mg, x);
 
-    assign(x, m.solution());
     expected = {4, 5, 6, -20, -30, 9, 10};
 
     EXPECT_TRUE(testing::seq_almost_eq<double>(expected, x));

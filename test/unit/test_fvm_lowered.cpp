@@ -238,11 +238,12 @@ TEST(fvm_lowered, matrix_init)
     fvcell.integrate(0.01, 0.01, {}, {});
 
     auto n = J.size();
+    auto& S = fvcell.*private_state_ptr;
     auto& mat = J.state_;
 
     EXPECT_FALSE(util::any_of(util::subrange_view(mat.u, 1, n), isnan));
     EXPECT_FALSE(util::any_of(mat.d, isnan));
-    EXPECT_FALSE(util::any_of(J.solution(), isnan));
+    EXPECT_FALSE(util::any_of(S->voltage, isnan));
 
     EXPECT_FALSE(util::any_of(util::subrange_view(mat.u, 1, n), ispos));
     EXPECT_FALSE(util::any_of(mat.d, isneg));
