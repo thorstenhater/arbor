@@ -127,6 +127,14 @@ struct shared_state {
         array& sample_value);
 
     void reset();
+
+    void process_events(fvm_value_type dt_max, fvm_value_type tfinal) {
+        deliverable_events.drop_marked_events();
+        update_time_to(dt_max, tfinal);
+        deliverable_events.event_time_if_before(time_to);
+        set_dt();
+    }
+
 };
 
 // For debugging only
