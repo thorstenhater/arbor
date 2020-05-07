@@ -81,6 +81,7 @@ struct shared_state {
 
     std::unordered_map<std::string, ion_state> ion_data;
 
+    sample_event_stream sample_events;
     deliverable_event_stream deliverable_events;
 
     shared_state() = default;
@@ -137,12 +138,21 @@ struct shared_state {
         deliverable_events.drop_marked_events();
     }
 
-    void update_time_to(fvm_value_type dt_max, fvm_value_type tfinal) {
+    void update_dt(fvm_value_type dt_max, fvm_value_type tfinal) {
         update_time_to(dt_max, tfinal);
         deliverable_events.event_time_if_before(time_to);
         set_dt();
     }
 
+    void advance_samples(array& sample_time, array& sample_value) {
+        sample_events.mark_until(time_to);
+        take_samples(sample_events.marked_events(), sample_time, sample_value);
+        sample_events.drop_marked_events();
+    }
+
+    void swap_times() {
+        memory::copy(time_to, time);
+    }
 };
 
 // For debugging only

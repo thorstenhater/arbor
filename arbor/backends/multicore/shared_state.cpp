@@ -114,7 +114,8 @@ shared_state::shared_state(
     init_voltage(init_membrane_potential.begin(), init_membrane_potential.end(), pad(alignment)),
     temperature_degC(n_cv, pad(alignment)),
     diam_um(diam.begin(), diam.end(), pad(alignment)),
-    deliverable_events(n_intdom)
+    deliverable_events(n_intdom),
+    sample_events(n_intdom)
 {
     // For indices in the padded tail of cv_to_intdom, set index to last valid intdom index.
     if (n_cv>0) {

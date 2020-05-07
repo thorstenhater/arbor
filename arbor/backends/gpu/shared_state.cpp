@@ -19,13 +19,7 @@ namespace gpu {
 
 // CUDA implementation entry points:
 
-void update_time_to_impl(
-    std::size_t n, fvm_value_type* time_to, const fvm_value_type* time,
-    fvm_value_type dt, fvm_value_type tmax);
-
-void update_time_to_impl(
-    std::size_t n, fvm_value_type* time_to, const fvm_value_type* time,
-    fvm_value_type dt, fvm_value_type tmax);
+void update_time_to_impl(std::size_t n, fvm_value_type* time_to, const fvm_value_type* time, fvm_value_type dt, fvm_value_type tmax);
 
 void set_dt_impl(
     fvm_size_type nintdom, fvm_size_type ncomp, fvm_value_type* dt_intdom, fvm_value_type* dt_comp,
@@ -112,7 +106,8 @@ shared_state::shared_state(
     init_voltage(make_const_view(init_membrane_potential)),
     temperature_degC(make_const_view(temperature_K)),
     diam_um(make_const_view(diam)),
-    deliverable_events(n_intdom)
+    deliverable_events(n_intdom),
+    sample_events(n_intdom)
 {
     add_scalar(temperature_degC.size(), temperature_degC.data(), -273.15);
 }

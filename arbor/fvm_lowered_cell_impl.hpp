@@ -86,15 +86,12 @@ private:
     // Host or GPU-side back-end dependent storage.
     using array = typename backend::array;
     using shared_state = typename backend::shared_state;
-    using sample_event_stream = typename backend::sample_event_stream;
     using threshold_watcher = typename backend::threshold_watcher;
 
     execution_context context_;
 
     std::unique_ptr<shared_state> state_; // Cell state shared across mechanisms.
 
-    // TODO: Can we move the backend-dependent data structures below into state_?
-    sample_event_stream sample_events_;
     array sample_time_;
     array sample_value_;
     matrix<backend> matrix_;
@@ -212,7 +209,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
     }
 
     state_->deliverable_events.init(std::move(staged_events));
-    sample_events_.init(std::move(staged_samples));
+    state_->sample_events.init(std::move(staged_samples));
 
     arb_assert((assert_tmin(), true));
     unsigned remaining_steps = dt_steps(tmin_, tfinal, dt_max);
@@ -221,7 +218,6 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
     // TODO: Consider devolving more of this to back-end routines (e.g.
     // per-compartment dt probably not a win on GPU), possibly rumbling
     // complete fvm state into shared state object.
-
     while (remaining_steps) {
         // Update any required reversal potentials based on ionic concs.
         for (auto& m: revpot_mechanisms_) {
@@ -246,15 +242,14 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         PL();
 
         // Get rid of processed elements
-
+        state_->drop_consumed_events();
+        
         // Update integration step times.
-        state_->update_time_to(dt_max, tfinal);
+        state_->update_dt(dt_max, tfinal);
 
         // Take samples at cell time if sample time in this step interval.
         PE(advance_integrate_samples);
-        sample_events_.mark_until(state_->time_to); // This should be part of state ...
-        state_->take_samples(sample_events_.marked_events(), sample_time_, sample_value_); // ... and merged into this ...
-        sample_events_.drop_marked_events(); // ... as well as this?
+        state_->advance_samples(sample_time_, sample_value_);
         PL();
 
         // Integrate voltage by matrix solve.
@@ -269,30 +264,33 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         }
 
         // Update ion concentrations.
-        // PE(advance_integrate_ionupdate);
-        update_ion_state();
-        // PL();
+        PE(advance_integrate_ionupdate);
+        state_->ions_init_concentration(); // Inlined this for clarity
+        for (auto& m: mechanisms_) {
+            m->write_ions();
+        }
+        PL();
 
         // Update time and test for spike threshold crossings.
-        // PE(advance_integrate_threshold);
+        PE(advance_integrate_threshold);
         threshold_watcher_.test();
-        memory::copy(state_->time_to, state_->time);
-        // PL();
+        memory::copy(state_->time_to, state_->time); // should be a method of state
+        PL();
 
         // Check for non-physical solutions:
-        // PE(advance_integrate_physicalcheck);
+        PE(advance_integrate_physicalcheck);
         if (check_voltage_mV>0) {
             assert_voltage_bounded(check_voltage_mV);
         }
-        // PL();
+        PL();
 
         // Check for end of integration.
-        // PE(advance_integrate_stepsupdate);
+        PE(advance_integrate_stepsupdate);
         if (!--remaining_steps) {
             tmin_ = state_->time_bounds().first;
             remaining_steps = dt_steps(tmin_, tfinal, dt_max);
         }
-        // PL();
+        PL();
     }
 
     set_tmin(tfinal);
@@ -400,7 +398,6 @@ void fvm_lowered_cell_impl<Backend>::initialize(
     arb_assert(D.n_cell() == ncell);
     matrix_ = matrix<backend>(D.geometry.cv_parent, D.geometry.cell_cv_divs,
                               D.cv_capacitance, D.face_conductance, D.cv_area, cell_to_intdom);
-    sample_events_ = sample_event_stream(num_intdoms);
 
     // Discretize mechanism data.
 
