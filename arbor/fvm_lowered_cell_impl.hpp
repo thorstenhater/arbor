@@ -230,7 +230,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
 
         // Deliver events and accumulate mechanism current contributions.
         PE(advance_integrate_events);
-        state_->deliverable_events.mark_until_after(state_->time);
+        state_->mark_events_until_after();
         PL();
 
         PE(advance_integrate_current);
@@ -245,16 +245,16 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         state_->add_gj_current();
         PL();
 
-        // Update event list and integration step times.
-        PE(advance_integrate_events);
-        state_->process_events(dt_max, tfinal);
-        PL();
+        // Get rid of processed elements
+
+        // Update integration step times.
+        state_->update_time_to(dt_max, tfinal);
 
         // Take samples at cell time if sample time in this step interval.
         PE(advance_integrate_samples);
-        sample_events_.mark_until(state_->time_to);
-        state_->take_samples(sample_events_.marked_events(), sample_time_, sample_value_);
-        sample_events_.drop_marked_events();
+        sample_events_.mark_until(state_->time_to); // This should be part of state ...
+        state_->take_samples(sample_events_.marked_events(), sample_time_, sample_value_); // ... and merged into this ...
+        sample_events_.drop_marked_events(); // ... as well as this?
         PL();
 
         // Integrate voltage by matrix solve.
