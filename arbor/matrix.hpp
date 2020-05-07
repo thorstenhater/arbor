@@ -61,21 +61,7 @@ public:
     /// the partition of the parent index over the cells
     const iarray& cell_index() const { return cell_index_; }
 
-    /// Solve the linear system.
-    void solve() {
-        state_.solve();
-    }
-
-    /// Assemble the matrix for given dt
-    void assemble(const array& dt_cell, const array& voltage, const array& current, const array& conductivity) {
-        state_.assemble(dt_cell, voltage, current, conductivity);
-    }
-
-    /// Get a view of the solution
-    typename State::const_view solution() const {
-        return state_.solution();
-    }
-
+    /// Setup and solve linear system, store solution into given array
     void get_solution(const array& dt_intdom,
                       const array& voltage,
                       const array& current_density,
@@ -84,10 +70,8 @@ public:
         state_.get_solution(dt_intdom, voltage, current_density, conductivity, output);
     }
 
-
-
 private:
-    /// the parent indice that describe matrix structure
+    /// the parent indices that describe matrix structure
     iarray parent_index_;
 
     /// indexes that point to the start of each cell in the index
