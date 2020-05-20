@@ -289,10 +289,8 @@ public:
     ~IdentifierExpression() {}
 
     std::string const& name() const {
-        if(symbol_) return symbol_->name();
-        throw compiler_exception(
-            " attempt to look up name of identifier for which no symbol_ yet defined",
-            location_);
+        if (symbol_) return symbol_->name();
+        else         return spelling_;
     }
 
 protected:
