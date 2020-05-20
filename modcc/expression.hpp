@@ -45,7 +45,6 @@ class Symbol;
 class ConductanceExpression;
 class PDiffExpression;
 class VariableExpression;
-class ProcedureExpression;
 class NetReceiveExpression;
 class APIMethod;
 class IndexedVariable;
@@ -228,6 +227,8 @@ public :
         return this;
     }
 
+    expression_ptr clone() const override { return make_expression<Symbol>(location_, name_, kind_); }
+
     std::string to_string() const override;
     void accept(Visitor *v) override;
 
@@ -268,7 +269,7 @@ public:
     }
 
     std::string to_string() const override {
-        return yellow(pprintf("%", spelling_));
+        return yellow(pprintf("%", name()));
     }
 
     expression_ptr clone() const override;
