@@ -15,9 +15,12 @@
 #include "module.hpp"
 #include "parser.hpp"
 #include "perfvisitor.hpp"
+#include "accessvisitor.hpp"
 
 #include "io/bulkio.hpp"
 #include "io/pprintf.hpp"
+
+#include "registeriserewriter.hpp"
 
 using std::cout;
 using std::cerr;
@@ -69,6 +72,7 @@ struct Options {
     std::string modulename;
     bool verbose = false;
     bool analysis = false;
+    bool registerise = false;
     std::unordered_set<targetKind> targets;
 };
 
@@ -101,7 +105,8 @@ std::ostream& operator<<(std::ostream& out, const Options& opt) {
         table_prefix{"output"} << (opt.outprefix.empty()? "-": opt.outprefix) << line_end <<
         table_prefix{"verbose"} << noyes[opt.verbose] << line_end <<
         table_prefix{"targets"} << targets << line_end <<
-        table_prefix{"analysis"} << noyes[opt.analysis] << line_end;
+        table_prefix{"analysis"} << noyes[opt.analysis] << 
+        table_prefix{"registerise"} << noyes[opt.registerise] << line_end;
 }
 
 std::ostream& operator<<(std::ostream& out, const printer_options& popt) {
@@ -140,6 +145,7 @@ const char* usage_str =
         "-P|--profile           [Build with profiled kernels]\n"
         "-V|--verbose           [Toggle verbose mode]\n"
         "-A|--analyse           [Toggle analysis mode]\n"
+        "-R|--registerise       [Toggle register pass]\n"
         "<filename>             [File to be compiled]\n";
 
 int main(int argc, char **argv) {
@@ -169,6 +175,7 @@ int main(int argc, char **argv) {
                 { opt.outprefix,                     "-o", "--output" },
                 { to::set(opt.verbose),  to::flag,   "-V", "--verbose" },
                 { to::set(opt.analysis), to::flag,   "-A", "--analyse" },
+                { to::set(opt.registerise), to::flag,"-R", "--registerise" },
                 { opt.modulename,                    "-m", "--module" },
                 { to::set(popt.profile), to::flag,   "-P", "--profile" },
                 { popt.cpp_namespace,                "-N", "--namespace" },
@@ -230,6 +237,28 @@ int main(int argc, char **argv) {
             return report_error(m.error_string());
         }
 
+        // Optionally do some optimisation.
+        if (opt.registerise) {
+            cout << green("Register pass\n");
+            for (auto &symbol: m.symbols()) {
+                if (auto method = symbol.second->is_procedure()) {
+                    cout << white("-------------------------\n");
+                    cout << yellow("Registerising " + method->name()) << "\n";
+                    cout << white("-------------------------\n");
+                    cout << "Old body " << '\n'
+                         << method->body()->to_string() << '\n' << '\n'
+                         << white("-------------------------\n");
+                    RegisteriseRewriter registerise;
+                    method->accept(&registerise);
+
+                    cout << "New body " << '\n'
+                         << method->body()->to_string() << '\n'
+                         << white("-------------------------\n");
+                }
+            }
+        }
+
+
         // Generate backend-specific sources for each backend provided.
 
         emit_header("code generation");
@@ -252,7 +281,6 @@ int main(int argc, char **argv) {
         }
 
         // Optional analysis report.
-
         if (opt.analysis) {
             cout << green("performance analysis\n");
             for (auto &symbol: m.symbols()) {
