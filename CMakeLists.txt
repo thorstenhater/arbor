@@ -337,6 +337,7 @@ else()
 endif()
 
 set(ARB_MODCC_FLAGS)
+list(APPEND ARB_MODCC_FLAGS "--registerise")
 if(ARB_VECTORIZE)
     list(APPEND ARB_MODCC_FLAGS "--simd")
 endif()
