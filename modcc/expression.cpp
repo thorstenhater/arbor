@@ -3,7 +3,7 @@
 #include "expression.hpp"
 #include "identifier.hpp"
 
-inline std::string to_string(symbolKind k) {
+std::string to_string(symbolKind k) {
     switch (k) {
         case symbolKind::variable:
             return std::string("variable");
