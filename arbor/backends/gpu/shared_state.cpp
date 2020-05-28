@@ -7,6 +7,7 @@
 #include "backends/event.hpp"
 #include "backends/gpu/gpu_store_types.hpp"
 #include "backends/gpu/shared_state.hpp"
+#include <backends/gpu/mechanism.hpp>
 #include "backends/multi_event_stream_state.hpp"
 #include "memory/copy.hpp"
 #include "memory/wrappers.hpp"
@@ -150,6 +151,88 @@ void shared_state::ions_init_concentration() {
 
 void shared_state::update_time_to(fvm_value_type dt_step, fvm_value_type tmax) {
     update_time_to_impl(n_intdom, time_to.data(), time.data(), dt_step, tmax);
+}
+
+void shared_state::update_currents(std::vector<mechanism_ptr>& mechanisms) {
+    // state_->zero_currents();
+    // for (auto& m: mechanisms_) {
+    // m->deliver_events();
+    // m->nrn_current();
+    // }
+    static bool initialised = false;
+    static cudaStream_t stream;
+    static cudaGraphExec_t instance;
+    if (!initialised) {
+        cudaGraph_t graph = {0};
+        std::vector<cudaGraphNode_t> nodes;
+
+        initialised = true;
+        cudaStreamCreate (&stream);
+        cudaGraphCreate(&graph, 0);
+
+        // fan in node after zeroing all current/conductivity/ions
+        nodes.push_back({0});
+        auto* join = &nodes.back();
+        cudaGraphAddEmptyNode(&nodes.back(), graph, nullptr, 0);
+
+        // zeroing all the memories
+        cudaMemsetParams memsetParams = {0};
+        memsetParams.dst   = nullptr;
+        memsetParams.value = 0;
+        memsetParams.pitch = 0;
+        memsetParams.elementSize = 1;
+        memsetParams.width = 0;
+        memsetParams.height = 1;
+
+        memory::fill(current_density, 0);
+        nodes.push_back({0});
+        memsetParams.dst   = current_density.data();
+        memsetParams.width = current_density.size()*sizeof(fvm_value_type);
+        cudaGraphAddMemsetNode(&nodes.back(), graph, nullptr, 0, &memsetParams);
+        cudaGraphAddDependencies(graph, &nodes.back(), join, 1);
+
+        memory::fill(conductivity, 0);
+        nodes.push_back({0});
+        memsetParams.dst   = conductivity.data();
+        memsetParams.width = conductivity.size()*sizeof(fvm_value_type);
+        cudaGraphAddMemsetNode(&nodes.back(), graph, nullptr, 0, &memsetParams);
+        cudaGraphAddDependencies(graph, &nodes.back(), join, 1);
+
+        // for (auto& i: ion_data) {
+            // i.second.zero_current();
+        // }
+
+        for (auto& m: mechanisms) {
+            auto m_d = static_cast<arb::gpu::mechanism*>(m.get());
+            if (m_d->use_graphs()) {
+                std::cout << "Graph support for mechanism " << m_d->internal_name() << " found\n";
+                // Update events pointer
+                m_d->add_get_marked_events(graph, nodes);
+                auto* um_task = &nodes.back();
+                // Deliver events
+                m_d->add_deliver_events(graph, nodes);
+                auto* de_task = &nodes.back();
+                // NRN Current
+                m_d->add_nrn_current(graph, nodes);
+                auto* nc_task = &nodes.back();
+                // add dependency chain: join -> update marked -> deliver -> current
+                cudaGraphAddDependencies(graph, join,    um_task, 1);
+                cudaGraphAddDependencies(graph, um_task, de_task, 1);
+                cudaGraphAddDependencies(graph, de_task, nc_task, 1);
+            } else {
+                std::cout << "NO graph support for mechanism " << m_d->internal_name() << " found\n";
+            }
+        }
+        cudaGraphInstantiate(&instance, graph, nullptr, nullptr, 0);
+    }
+    cudaStreamSynchronize(stream);
+    // memory::fill(current_density, 0);
+    // memory::fill(conductivity, 0);
+    for (auto& i: ion_data) {
+        i.second.zero_current();
+    }
+    cudaGraphLaunch(instance, stream);
+    cudaStreamSynchronize(stream);
 }
 
 void shared_state::set_dt() {

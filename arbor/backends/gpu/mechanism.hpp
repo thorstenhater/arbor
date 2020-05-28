@@ -15,6 +15,8 @@
 #include "backends/gpu/gpu_store_types.hpp"
 #include "backends/gpu/mechanism_ppack_base.hpp"
 
+#include <cuda_runtime.h>
+
 namespace arb {
 namespace gpu {
 
@@ -51,6 +53,32 @@ public:
     void deliver_events() override {
         // Delegate to derived class, passing in event queue state.
         deliver_events(event_stream_ptr_->marked_events());
+    }
+
+    virtual bool use_graphs() { return false; }
+
+    virtual void add_get_marked_events(cudaGraph_t& graph, std::vector<cudaGraphNode_t>& nodes) {
+        std::cerr << "Adding blank node for marking in " << internal_name() << '\n';
+        nodes.push_back({0});
+        auto rc = cudaGraphAddEmptyNode(&nodes.back(), graph, nullptr, 0);
+        if (rc != cudaSuccess) { fprintf(stderr,"Error: %s (%s:%d)\n", cudaGetErrorString(rc), __FILE__, __LINE__); }
+        std::cerr << "DONE\n";
+    }
+
+    virtual void add_deliver_events(cudaGraph_t& graph, std::vector<cudaGraphNode_t>& nodes) {
+        std::cerr << "Adding blank node for deliver in " << internal_name() << '\n';
+        nodes.push_back({0});
+        auto rc = cudaGraphAddEmptyNode(&nodes.back(), graph, nullptr, 0);
+        if (rc != cudaSuccess) { fprintf(stderr,"Error: %s (%s:%d)\n", cudaGetErrorString(rc), __FILE__, __LINE__); }
+        std::cerr << "DONE\n";
+    }
+
+    virtual void add_nrn_current(cudaGraph_t& graph, std::vector<cudaGraphNode_t>& nodes) {
+        std::cerr << "Adding blank node for current in " << internal_name() << '\n';
+        nodes.push_back({0});
+        auto rc = cudaGraphAddEmptyNode(&nodes.back(), graph, nullptr, 0);
+        if (rc != cudaSuccess) { fprintf(stderr,"Error: %s (%s:%d)\n", cudaGetErrorString(rc), __FILE__, __LINE__); }
+        std::cerr << "DONE\n";
     }
 
     void set_parameter(const std::string& key, const std::vector<fvm_value_type>& values) override;

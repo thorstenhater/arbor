@@ -215,35 +215,20 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
     unsigned remaining_steps = dt_steps(tmin_, tfinal, dt_max);
     PL();
 
-    // TODO: Consider devolving more of this to back-end routines (e.g.
-    // per-compartment dt probably not a win on GPU), possibly rumbling
-    // complete fvm state into shared state object.
     while (remaining_steps) {
         // Update any required reversal potentials based on ionic concs.
         for (auto& m: revpot_mechanisms_) {
             m->nrn_current();
         }
 
-        // Deliver events and accumulate mechanism current contributions.
+        // Mark and deliver events, and accumulate mechanism current contributions.
         PE(advance_integrate_events);
         state_->mark_events_until_after();
-        PL();
-
-        PE(advance_integrate_current);
-        state_->zero_currents();
-
-        for (auto& m: mechanisms_) {
-            m->deliver_events();
-            m->nrn_current();
-        }
-
+        state_->update_currents(mechanisms_);
         // Add current contribution from gap_junctions
         state_->add_gj_current();
-        PL();
-
         // Get rid of processed elements
         state_->drop_consumed_events();
-        
         // Update integration step times.
         state_->update_dt(dt_max, tfinal);
 
@@ -274,7 +259,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         // Update time and test for spike threshold crossings.
         PE(advance_integrate_threshold);
         threshold_watcher_.test();
-        memory::copy(state_->time_to, state_->time); // should be a method of state
+        state_->swap_times();
         PL();
 
         // Check for non-physical solutions:

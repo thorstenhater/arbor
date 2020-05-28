@@ -98,8 +98,8 @@ struct shared_state {
 
     std::unordered_map<std::string, ion_state> ion_data;
 
-    sample_event_stream sample_events;
     deliverable_event_stream deliverable_events;
+    sample_event_stream sample_events;
 
     shared_state() = default;
 
@@ -167,6 +167,14 @@ struct shared_state {
         sample_events.mark_until(time_to);
         take_samples(sample_events.marked_events(), sample_time, sample_value);
         sample_events.drop_marked_events();
+    }
+
+    void update_currents(std::vector<mechanism_ptr>& mechanisms) {
+        zero_currents();
+        for (auto& m: mechanisms) {
+            m->deliver_events();
+            m->nrn_current();
+        }
     }
 
     void swap_times() {
