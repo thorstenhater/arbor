@@ -1,9 +1,9 @@
 NEURON {
-    SUFFIX hh
+    SUFFIX hh_pas
     USEION na READ ena WRITE ina
     USEION k READ ek WRITE ik
     NONSPECIFIC_CURRENT il
-    RANGE gnabar, gkbar, gl, el
+    RANGE gnabar, gkbar, gl, el, gpas, epas
 }
 
 UNITS {
@@ -17,7 +17,8 @@ PARAMETER {
     gl = .0003 (S/cm2)
     el = -54.3 (mV)
     celsius (degC)
-
+    gpas = .001 (S/cm2)
+    epas = -65  (mV) : we use -65 for the ball and stick model, instead of Neuron default of -70
 }
 
 STATE {
@@ -39,7 +40,7 @@ BREAKPOINT {
     ina = gna*(v - ena)
     gk = gkbar*n2*n2
     ik = gk*(v - ek)
-    il = gl*(v - el)
+    il = gl*(v - el) + gpas*(v - epas)
 }
 
 INITIAL {
