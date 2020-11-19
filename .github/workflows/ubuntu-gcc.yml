@@ -40,7 +40,7 @@ jobs:
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
            tar -xvf ./openmpi-4.0.2.tar.gz
            cd openmpi-4.0.2
-           ./configure
+           ./configure --disable-mpi-fortran
            make -j
            sudo make install
            sudo ldconfig
