@@ -29,6 +29,7 @@ jobs:
       - name: Install OpenMPI 
         run: |
           sudo apt update
+          sudo apt search openmpi
           sudo apt install openmpi
       - name: Install Python packages
         run: python${{ matrix.py }} -mpip install numpy sphinx svgwrite sphinx-rtd-theme
