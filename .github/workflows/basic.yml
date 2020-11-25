@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os:    ["ubuntu-20.04"]
-        gcc:   ["9"]
+        cxx:   ["g++-9"]
         py:    ["3.6"]
         cmake: ["3.12.x"]
         mpi:   ["ON"]
@@ -33,12 +33,6 @@ jobs:
           sudo apt install openmpi-bin libopenmpi-dev
       - name: Install Python packages
         run: python${{ matrix.py }} -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
-      - name: Check versions
-        run: |
-          python${{ matrix.py }} --version
-          cmake --version
-          gcc-${{ matrix.gcc }} --version
-          g++-${{ matrix.gcc }} --version
       - name: "Clone w/ submodules"
         uses: actions/checkout@v2
         with:
@@ -47,7 +41,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} -DCMAKE_C_COMPILER=gcc-${{ matrix.gcc }} -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python${{ matrix.py }}` -DARB_WITH_MPI=${{ matrix.mpi }}
+          cmake .. -DCMAKE_CXX_COMPILER=g++-${{ matrix.cxx }} -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python${{ matrix.py }}` -DARB_WITH_MPI=${{ matrix.mpi }}
           make tests examples html
           sudo make install
           cd -
