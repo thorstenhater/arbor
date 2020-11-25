@@ -55,9 +55,9 @@ jobs:
         run: build/bin/unit
       - if: ${{ matrix.mpi == 'ON' }}
         name: "Run MPI tests"
-        run: mpirun -n 4 build/bin/unit-mpi      
+        run: mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: "Run python tests"
         run: PYTHONPATH="/usr/local/lib/python${{ matrix.py }}/site-packages/:${PYTHONPATH}" python${{ matrix.py }} python/test/unit/runner.py
       - if: ${{ matrix.mpi == 'ON' }}
         name: "Run python+MPI tests"
-        run: PYTHONPATH="/usr/local/lib/python${{ matrix.py }}/site-packages/:${PYTHONPATH}" mpirun -n 4 python${{ matrix.py }} python/test/unit_distributed/runner.py
+        run: PYTHONPATH="/usr/local/lib/python${{ matrix.py }}/site-packages/:${PYTHONPATH}" mpirun -n 4 -oversubscribe python${{ matrix.py }} python/test/unit_distributed/runner.py
