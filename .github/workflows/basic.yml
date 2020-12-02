@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=g++-${{ matrix.cxx }} -DCMAKE_CXX_COMPILER=gcc-${{ matrix.cxx }} -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python${{ matrix.py }}` -DARB_WITH_MPI=${{ matrix.mpi }}
+          cmake .. -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} -DCMAKE_CXX_COMPILER=gcc-${{ matrix.gcc }} -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python${{ matrix.py }}` -DARB_WITH_MPI=${{ matrix.mpi }}
           make tests examples html
           sudo make install
           cd -
