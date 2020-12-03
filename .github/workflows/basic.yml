@@ -46,6 +46,12 @@ jobs:
            ./configure --disable-mpi-fortran
            make -j
            cd -
+      - name: Check config
+        run: |
+          $CC --version
+          $CXX --version
+          $PY --version
+          echo "Hit chached MPI ${{ steps.cache-ompi.outputs.cache-hit }}"
       - name: Install OpenMPI
         run: |
            cd openmpi-4.0.2
