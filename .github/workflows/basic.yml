@@ -13,11 +13,18 @@ jobs:
     strategy:
       matrix:
         os:    ["ubuntu-20.04"]
-        gcc:   ["9"]
+        cxx:   ["g++"]
+        cc:    ["gcc"]
+        ver:   ["9"]
         py:    ["3.6"]
         cmake: ["3.12.x"]
         mpi:   ["ON"]
     steps:
+      - name: Environment
+        env:
+          CC:  ${{ matrix.cc }}-${{ matrix.ver }}
+          CXX: ${{ matrix.cxx }}-${{ matrix.ver }}
+          PY:  python${{ matrix.py }}
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
         with:
@@ -26,14 +33,28 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.py }}
-      - name: Install OpenMPI 
+      - uses: actions/cache@v2
+        id: cache-ompi  # give it a name for checking the cache hit-or-not
+        with:
+          path: openmpi-4.0.2  # what we cache: the folder
+          key: ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
+      - if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
+        name: Build OpenMPI
         run: |
-          sudo apt update
-          sudo apt install openmpi-bin libopenmpi-dev
-          which mpic++
-          mpic++ --version
+           wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
+           tar -xvf ./openmpi-4.0.2.tar.gz
+           cd openmpi-4.0.2
+           ./configure --disable-mpi-fortran
+           make -j
+           cd -
+      - name: Install OpenMPI
+        run: |
+           cd openmpi-4.0.2
+           sudo make install
+           sudo ldconfig
+           cd -
       - name: Install Python packages
-        run: python${{ matrix.py }} -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
+        run: $PY -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
       - name: "Clone w/ submodules"
         uses: actions/checkout@v2
         with:
@@ -42,8 +63,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          export MPI_CXX=`which mpic++`
-          cmake .. -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc }} -DCMAKE_CXX_COMPILER=gcc-${{ matrix.gcc }} -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python${{ matrix.py }}` -DARB_WITH_MPI=${{ matrix.mpi }}
+          cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
           make tests examples html
           sudo make install
           cd -
@@ -53,7 +73,7 @@ jobs:
         name: "Run MPI tests"
         run: mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: "Run python tests"
-        run: PYTHONPATH="/usr/local/lib/python${{ matrix.py }}/site-packages/:${PYTHONPATH}" python${{ matrix.py }} python/test/unit/runner.py
+        run: PYTHONPATH="/usr/local/lib/$PY/site-packages/:${PYTHONPATH}" $PY python/test/unit/runner.py
       - if: ${{ matrix.mpi == 'ON' }}
         name: "Run python+MPI tests"
-        run: PYTHONPATH="/usr/local/lib/python${{ matrix.py }}/site-packages/:${PYTHONPATH}" mpirun -n 4 -oversubscribe python${{ matrix.py }} python/test/unit_distributed/runner.py
+        run: PYTHONPATH="/usr/local/lib/$PY/site-packages/:${PYTHONPATH}" mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
