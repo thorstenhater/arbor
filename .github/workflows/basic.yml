@@ -38,9 +38,11 @@ jobs:
         with:
           path: openmpi-4.0.2  # what we cache: the folder
           key: ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
-      - if: ${{ steps.cache-ompi.outputs.cache-hit == 'false' }}
+      - if: ${{ !steps.cache-ompi.outputs.cache-hit }}
         name: Build OpenMPI
         run: |
+           export CC=${{ matrix.cc }}-${{ matrix.ver }}
+           export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
            tar -xvf ./openmpi-4.0.2.tar.gz
            cd openmpi-4.0.2
