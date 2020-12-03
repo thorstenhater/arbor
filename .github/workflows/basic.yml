@@ -19,12 +19,11 @@ jobs:
         py:    ["3.6"]
         cmake: ["3.12.x"]
         mpi:   ["ON"]
+    env:
+        CC:  ${{ matrix.cc }}-${{ matrix.ver }}
+        CXX: ${{ matrix.cxx }}-${{ matrix.ver }}
+        PY:  python${{ matrix.py }}
     steps:
-      - name: Environment
-        env:
-          CC:  ${{ matrix.cc }}-${{ matrix.ver }}
-          CXX: ${{ matrix.cxx }}-${{ matrix.ver }}
-          PY:  python${{ matrix.py }}
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
         with:
