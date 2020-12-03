@@ -73,7 +73,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
+          cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
           make VERBOSE=1 tests examples html
           sudo make VERBOSE=1 install
           cd -
