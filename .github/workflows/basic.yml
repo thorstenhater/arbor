@@ -46,12 +46,6 @@ jobs:
            ./configure --disable-mpi-fortran
            make -j
            cd -
-      - name: Check config
-        run: |
-          $CC --version
-          $CXX --version
-          $PY --version
-          echo "Hit chached MPI ${{ steps.cache-ompi.outputs.cache-hit }}"
       - name: Install OpenMPI
         run: |
            cd openmpi-4.0.2
@@ -64,11 +58,19 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: "recursive"
+      - name: Check config
+        run: |
+          $CC --version
+          $CXX --version
+          $PY --version
+          echo "Hit chached MPI ${{ steps.cache-ompi.outputs.cache-hit }}"
+          mpic++ --version
+          mpicc --version
       - name: Install arbor
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
+          cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=$PY -DARB_WITH_MPI=${{ matrix.mpi }}
           make tests examples html
           sudo make install
           cd -
