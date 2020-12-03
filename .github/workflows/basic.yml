@@ -38,7 +38,7 @@ jobs:
         with:
           path: openmpi-4.0.2  # what we cache: the folder
           key: ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
-      - if: ${{ !steps.cache-ompi.outputs.cache-hit }}
+      - if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         name: Build OpenMPI
         run: |
            export CC=${{ matrix.cc }}-${{ matrix.ver }}
@@ -74,8 +74,8 @@ jobs:
           mkdir build
           cd build
           cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_CXX_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
-          make tests examples html
-          sudo make install
+          make VERBOSE=1 tests examples html
+          sudo make VERBOSE=1 install
           cd -
       - name: "Run unit tests"
         run: build/bin/unit
