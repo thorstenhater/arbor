@@ -24,6 +24,7 @@ jobs:
         CXX:        ${{ matrix.cxx }}-${{ matrix.ver }}
         PY:         python${{ matrix.py }}
         PYPATH: /usr/local/lib/python${{ matrix.py }}/site-packages/
+        PYTHONPATH: /usr/local/lib/python${{ matrix.py }}/site-packages/:  
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
