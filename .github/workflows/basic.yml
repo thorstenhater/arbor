@@ -20,9 +20,10 @@ jobs:
         cmake: ["3.12.x"]
         mpi:   ["ON"]
     env:
-        CC:  ${{ matrix.cc }}-${{ matrix.ver }}
-        CXX: ${{ matrix.cxx }}-${{ matrix.ver }}
-        PY:  python${{ matrix.py }}
+        CC:         ${{ matrix.cc }}-${{ matrix.ver }}
+        CXX:        ${{ matrix.cxx }}-${{ matrix.ver }}
+        PY:         python${{ matrix.py }}
+        PYTHONPATH: /usr/local/lib/$PY/site-packages/:${PYTHONPATH}
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
@@ -34,10 +35,10 @@ jobs:
           python-version: ${{ matrix.py }}
       - name: OpenMPI cache
         uses: actions/cache@v2
-        id: cache-ompi  # give it a name for checking the cache hit-or-not
+        id:   cache-ompi  # give it a name for checking the cache hit-or-not
         with:
           path: openmpi-4.0.2  # what we cache: the folder
-          key: ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
+          key:  ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
       - if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         name: Build OpenMPI
         run: |
@@ -56,11 +57,11 @@ jobs:
            sudo ldconfig
            cd -
       - name: Install Python packages
-        run: $PY -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
-      - name: "Clone w/ submodules"
+        run:  $PY -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
+      - name: Clone w/ submodules
         uses: actions/checkout@v2
         with:
-          submodules: "recursive"
+          submodules: recursive
       - name: Check config
         run: |
           $CC --version
@@ -78,12 +79,19 @@ jobs:
           sudo make VERBOSE=1 install
           cd -
       - name: "Run unit tests"
-        run: build/bin/unit
-      - if: ${{ matrix.mpi == 'ON' }}
-        name: "Run MPI tests"
-        run: mpirun -n 4 -oversubscribe build/bin/unit-mpi      
-      - name: "Run python tests"
-        run: PYTHONPATH="/usr/local/lib/$PY/site-packages/:${PYTHONPATH}" $PY python/test/unit/runner.py
-      - if: ${{ matrix.mpi == 'ON' }}
-        name: "Run python+MPI tests"
-        run: PYTHONPATH="/usr/local/lib/$PY/site-packages/:${PYTHONPATH}" mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
+        run:  build/bin/unit
+      - if:   ${{ matrix.mpi == 'ON' }}
+        name: Run MPI tests
+        run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi      
+      - name: Run python tests
+        run:  $PY python/test/unit/runner.py
+      - if:   ${{ matrix.mpi == 'ON' }}
+        name: Run python+MPI tests
+        run:  mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
+      - name: Run Python examples
+        run: |
+            $PY python/example/network_ring.py
+            $PY python/example/single_cell_model.py
+            $PY python/example/single_cell_recipe.py
+            $PY python/example/single_cell_multi_branch.py
+            $PY python/example/single_cell_swc.py test/unit/swc/pyramidal.swc
