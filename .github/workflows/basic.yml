@@ -90,8 +90,8 @@ jobs:
         run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: Run python tests
         run: |
-          PYTHONPATH=${PYPATH}:${PYTHONPATH} echo My Python Path is "${PYTHONPATH}"
-          PYTHONPATH=${PYPATH}:{PYTHONPATH} $PY python/test/unit/runner.py
+          PYTHONPATH="${PYPATH}:${PYTHONPATH}" echo My Python Path is ${PYTHONPATH}
+          PYTHONPATH="${PYPATH}:{PYTHONPATH}" $PY python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
         name: Run python+MPI tests
         run:  PYTHONPATH=$PYPATH:$PYTHONPATH mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
