@@ -63,7 +63,7 @@ jobs:
            sudo ldconfig
            cd -
       - name: Install Python packages
-        run:  $PY -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py
+        run:  $PY -mpip install numpy sphinx svgwrite sphinx-rtd-theme mpi4py pandas seaborn
       - name: Clone w/ submodules
         uses: actions/checkout@v2
         with:
