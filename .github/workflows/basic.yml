@@ -39,8 +39,8 @@ jobs:
         with:
           path: openmpi-4.0.2  # what we cache: the folder
           key:  ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}
-      - if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
-        name: Build OpenMPI
+      - name: Build OpenMPI
+        #if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         run: |
            export CC=${{ matrix.cc }}-${{ matrix.ver }}
            export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
