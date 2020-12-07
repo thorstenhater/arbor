@@ -52,6 +52,8 @@ jobs:
            cd -
       - name: Install OpenMPI
         run: |
+           ls
+           pwd
            cd openmpi-4.0.2
            sudo make install
            sudo ldconfig
