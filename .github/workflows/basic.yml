@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: "Generate docs"
+    name: "Default test set"
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
