@@ -23,7 +23,6 @@ jobs:
         CC:         ${{ matrix.cc }}-${{ matrix.ver }}
         CXX:        ${{ matrix.cxx }}-${{ matrix.ver }}
         PY:         python${{ matrix.py }}
-        PYPATH: /usr/local/lib/python${{ matrix.py }}/site-packages/
         PYTHONPATH: /usr/local/lib/python${{ matrix.py }}/site-packages/
     steps:
       - name: Set up cmake
@@ -90,10 +89,7 @@ jobs:
         name: Run MPI tests
         run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: Run python tests
-        run: |
-          export PYTHONPATH=$PYPATH:$PYTHONPATH
-          echo My Python Path is ${PYTHONPATH}
-          $PY python/test/unit/runner.py
+        run:  $PY python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
         name: Run python+MPI tests
         run:  PYTHONPATH=$PYPATH:$PYTHONPATH mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
