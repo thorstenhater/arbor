@@ -92,7 +92,7 @@ jobs:
         run:  $PY python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
         name: Run python+MPI tests
-        run:  PYTHONPATH=$PYPATH:$PYTHONPATH mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
+        run:  mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
       - name: Run Python examples
         run: |
             $PY python/example/network_ring.py
