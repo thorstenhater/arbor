@@ -99,7 +99,6 @@ jobs:
         run:  PYTHONPATH=$PYPATH:$PYTHONPATH mpirun -n 4 -oversubscribe $PY python/test/unit_distributed/runner.py
       - name: Run Python examples
         run: |
-            export PYTHONPATH=$PYPATH:$PYTHONPATH
             $PY python/example/network_ring.py
             $PY python/example/single_cell_model.py
             $PY python/example/single_cell_recipe.py
