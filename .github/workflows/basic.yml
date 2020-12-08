@@ -33,9 +33,16 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.py }}
+      - name: OpenMPI cache
+        uses: actions/cache@v2
+        id:   cache-ompi  # give it a name for checking the cache hit-or-not
+        with:
+          path: openmpi-4.0.2  # what we cache: the folder
+          key:  ${{ matrix.os }}-openmpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}
       - name: Build OpenMPI
         if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         run: |
+           echo ${{ steps.cache-ompi.outputs.cache-hit }}
            export CC=${{ matrix.cc }}-${{ matrix.ver }}
            export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
@@ -43,13 +50,7 @@ jobs:
            cd openmpi-4.0.2
            ./configure --disable-mpi-fortran
            make -j
-           cd -
-      - name: OpenMPI cache
-        uses: actions/cache@v2
-        id:   cache-ompi  # give it a name for checking the cache hit-or-not
-        with:
-          path: openmpi-4.0.2  # what we cache: the folder
-          key:  ${{ matrix.os }}-ompi-${{ matrix.cxx }}-${{ matrix.ver }}           
+           cd -        
       - name: Install OpenMPI
         run: |
            echo "Going to install ompi"
