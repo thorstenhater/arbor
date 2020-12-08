@@ -37,12 +37,13 @@ jobs:
         uses: actions/cache@v2
         id:   cache-ompi  # give it a name for checking the cache hit-or-not
         with:
-          path: openmpi-4.0.2  # what we cache: the folder
+          path: ${HOME}/openmpi-4.0.2
           key:  ${{ matrix.os }}-openmpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}
       - name: Build OpenMPI
         if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         run: |
-           echo ${{ steps.cache-ompi.outputs.cache-hit }}
+           echo cache-hit='${{ steps.cache-ompi.outputs.cache-hit }}'
+           cd ${HOME}
            export CC=${{ matrix.cc }}-${{ matrix.ver }}
            export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
@@ -54,7 +55,7 @@ jobs:
       - name: Install OpenMPI
         run: |
            echo "Going to install ompi"
-           cd openmpi-4.0.2
+           cd ${HOME}/openmpi-4.0.2
            sudo make install
            sudo ldconfig
            cd -
