@@ -38,14 +38,14 @@ jobs:
         id:   cache-ompi
         with:
           path: ~/openmpi-4.0.2
-          key:  ${{ matrix.os }}-openmpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}-new
+          key:  ${{ matrix.os }}-openmpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}-new-1
       - name: Build OpenMPI
         if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         run: |
            echo cache-hit='${{ steps.cache-ompi.outputs.cache-hit }}'
            cd ~
-           export CC=${{ matrix.cc }}-${{ matrix.ver }}
-           export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
+           #export CC=${{ matrix.cc }}-${{ matrix.ver }}
+           #export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
            tar -xvf ./openmpi-4.0.2.tar.gz
            cd openmpi-4.0.2
@@ -78,8 +78,8 @@ jobs:
           mkdir build
           cd build
           cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which $PY` -DARB_WITH_MPI=${{ matrix.mpi }}
-          make -j4 VERBOSE=1 tests examples html
-          sudo make VERBOSE=1 install
+          make -j4 tests examples html
+          sudo make install
           cd -
       - name: Run unit tests
         run:  build/bin/unit
