@@ -37,13 +37,13 @@ jobs:
         uses: actions/cache@v2
         id:   cache-ompi
         with:
-          path: ${HOME}/openmpi-4.0.2
-          key:  ${{ matrix.os }}-open_mpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}
+          path: ~/openmpi-4.0.2
+          key:  ${{ matrix.os }}-openmpi-4.0.2-${{ matrix.cxx }}-${{ matrix.ver }}-new
       - name: Build OpenMPI
         if: ${{ steps.cache-ompi.outputs.cache-hit != 'true' }}
         run: |
            echo cache-hit='${{ steps.cache-ompi.outputs.cache-hit }}'
-           cd ${HOME}
+           cd ~
            export CC=${{ matrix.cc }}-${{ matrix.ver }}
            export CXX=${{ matrix.cxx }}-${{ matrix.ver }}
            wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.2.tar.gz
@@ -51,11 +51,11 @@ jobs:
            cd openmpi-4.0.2
            ./configure --disable-mpi-fortran
            make -j
-           cd -        
       - name: Install OpenMPI
         run: |
            echo "Going to install ompi"
-           cd ${HOME}/openmpi-4.0.2
+           cd ~
+           cd openmpi-4.0.2
            sudo make install
            sudo ldconfig
            cd -
