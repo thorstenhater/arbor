@@ -50,7 +50,7 @@ jobs:
            tar -xvf ./openmpi-4.0.2.tar.gz
            cd openmpi-4.0.2
            ./configure --disable-mpi-fortran
-           make -j
+           make -j4
       - name: Install OpenMPI
         run: |
            echo "Going to install ompi"
