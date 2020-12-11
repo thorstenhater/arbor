@@ -89,6 +89,7 @@ jobs:
         run:  mpirun -n 4 -oversubscribe python python/test/unit_distributed/runner.py
       - name: Run Python examples
         run: |
+            pwd
             python python/example/network_ring.py
             python python/example/single_cell_model.py
             python python/example/single_cell_recipe.py
