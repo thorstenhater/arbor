@@ -86,24 +86,7 @@ jobs:
         name: Run MPI tests
         run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: Run python tests
-        run:  |
-           echo $HOME
-           echo "=== HOME ==="
-           ls $HOME
-           echo "=== HOME/work ==="
-           ls $HOME/work
-           echo "=== HOME/work/arbor ==="
-           ls $HOME/work/arbor
-           echo "=== HOME/work/arbor/arbor ==="
-           ls $HOME/work/arbor/arbor
-           echo "=== HOME/work/arbor/arbor/build ==="
-           ls $HOME/work/arbor/arbor/build
-           echo "=== HOME/work/arbor/arbor/build/python ==="
-           ls $HOME/work/arbor/arbor/build/python
-           echo "=== HOME/work/arbor/arbor/build/python/arbor ==="
-           ls /home/runner/work/arbor/arbor/build/python/arbor
-           echo "=== Run snake run ==="
-           PYTHONPATH=/home/runner/work/arbor/arbor/build/python:$PYTHONPATH python python/test/unit/runner.py
+        run:  python python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
         name: Run python+MPI tests
         run:  mpirun -n 4 -oversubscribe python python/test/unit_distributed/runner.py
