@@ -76,6 +76,9 @@ jobs:
           cd build
           cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DARB_WITH_PYTHON=ON -DPYTHON_EXECUTABLE=`which python` -DARB_WITH_MPI=${{ matrix.mpi }}
           make -j4 tests examples html
+          pwd
+          ls python
+          ls python/arbor
           cd -
       - name: Run unit tests
         run:  build/bin/unit
