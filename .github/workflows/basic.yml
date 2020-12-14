@@ -84,6 +84,12 @@ jobs:
         run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi      
       - name: Run python tests
         run:  |
+           echo $HOME
+           ls $HOME
+           ls $HOME/work
+           ls $HOME/work/arbor
+           ls $HOME/work/arbor/arbor
+           ls $HOME/work/arbor/arbor/build
            ls $PYTHONPATH
            python python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
