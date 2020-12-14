@@ -93,9 +93,13 @@ jobs:
            ls $HOME/work/arbor
            echo "=== HOME/work/arbor/arbor ==="
            ls $HOME/work/arbor/arbor
-           echo "=== build ==="
+           echo "=== HOME/work/arbor/arbor/build ==="
            ls $HOME/work/arbor/arbor/build
+           echo "=== HOME/work/arbor/arbor/build/python ==="
+           ls $HOME/work/arbor/arbor/build/python
+           echo "=== PYTHONPATH: $PYTHONPATH ==="
            ls $PYTHONPATH
+           echo "=== Run snake run ==="
            python python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
         name: Run python+MPI tests
