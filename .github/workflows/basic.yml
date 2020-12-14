@@ -85,10 +85,15 @@ jobs:
       - name: Run python tests
         run:  |
            echo $HOME
+           echo "=== HOME ==="
            ls $HOME
+           echo "=== HOME/work ==="
            ls $HOME/work
+           echo "=== HOME/work/arbor ==="
            ls $HOME/work/arbor
+           echo "=== HOME/work/arbor/arbor ==="
            ls $HOME/work/arbor/arbor
+           echo "=== build ==="
            ls $HOME/work/arbor/arbor/build
            ls $PYTHONPATH
            python python/test/unit/runner.py
