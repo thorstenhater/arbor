@@ -90,6 +90,7 @@ jobs:
       - name: Run Python examples
         run: |
             pwd
+            echo $HOME
             python python/example/network_ring.py
             python python/example/single_cell_model.py
             python python/example/single_cell_recipe.py
