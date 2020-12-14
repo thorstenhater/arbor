@@ -99,6 +99,7 @@ jobs:
            ls $HOME/work/arbor/arbor/build/python
            echo "=== PYTHONPATH: $PYTHONPATH ==="
            ls $PYTHONPATH
+           ls /home/runner/work/arbor/arbor/build/python/arbor
            echo "=== Run snake run ==="
            PYTHONPATH=/home/runner/work/arbor/arbor/build/python:$PYTHONPATH python python/test/unit/runner.py
       - if:   ${{ matrix.mpi == 'ON' }}
