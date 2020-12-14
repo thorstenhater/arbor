@@ -22,7 +22,8 @@ jobs:
     env:
         CC:         ${{ matrix.cc }}-${{ matrix.ver }}
         CXX:        ${{ matrix.cxx }}-${{ matrix.ver }}
-        PYTHONPATH: /usr/local/lib/python${{ matrix.py }}/site-packages/
+        # We set PYTHONPATH instead of installing to avoid distribution/OS specific behaviour.
+        PYTHONPATH: ~/work/arbor/arbor/build/python
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
@@ -89,8 +90,6 @@ jobs:
         run:  mpirun -n 4 -oversubscribe python python/test/unit_distributed/runner.py
       - name: Run Python examples
         run: |
-            pwd
-            echo $HOME
             python python/example/network_ring.py
             python python/example/single_cell_model.py
             python python/example/single_cell_recipe.py
