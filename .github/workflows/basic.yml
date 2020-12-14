@@ -23,7 +23,7 @@ jobs:
         CC:         ${{ matrix.cc }}-${{ matrix.ver }}
         CXX:        ${{ matrix.cxx }}-${{ matrix.ver }}
         # We set PYTHONPATH instead of installing to avoid distribution/OS specific behaviour.
-        PYTHONPATH: $HOME/work/arbor/arbor/build/python
+        PYTHONPATH: ~/work/arbor/arbor/build/python
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.4
