@@ -6,6 +6,7 @@
  * event generators, one inhibitory, and one excitatory, are attached.
  */
 
+#include <any>
 #include <cassert>
 #include <fstream>
 #include <iomanip>
@@ -47,22 +48,22 @@ public:
     //    capacitance: 0.01 F/m² [default]
     //    synapses: 1 * expsyn
     arb::util::unique_any get_cell_description(cell_gid_type gid) const override {
-        arb::sample_tree tree;
+        arb::segment_tree tree;
         double r = 18.8/2.0; // convert 18.8 μm diameter to radius
-        tree.append({{0,0,0,r}, 1});
+        tree.append(arb::mnpos, {0,0,-r,r}, {0,0,r,r}, 1);
 
-        arb::label_dict d;
-        d.set("soma", arb::reg::tagged(1));
+        arb::label_dict labels;
+        labels.set("soma", arb::reg::tagged(1));
 
-        arb::cable_cell c(tree, d);
-        c.paint("soma", "pas");
+        arb::decor decor;
+        decor.paint("\"soma\"", "pas");
 
         // Add one synapse at the soma.
         // This synapse will be the target for all events, from both
         // event_generators.
-        c.place(arb::mlocation{0, 0.5}, "expsyn");
+        decor.place(arb::mlocation{0, 0.5}, "expsyn");
 
-        return std::move(c);
+        return arb::cable_cell(tree, labels, decor);
     }
 
     cell_kind get_cell_kind(cell_gid_type gid) const override {
@@ -70,7 +71,7 @@ public:
         return cell_kind::cable;
     }
 
-    arb::util::any get_global_properties(arb::cell_kind) const override {
+    std::any get_global_properties(arb::cell_kind) const override {
         arb::cable_cell_global_properties gprop;
         gprop.default_parameters = arb::neuron_parameter_defaults;
         return gprop;

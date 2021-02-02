@@ -1,3 +1,4 @@
+#include <any>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -13,14 +14,14 @@
 #include <arbor/morph/region.hpp>
 #include <arbor/simulation.hpp>
 #include <arbor/sampling.hpp>
-#include <arbor/util/any.hpp>
+#include <arbor/util/any_cast.hpp>
 #include <arbor/util/any_ptr.hpp>
 #include <tinyopt/smolopt.h>
 
 // Simulate a cell modelled as a simple cable with HH dynamics,
 // emitting the results of a user specified probe over time.
 
-using arb::util::any;
+using std::any;
 using arb::util::any_cast;
 using arb::util::any_ptr;
 
@@ -108,21 +109,22 @@ struct cable_recipe: public arb::recipe {
         return arb::cell_kind::cable;
     }
 
-    arb::util::any get_global_properties(arb::cell_kind) const override {
+    any get_global_properties(arb::cell_kind) const override {
         return gprop;
     }
 
     arb::util::unique_any get_cell_description(arb::cell_gid_type) const override {
-        using namespace arb;
         const double length = 1000; // [µm]
-        const double diam = 1; // [µm]
+        const double diam   = 1;    // [µm]
 
-        sample_tree samples({msample{0, 0, 0, 0.5*diam}, msample{length, 0, 0, 0.5*diam}}, {mnpos, 0u});
-        cable_cell c(samples);
+        arb::segment_tree tree;
+        tree.append(arb::mnpos, {0, 0, 0, 0.5*diam}, {length, 0, 0, 0.5*diam}, 1);
 
-        c.paint(reg::all(), "hh"); // HH mechanism over whole cell.
-        c.place(mlocation{0, 0.}, i_clamp{0., INFINITY, 1.}); // Inject a 1 nA current indefinitely.
-        return c;
+        arb::decor decor;
+        decor.paint(arb::reg::all(), "hh"); // HH mechanism over whole cell.
+        decor.place(arb::mlocation{0, 0.}, arb::i_clamp{0., INFINITY, 1.}); // Inject a 1 nA current indefinitely.
+
+        return arb::cable_cell(tree, {}, decor);
     }
 };
 

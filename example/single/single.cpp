@@ -1,3 +1,4 @@
+#include <any>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -8,10 +9,11 @@
 #include <arbor/load_balance.hpp>
 #include <arbor/cable_cell.hpp>
 #include <arbor/morph/morphology.hpp>
-#include <arbor/morph/sample_tree.hpp>
-#include <arbor/swcio.hpp>
+#include <arbor/morph/segment_tree.hpp>
 #include <arbor/simulation.hpp>
 #include <arbor/simple_sampler.hpp>
+
+#include <arborio/swcio.hpp>
 
 #include <tinyopt/tinyopt.h>
 
@@ -50,7 +52,7 @@ struct single_recipe: public arb::recipe {
         return arb::cell_kind::cable;
     }
 
-    arb::util::any get_global_properties(arb::cell_kind) const override {
+    std::any get_global_properties(arb::cell_kind) const override {
         return gprop;
     }
 
@@ -59,19 +61,20 @@ struct single_recipe: public arb::recipe {
         using arb::reg::tagged;
         dict.set("soma", tagged(1));
         dict.set("dend", join(tagged(3), tagged(4), tagged(42)));
-        arb::cable_cell c(morpho, dict);
+
+        arb::decor decor;
 
         // Add HH mechanism to soma, passive channels to dendrites.
-        c.paint("soma", "hh");
-        c.paint("dend", "pas");
+        decor.paint("\"soma\"", "hh");
+        decor.paint("\"dend\"", "pas");
 
         // Add synapse to last branch.
 
-        arb::cell_lid_type last_branch = c.morphology().num_branches()-1;
+        arb::cell_lid_type last_branch = morpho.num_branches()-1;
         arb::mlocation end_last_branch = { last_branch, 1. };
-        c.place(end_last_branch, "exp2syn");
+        decor.place(end_last_branch, "exp2syn");
 
-        return c;
+        return arb::cable_cell(morpho, dict, decor);
     }
 
     arb::morphology morpho;
@@ -128,7 +131,7 @@ options parse_options(int argc, char** argv) {
             opt.swc_file = swc.value();
         }
         else if (auto nseg = parse<unsigned>(arg, 'n', "cv-per-branch")) {
-            opt.policy = arb::cv_policy_fixed_per_branch(nseg.value(), arb::cv_policy_flag::single_root_cv);
+            opt.policy = arb::cv_policy_fixed_per_branch(nseg.value());
         }
         else {
             usage(argv[0], "[-m|--morphology SWCFILE] [-d|--dt TIME] [-t|--t-end TIME] [-w|--weight WEIGHT] [-n|--cv-per-branch N]");
@@ -144,18 +147,17 @@ options parse_options(int argc, char** argv) {
 // to 0.2 µm.
 
 arb::morphology default_morphology() {
-    arb::sample_tree samples;
+    arb::segment_tree tree;
 
-    auto p = samples.append(arb::msample{{  0.0, 0.0, 0.0, 6.3}, 1});
-    p = samples.append(p, arb::msample{{  6.3, 0.0, 0.0, 0.5}, 3});
-    p = samples.append(p, arb::msample{{206.3, 0.0, 0.0, 0.2}, 3});
+    tree.append(arb::mnpos, { -6.3, 0.0, 0.0, 6.3}, {  6.3, 0.0, 0.0, 6.3}, 1);
+    tree.append(         0, {  6.3, 0.0, 0.0, 0.5}, {206.3, 0.0, 0.0, 0.2}, 3);
 
-    return arb::morphology(std::move(samples));
+    return arb::morphology(tree);
 }
 
 arb::morphology read_swc(const std::string& path) {
     std::ifstream f(path);
     if (!f) throw std::runtime_error("unable to open SWC file: "+path);
 
-    return arb::morphology(arb::swc_as_sample_tree(arb::parse_swc_file(f)));
+    return arborio::load_swc_arbor(arborio::parse_swc(f));
 }

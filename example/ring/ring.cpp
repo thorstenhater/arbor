@@ -3,6 +3,7 @@
  *
  */
 
+#include <any>
 #include <cassert>
 #include <fstream>
 #include <iomanip>
@@ -43,7 +44,7 @@ struct ring_params {
     std::string name = "default";
     unsigned num_cells = 10;
     double min_delay = 10;
-    double duration = 100;
+    double duration = 200;
     cell_parameters cell;
 };
 
@@ -115,7 +116,7 @@ public:
         return {arb::cable_probe_membrane_voltage{loc}};
     }
 
-    arb::util::any get_global_properties(arb::cell_kind) const override {
+    std::any get_global_properties(arb::cell_kind) const override {
         return gprop_;
     }
 
@@ -229,6 +230,9 @@ int main(int argc, char** argv) {
             write_trace_json(voltage.at(0));
         }
 
+        auto profile = arb::profile::profiler_summary();
+        std::cout << profile << "\n";
+
         auto report = arb::profile::make_meter_report(meters, context);
         std::cout << report;
     }
@@ -282,7 +286,7 @@ ring_params read_options(int argc, char** argv) {
     }
 
     nlohmann::json json;
-    json << f;
+    f >> json;
 
     param_from_json(params.name, "name", json);
     param_from_json(params.num_cells, "num-cells", json);
