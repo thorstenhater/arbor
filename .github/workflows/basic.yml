@@ -136,7 +136,6 @@ jobs:
       - name: Run python tests
         run:  |
           export PYTHONPATH=/home/runner/work/arbor/arbor/build/python
-          ls $PYTHONPATH
           pwd
           ls
           ls /home/runner/
@@ -144,6 +143,7 @@ jobs:
           ls /home/runner/work/arbor
           ls /home/runner/work/arbor/arbor
           ls /home/runner/work/arbor/arbor/build
+          ls $PYTHONPATH
           python python/test/unit/runner.py
       - if:   ${{ matrix.config.mpi == 'ON' }}
         name: Run python+MPI tests
