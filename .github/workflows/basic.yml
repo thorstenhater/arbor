@@ -135,14 +135,6 @@ jobs:
         run:  mpirun -n 4 -oversubscribe build/bin/unit-mpi
       - name: Run python tests
         run:  |
-          export PYTHONPATH=/home/runner/work/arbor/arbor/build/python
-          pwd
-          ls
-          ls /home/runner/
-          ls /home/runner/work
-          ls /home/runner/work/arbor
-          ls /home/runner/work/arbor/arbor
-          ls /home/runner/work/arbor/arbor/build
           ls $PYTHONPATH
           python python/test/unit/runner.py
       - if:   ${{ matrix.config.mpi == 'ON' }}
