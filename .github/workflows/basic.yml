@@ -71,7 +71,7 @@ jobs:
         CC:         ${{ matrix.config.cc }}
         CXX:        ${{ matrix.config.cxx }}
         # We set PYTHONPATH instead of installing arbor to avoid distribution/OS specific behaviour.
-        PYTHONPATH: $GITHUB_WORKSPACE/build/python:$PYTHONPATH
+        PYTHONPATH: "$GITHUB_WORKSPACE/build/python:$PYTHONPATH"
     steps:
       - name: Poke PyPath
         run: echo $PYTHONPATH
