@@ -264,7 +264,11 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         }
     }
 
-    //trace vectors for recording voltages
+    // trace vectors for recording voltages
+    // data layout
+    //  mechanism id -> [[U]]
+    //                   ^  ^-- steps
+    //                    \---- GJ CV voltage, once per connection from this CV
     std::unordered_map<arb_index_type, std::vector<std::vector<arb_value_type>>> trace, trace_prev;
 
     threshold_watcher threshold_watcher_reset = threshold_watcher_;
@@ -292,10 +296,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
     //WR iterations
     int wr_max = 1;
     auto eps = 1e-7;
-    for (int wr_it = 0; wr_it < wr_max; wr_it++){
-
-        //std::cout << "Start WR" << std::endl;
-
+    for (int wr_it = 0; wr_it < wr_max; wr_it++) {
         // Reset remaining_steps
         if (wr_it > 0) {
             remaining_steps = dt_steps(tmin_reset, tfinal_reset, dt_max_reset);
@@ -308,7 +309,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
         threshold_watcher_ = threshold_watcher_reset;
 
         while (remaining_steps) {
-            auto step = max_steps-remaining_steps;
+            auto step = max_steps - remaining_steps;
             
             // Update any required reversal potentials based on ionic concs.
             for (auto& m: revpot_mechanisms_) {
@@ -333,56 +334,79 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
                 events.events    = (arb_deliverable_event_data*) state.ev_data; // FIXME(TH): This relies on bit-castability
                 m->deliver_events(events);
 
-                // Map peer_index to position in trace
+                // index_to_cell: translate global CV index to cell gid
+
                 if (m->kind() == arb_mechanism_kind_gap_junction) {
 
+                    auto& ppack = m->ppack_;
+                    auto& pidx  = ppack.peer_index;
+                    auto& nidx  = ppack.node_index;
+
+                    std::vector<arb_index_type> peer_ix(ppack.width, 0);
+
                     if (wr_it == 0 && step == 0) {
-                        // iterate through peer indices and check if in same group as node
-                        // if not, set peer = node for guess
+                        std::cerr << "Setting up index mappings #p=" << peer_ix.size() << " #pg=" << peer_ix_group.size() << '\n';
+                        for (int i = 0; i<ppack.width; ++i) {
+                            node_ix_group.push_back(std::get<2>(index_to_cell[nidx[i]]));
+                        }
 
-                        std::vector<int> peer_guess;
-                        for (auto ix = 0; ix < m->ppack_.width; ++ix) {
-                            int node = m->ppack_.node_index[ix];
-                            int peer = m->ppack_.peer_index[ix];
-                            if (std::find(node_arr.begin(), node_arr.end(), peer) != node_arr.end()){
-                                peer_guess.push_back(remove_cv_offset(peer, node_arr));
-                            } else {
-                                peer_guess.push_back(remove_cv_offset(node, node_arr));
+                        for (int i = 0; i<ppack.width; ++i) {
+                            auto cg_node = std::get<1>(index_to_cell[nidx[i]]);
+                            auto cg_peer = std::get<1>(index_to_cell[pidx[i]]);
+                            std::cout << "cell_group node = " << cg_node << " cell_group peer = " << cg_peer << std::endl;
+                            std::cout << " tmin = " << tmin_ << std::endl;
+                            if (cg_peer == cg_node) { // We are local to local
+                                peer_ix_group.push_back(std::get<2>(index_to_cell[pidx[i]]));
+                            }
+                            else {
+                                peer_ix_group.push_back(std::get<2>(index_to_cell[nidx[i]]));
                             }
                         }
 
-                        std::unordered_map<arb_index_type, std::deque<arb_index_type>> peer_pos;
-                        for (auto ix = 0; ix < m->ppack_.width; ++ix) {
-                            peer_pos[m->ppack_.node_index[ix]].push_back(ix);
-                        }
-                        for (auto it = 0; it < m->ppack_.width; ++it) {
-                            auto p = peer_guess[it];
-                            peer_ix.push_back(peer_pos[p][0]);
-                            peer_pos[p].pop_front();
-                        }
+                        // Setup peer indices
+                        //  * peer_ix:       indices into the trace, to be consumed after the first WR iteration has recorded one
+                        //  * peer_ix_group: indices into the *local* voltage array, s.t. the i'th CV get its own voltage back since
+                        //                   we assume zero differential for the first iteration
+                        peer_ix.clear();
+                        peer_ix.resize(ppack.width);
 
-                        if (cell_group == 1) {
-                            for (auto ix: peer_ix) {
-                                std::cout << ix << " ";
+                        for (int ix = 0; ix < ppack.width; ++ix) {
+                            if (true /* TODO decide whether we are local-local */) {
+                                const auto& nodes = ppack.node_index;
+                                auto len    = ppack.width;
+                                // TODO use the correct index arrays here
+                                auto peer   = ppack.peer_index[ix];
+                                auto node   = std::find(nodes, nodes + len, peer);
+                                auto offset = std::distance(nodes, node);
+                                if (offset >= len) throw std::runtime_error("Connection not found.");
+                                peer_ix[ix] = offset;
                             }
-                            std::cout << std::endl;
+                            else {
+                                throw std::runtime_error("Non-local connectivity is not implemented yet.");
+                            }
                         }
 
+                        std::cerr << "m_id=" << m->mechanism_id() << '\n';
+                        for (int ix = 0; ix < ppack.width; ++ix) std::cerr << " * " << peer_ix[ix] << '\n';
                     }
-                    // Use trace_prev for gj current calculation
-                    m->ppack_.peer_index = peer_ix.data();
-                    
-                    if (wr_it == 0){
-                        std::vector<value_type> v_step;
-                        for (auto ix = 0; ix<m->ppack_.width; ++ix) {
-                            v_step.push_back(state_->voltage[ix]);
+
+                    // TH: Why only step=0
+                    if (step == 0) {
+                        // in iteration=0 we do not have a trace yet
+                        if (wr_it == 0) {
+                            // Peer index in this group?
+                            // Q: Didn't we want to have the identity here, ie i --> i, instead of the peer index?
+                            // A: Yes, indeed peer_ix_group is either the local peer index or the identity, if not local
+                            pidx = peer_ix_group.data();
                         }
-                        m->ppack_.vec_v_peer = v_step.data();
-                    }
-                    
-                    if (wr_it > 0) {
-                        auto gj = m->mechanism_id();
-                        m->ppack_.vec_v_peer = trace_prev[gj][step].data();
+                        else {
+                            auto gj = m->mechanism_id();
+                            // Here we expect peer_ix to be the index into the trace structure, regardlees of local
+                            // or not. However, the selection of the trace must take locality into account.
+                            // Q: How to select?
+                            pidx = peer_ix.data();
+                            ppack.vec_v_peer = trace_prev[gj][step].data();
+                        }
                     }
                 }
                 
@@ -390,9 +414,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
 
                 //update traces
                 if (m->kind() == arb_mechanism_kind_gap_junction) {
-                        std::cout << "write trace at step = " << step << std::endl;
-                    }
-
+                    //write trace
                     auto gj = m->mechanism_id();
                     std::vector<value_type> v_step(m->ppack_.width, 0.);
     
@@ -401,18 +423,6 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(
                         v_step[ix] = state_->voltage[node_cv];
                     }
                     trace[gj].push_back(v_step);
-                    
-                    // Calculate error for break condition
-                    /*
-                    if (wr_it > 1) {
-                        for (auto ix = 0; ix < trace[gj][step].size(); ++ ix){
-                            auto node_cv = m->ppack_.node_index[ix];
-                            auto err_cv = std::abs(trace[gj][step][node_cv] - trace_prev[gj][step][node_cv]);
-                            if (err_cv > max_err) {
-                                max_err = err_cv;
-                            }
-                        }
-                    }*/
                 }
             }
 

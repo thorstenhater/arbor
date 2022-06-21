@@ -20,6 +20,9 @@
 
 namespace arb {
 
+// NB. Maybe to general of a name
+using cell_id = std::tuple<int, int, int, int>;
+
 // CV geometry as determined by per-cell CV boundary points.
 //
 // Details of CV cable representation:
@@ -294,6 +297,33 @@ ARB_ARBOR_API std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> f
     const std::unordered_map<cell_member_type, fvm_size_type>& gj_cv,
     const recipe& rec);
 
+<<<<<<< Updated upstream
+=======
+
+ARB_ARBOR_API std::map<cell_id, int> fvm_cell_to_index(
+    const std::vector<int>& gids,
+    const std::vector<int>& cgs,
+    const std::vector<int>& cvs,
+    const std::vector<int>& lids);
+
+ARB_ARBOR_API std::map<int, cell_id> fvm_index_to_cell(
+    const std::map<cell_id, int>& cell_to_index);
+
+ARB_ARBOR_API std::unordered_map<cell_member_type, fvm_size_type> fvm_index_to_cv_map(
+    const std::vector<int>& gids,
+    const std::vector<int>& lids,
+    const std::vector<int>& cgs,
+    const std::vector<int>& cvs,
+    const std::map<cell_id, int>& cell_to_index);
+
+// 1) split cg cv map into 4 arrays
+ARB_ARBOR_API std::vector<std::vector<int>> fvm_build_gap_junction_cv_arr(
+    const std::vector<cable_cell>& cells,
+    const std::vector<cell_gid_type>& gids,
+    unsigned cg,
+    const fvm_cv_discretization& D);
+
+>>>>>>> Stashed changes
 struct fvm_mechanism_data {
     // Mechanism config, indexed by mechanism name.
     std::unordered_map<std::string, fvm_mechanism_config> mechanisms;

@@ -677,6 +677,7 @@ ARB_ARBOR_API std::unordered_map<cell_member_type, cell_member_type> fvm_build_g
     return gj_cg_cvs;
 }
 
+<<<<<<< Updated upstream
 ARB_ARBOR_API int remove_cv_offset(
     const int cv_offset,
     const std::vector<int> nodes)
@@ -688,10 +689,27 @@ ARB_ARBOR_API int remove_cv_offset(
         if(nodes[i] == cv_offset){
             cv = i;
         }
+=======
+//3) index map function 
+
+ARB_ARBOR_API std::map<cell_id, int> fvm_cell_to_index(
+    const std::vector<int>& gids,
+    const std::vector<int>& cgs,
+    const std::vector<int>& cvs,
+    const std::vector<int>& lids
+)
+{
+    std::map<cell_id, int> cell_to_index;
+
+    for (int i = 0; i<gids.size(); ++i) {
+        cell_id element{gids[i], cgs[i], cvs[i], lids[i]};
+        cell_to_index[element] = i;
+>>>>>>> Stashed changes
     }
     return cv;
 }
 
+<<<<<<< Updated upstream
 
 //ARB_ARBOR_API std::unordered_map<cell_member_type, unsigned> fvm_convert_cv(
 ARB_ARBOR_API std::vector<int> fvm_convert_cv(
@@ -724,6 +742,30 @@ ARB_ARBOR_API std::unordered_map<cell_member_type, fvm_size_type> fvm_convert_cv
         }
     }
     return gcv_map;
+=======
+ARB_ARBOR_API std::map<int, cell_id> fvm_index_to_cell(const std::map<cell_id, int>& cell_to_index) {
+    std::map<int, cell_id> index_to_cell;
+    for (const auto& [value, index]: cell_to_index) {
+        index_to_cell[index] = value;
+    }
+    return index_to_cell;
+}
+
+ARB_ARBOR_API std::unordered_map<cell_member_type, fvm_size_type> fvm_index_to_cv_map(
+    const std::vector<int>& gids,
+    const std::vector<int>& lids,
+    const std::vector<int>& cgs,
+    const std::vector<int>& cvs,
+    const std::map<cell_id, int>& cell_to_index
+) {
+    std::unordered_map<cell_member_type, fvm_size_type> gj_cvs_index;
+    for (int i = 0; i<gids.size(); ++i){
+        cell_id cell = {gids[i], cgs[i], cvs[i], lids[i]};
+        int index = cell_to_index.at(cell);
+        gj_cvs_index.insert({cell_member_type{unsigned(gids[i]), unsigned(lids[i])}, unsigned(index)});
+    }
+    return gj_cvs_index;
+>>>>>>> Stashed changes
 }
 
 ARB_ARBOR_API std::unordered_map<cell_member_type, fvm_size_type> fvm_build_gap_junction_cv_map(

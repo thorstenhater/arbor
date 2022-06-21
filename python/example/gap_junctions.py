@@ -47,8 +47,8 @@ def make_cable_cell(gid):
 
     # Paint dynamics onto the cell, hh on soma and passive properties on dendrite
     decor = arbor.decor()
-    decor.paint('"soma"', arbor.density("hh"))
-    decor.paint('"dend"', arbor.density("pas"))
+    # decor.paint('"soma"', arbor.density("hh"))
+    # decor.paint('"dend"', arbor.density("pas"))
 
     # Attach one synapse and gap junction each on their labeled sites
     decor.place('"synapse_site"', arbor.synapse('expsyn'), 'syn')
@@ -149,7 +149,9 @@ recipe = chain_recipe(ncells_per_chain, nchains)
 #sim = arbor.simulation(recipe, decomp, context)
 
 alloc   = arbor.proc_allocation(1, None)
-comm    = arbor.mpi_comm(mpi.COMM_WORLD)
+world   = mpi.COMM_WORLD
+print(world.size, world.rank)
+comm    = arbor.mpi_comm()
 context = arbor.context(alloc, comm)
 print(context)
 groups = [arbor.group_description(arbor.cell_kind.cable, [0], arbor.backend.multicore), arbor.group_description(arbor.cell_kind.cable, [1], arbor.backend.multicore), arbor.group_description(arbor.cell_kind.cable, [2], arbor.backend.multicore), arbor.group_description(arbor.cell_kind.cable, [3], arbor.backend.multicore)]
