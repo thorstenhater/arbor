@@ -680,11 +680,11 @@ ARB_ARBOR_API epoch_function epoch_progress_bar() {
     return impl{};
 }
 
-void serialize(serializer& s, const std::string& k, const simulation& v) {
+ARB_ARBOR_API void serialize(serializer& s, const std::string& k, const simulation& v) {
     serialize(s, k, v.impl_);
 }
 
-void deserialize(serializer& s, const std::string& k, simulation& v) {
+ARB_ARBOR_API void deserialize(serializer& s, const std::string& k, simulation& v) {
     deserialize(s, k, v.impl_);
 }
 

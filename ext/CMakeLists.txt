@@ -9,7 +9,6 @@ endif()
 
 # Random123 (DE Shaw Research) counter-based random number generators (header-only)
 
-add_library(ext-random123 INTERFACE)
 if(ARB_USE_BUNDLED_RANDOM123)
     check_git_submodule(random123 random123)
     if(NOT random123_avail)
