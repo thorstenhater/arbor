@@ -70,6 +70,8 @@ public:
         }
     }
 
+    arb::cell_gid_type get_population(arb::cell_gid_type) const override { return 0; }
+
     std::any get_global_properties(cell_kind kind) const override { return gprop; }
     cell_size_type num_cells() const override { return num_cells_; }
     cell_kind get_cell_kind(cell_gid_type gid) const override { return cell_kind::cable; }
@@ -219,8 +221,14 @@ int main(int argc, char** argv) {
         ring_recipe recipe(params);
         cell_stats stats(recipe);
         if (root) std::cout << stats << "\n";
+        auto ddc = arb::partition_load_balance(recipe,
+                                               context,
+                                               {{arb::cell_kind::cable,
+                                                 arb::partition_hint{arb::partition_hint::max_size,
+                                                                     arb::partition_hint::max_size,
+                                                                     true}}});
         // Construct the model.
-        arb::simulation sim(recipe, context);
+        arb::simulation sim(recipe, context, ddc);
 
         // Set up the probe that will measure voltage in the cell.
 

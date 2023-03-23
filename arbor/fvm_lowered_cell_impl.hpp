@@ -346,11 +346,18 @@ fvm_detector_info get_detector_info(arb_size_type max,
     return { max, std::move(cv), std::move(threshold), ctx };
 }
 
+// Apply functor to all elements of a sequence using the thread pool from context
+template <typename F, typename S, typename C>
+auto pforeach(S& seq, C& ctx, F fun) {
+    return threading::parallel_for::apply(0, seq.size(),
+                                          ctx.thread_pool.get(),
+                                          [&] (auto ix) { return fun(seq[ix]); });
+}
+
 template <typename Backend>
-fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
-    const std::vector<cell_gid_type>& gids,
-    const recipe& rec)
-{
+fvm_initialization_data
+fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gids,
+                                           const recipe& rec) {
     using std::any_cast;
     using util::count_along;
     using util::make_span;
@@ -361,20 +368,28 @@ fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
 
     set_gpu();
 
-    std::vector<cable_cell> cells;
     const std::size_t ncell = gids.size();
 
-    cells.resize(ncell);
-    threading::parallel_for::apply(0, gids.size(), context_.thread_pool.get(),
-           [&](cell_size_type i) {
-               auto gid = gids[i];
-               try {
-                   cells[i] = any_cast<cable_cell&&>(rec.get_cell_description(gid));
-               }
-               catch (std::bad_any_cast&) {
-                   throw bad_cell_description(rec.get_cell_kind(gid), gid);
-               }
-           });
+    std::vector<cable_cell> cells(ncell);
+    std::vector<cell_gid_type> pops; pops.reserve(ncell);
+    for (auto gid: gids) pops.emplace_back(rec.get_population(gid));
+
+    auto populations = fvm_population_info{pops};
+
+    // Now walk the lists in parallel at two levels, instantiating each
+    // population *once* and then copy it into all slots mandated by the index
+    // list.
+    pforeach(populations.prototypes, context_,
+             [&](int pop) {
+                 const auto& instances = populations.indices[pop];
+                 try {
+                     auto cell = any_cast<cable_cell&&>(rec.get_cell_description(pop));
+                     pforeach(instances, context_, [&] (auto& ix) { cells[ix] = cell; });
+                 }
+                 catch (std::bad_any_cast&) {
+                     throw bad_cell_description(rec.get_cell_kind(pop), pop);
+                 }
+             });
 
     // Populate source, target and gap_junction data vectors.
     for (auto i : util::make_span(ncell)) {
@@ -426,7 +441,7 @@ fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
         return catalogue.instance(backend::kind, name);
     };
 
-    // Check for physically reasonable membrane volages?
+    // Check for physically reasonable membrane voltages?
 
     check_voltage_mV_ = global_props.membrane_voltage_limit_mV;
 
@@ -434,7 +449,7 @@ fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
 
     // Discretize cells, build matrix.
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, global_props.default_parameters, context_);
+    fvm_cv_discretization D = fvm_cv_discretize(cells, populations, global_props.default_parameters, context_);
 
     std::vector<index_type> cv_to_intdom(D.size());
     std::transform(D.geometry.cv_to_cell.begin(), D.geometry.cv_to_cell.end(), cv_to_intdom.begin(),
@@ -449,7 +464,7 @@ fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
 
     // Discretize mechanism data.
 
-    fvm_mechanism_data mech_data = fvm_build_mechanism_data(global_props, cells, gids, gj_conns, D, context_);
+    fvm_mechanism_data mech_data = fvm_build_mechanism_data(global_props, cells, gids, populations, gj_conns, D, context_);
 
     // Fill src_to_spike and cv_to_cell vectors only if mechanisms with post_events implemented are present.
     post_events_ = mech_data.post_events;
@@ -623,7 +638,6 @@ fvm_initialization_data fvm_lowered_cell_impl<Backend>::initialize(
                 throw invalid_mechanism_kind(config.kind);
         }
     }
-
 
     std::vector<fvm_probe_data> probe_data;
 

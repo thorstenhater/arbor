@@ -309,7 +309,7 @@ TEST(fvm_lowered, stimulus) {
     cable_cell_global_properties gprop;
     gprop.default_parameters = neuron_parameter_defaults;
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters, *context);
+    fvm_cv_discretization D = fvm_cv_discretize(cells, {{0}}, gprop.default_parameters, *context);
     const auto& A = D.cv_area;
 
     fvm_cell fvcell(*context);
@@ -372,7 +372,7 @@ TEST(fvm_lowered, ac_stimulus) {
     cable_cell_global_properties gprop;
     gprop.default_parameters = neuron_parameter_defaults;
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters, *context);
+    fvm_cv_discretization D = fvm_cv_discretize(cells, {{0}}, gprop.default_parameters, *context);
     const auto& A = D.cv_area;
 
     fvm_cell fvcell(*context);

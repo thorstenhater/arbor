@@ -9,6 +9,8 @@
 #include <memory>
 #include <string>
 
+#include <iostream>
+
 #include <arbor/arbexcept.hpp>
 #include <arbor/cable_cell.hpp>
 #include <arbor/iexpr.hpp>
@@ -442,18 +444,30 @@ ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const cable_cell& cell, co
     return D;
 }
 
-ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const std::vector<cable_cell>& cells,
-    const cable_cell_parameter_set& global_defaults,
-    const arb::execution_context& ctx)
-{
-    std::vector<fvm_cv_discretization> cell_disc(cells.size());
-    threading::parallel_for::apply(0, cells.size(), ctx.thread_pool.get(),
-          [&] (int i) { cell_disc[i]=fvm_cv_discretize(cells[i], global_defaults);});
+// Apply functor to all elements of a sequence using the thread pool from context
+template <typename F, typename S, typename C>
+auto pforeach(S& seq, C& ctx, F fun) {
+    return threading::parallel_for::apply(0, seq.size(),
+                                          ctx.thread_pool.get(),
+                                          [&] (auto ix) { return fun(seq[ix]); });
+}
 
+ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const std::vector<cable_cell>& cells,
+                                                      const fvm_population_info& pop,
+                                                      const cable_cell_parameter_set& global_defaults,
+                                                      const arb::execution_context& ctx) {
+    std::vector<fvm_cv_discretization> cell_disc(cells.size());
+    pforeach(pop.prototypes, ctx,
+             [&] (int pix) {
+                 const auto& instances = pop.indices.at(pix);
+                 const auto& cell = cells[instances.front()];
+                 auto disc = fvm_cv_discretize(cell, global_defaults);
+                 pforeach(instances, ctx, [&] (auto in) { cell_disc[in] = disc; });
+             });
+
+    // fold the results into a single CV discretization.
     fvm_cv_discretization combined;
-    for (auto cell_idx: count_along(cells)) {
-        append(combined, cell_disc[cell_idx]);
-    }
+    for (const auto& cell: cell_disc) append(combined, cell);
     return combined;
 }
 
@@ -902,18 +916,30 @@ fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& 
 ARB_ARBOR_API fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& gprop,
                                                           const std::vector<cable_cell>& cells,
                                                           const std::vector<cell_gid_type>& gids,
+                                                          const fvm_population_info& pop,
                                                           const std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>>& gj_conns,
                                                           const fvm_cv_discretization& D,
                                                           const execution_context& ctx) {
     std::vector<fvm_mechanism_data> cell_mech(cells.size());
+#if 0
     threading::parallel_for::apply(0, cells.size(), ctx.thread_pool.get(), [&] (int i) {
         cell_mech[i] = fvm_build_mechanism_data(gprop, cells[i], gj_conns.at(gids[i]), D, i);
     });
+#else
+    std::cerr << "prototypes=" << pop.prototypes.size() << '\n';
+    for (const auto& [k, v]: pop.indices) std::cerr << "pop=" << k << " count=" << v.size() << '\n';
 
+    pforeach(pop.prototypes, ctx,
+             [&] (int pix) {
+                 const auto& instances = pop.indices.at(pix);
+                 auto idx = instances.front();
+                 const auto& cell = cells[idx];
+                 auto mech = fvm_build_mechanism_data(gprop, cell, gj_conns.at(gids[idx]), D, idx);
+                 pforeach(instances, ctx, [&] (auto in) { cell_mech[in] = mech; });
+             });
+#endif
     fvm_mechanism_data combined;
-    for (auto cell_idx: count_along(cells)) {
-        append(combined, cell_mech[cell_idx]);
-    }
+    for (const auto& mech: cell_mech) append(combined, mech);
     return combined;
 }
 

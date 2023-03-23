@@ -98,10 +98,12 @@ struct ARB_ARBOR_API connectivity: public has_synapses, has_generators {
 struct ARB_ARBOR_API recipe: public has_gap_junctions, has_probes, connectivity {
     // number of cells to build
     virtual cell_size_type num_cells() const = 0;
-    // Cell description type will be specific to cell kind of cell with given gid.
-    virtual util::unique_any get_cell_description(cell_gid_type gid) const = 0;
-    // Query cell kind per gid
-    virtual cell_kind get_cell_kind(cell_gid_type) const = 0;
+    // Cell description type will be specific to cell kind of cell with given population id.
+    virtual util::unique_any get_cell_description(cell_gid_type pop) const = 0;
+    // Return population id by gid; defaults to each gid being its own population
+    virtual cell_gid_type get_population(cell_gid_type gid) const { return gid; }
+    // Query cell kind per population
+    virtual cell_kind get_cell_kind(cell_gid_type pop) const = 0;
     // Global property type will be specific to given cell kind.
     virtual std::any get_global_properties(cell_kind) const { return std::any{}; };
 

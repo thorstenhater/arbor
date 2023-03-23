@@ -47,6 +47,8 @@ namespace {
     struct system {
         std::vector<soma_cell_builder> builders;
         std::vector<cable_cell_description> descriptions;
+        std::vector<cell_gid_type> gids;
+        fvm_population_info pops;
 
         std::vector<arb::cable_cell> cells() const {
             std::vector<arb::cable_cell> C;
@@ -132,6 +134,9 @@ namespace {
             descriptions.push_back(desc);
         }
 
+        s.gids = {0, 1};
+        s.pops = {s.gids};
+
         return s;
     }
 
@@ -208,6 +213,8 @@ namespace {
             s.builders.push_back(std::move(b));
             descriptions.push_back(desc);
         }
+        s.gids = {0, 1, 2, 3, 4};
+        s.pops = {s.gids};
         return s;
     }
 
@@ -223,7 +230,7 @@ void check_compatible_mechanism_failure(cable_cell_global_properties gprop, P pa
     check_two_cell_system(cells);
     std::vector<cell_gid_type> gids = {0,1};
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, system.pops, gprop.default_parameters);
 
     EXPECT_THROW(fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D), arb::cable_cell_error);
 }
@@ -258,7 +265,7 @@ TEST(fvm_layout, mech_index) {
     check_two_cell_system(cells);
     std::vector<cell_gid_type> gids = {0,1};
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, system.pops, gprop.default_parameters);
     fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
     auto& hh_config = M.mechanisms.at("hh");
@@ -374,7 +381,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.9}), synapse("expsyn"), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         auto &expsyn_config = M.mechanisms.at("expsyn");
@@ -391,7 +398,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.9}), synapse("exp2syn"), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         auto &expsyn_config = M.mechanisms.at("expsyn");
@@ -411,7 +418,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.9}), synapse("expsyn"), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_no_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         auto &expsyn_config = M.mechanisms.at("expsyn");
@@ -428,7 +435,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.9}), synapse("exp2syn"), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_no_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         auto &expsyn_config = M.mechanisms.at("expsyn");
@@ -449,7 +456,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.7}), synapse("expsyn"), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         auto &expsyn_config = M.mechanisms.at("expsyn");
@@ -466,7 +473,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.7}), synapse(syn_desc("expsyn", 0.1, 0.2)), "syn3");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         std::vector<exp_instance> instances{
@@ -493,7 +500,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.3}), synapse(syn_desc("expsyn", 1, 2)), "syn7");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         std::vector<exp_instance> instances{
@@ -523,7 +530,7 @@ TEST(fvm_layout, coalescing_synapses) {
         desc.decorations.place(builder.location({1, 0.7}), synapse(syn_desc_2("exp2syn", 2, 2)), "syn9");
 
         cable_cell cell(desc);
-        fvm_cv_discretization D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
+        auto D = fvm_cv_discretize({cell}, neuron_parameter_defaults);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop_coalesce, {cell}, {0}, {{0, {}}}, D);
 
         for (auto &instance: {exp_instance(2, L{0,2,5}, 1, 2),
@@ -575,7 +582,7 @@ TEST(fvm_layout, synapse_targets) {
     auto cells = system.cells();
     std::vector<cell_gid_type> gids = {0,1};
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, system.pops, gprop.default_parameters);
     fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
     ASSERT_EQ(1u, M.mechanisms.count("expsyn"));
@@ -658,7 +665,7 @@ TEST(fvm_lowered, gj_example_0) {
 
     std::vector<cell_gid_type> gids = {0, 1};
 
-    auto D = fvm_cv_discretize(cells, gprop.default_parameters, *context);
+    auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters, *context);
     auto gj_cvs = fvm_build_gap_junction_cv_map(cells, gids, D);
 
     auto cv_0 = D.geometry.location_cv(0, loc_0, cv_prefer::cv_nonempty);
@@ -804,7 +811,7 @@ TEST(fvm_lowered, gj_example_1) {
     std::vector<cable_cell> cells{c0, c1, c2};
     std::vector<cell_gid_type> gids = {0, 1, 2};
 
-    auto D = fvm_cv_discretize(cells, neuron_parameter_defaults, *context);
+    auto D = fvm_cv_discretize(cells, {gids}, neuron_parameter_defaults, *context);
     unsigned c0_gj_cv[2], c1_gj_cv[4], c2_gj_cv[3];
     for (int i = 0; i<2; ++i) c0_gj_cv[i] = D.geometry.location_cv(0, c0_gj[i], cv_prefer::cv_nonempty);
     for (int i = 0; i<4; ++i) c1_gj_cv[i] = D.geometry.location_cv(1, c1_gj[i], cv_prefer::cv_nonempty);
@@ -994,7 +1001,7 @@ TEST(fvm_layout, gj_example_2) {
     auto cells = system.cells();
     std::vector<cell_gid_type> gids = {0, 1, 2, 3, 4, 5};
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters);
 
     unsigned cvs_1[5], cvs_2[2], cvs_3[1], cvs_5[2];
     for (int i = 0; i<5; ++i) cvs_1[i] = D.geometry.location_cv(1, locs_1[i], cv_prefer::cv_nonempty);
@@ -1203,8 +1210,8 @@ TEST(fvm_lowered, cell_group_gj) {
     auto num_dom0 = fvcell0.fvm_intdom(rec, gids_cg0, fvm_info_0.cell_to_intdom);
     auto num_dom1 = fvcell1.fvm_intdom(rec, gids_cg1, fvm_info_1.cell_to_intdom);
 
-    fvm_cv_discretization D0 = fvm_cv_discretize(cell_group0, neuron_parameter_defaults, *context);
-    fvm_cv_discretization D1 = fvm_cv_discretize(cell_group1, neuron_parameter_defaults, *context);
+    fvm_cv_discretization D0 = fvm_cv_discretize(cell_group0, {gids_cg0}, neuron_parameter_defaults, *context);
+    fvm_cv_discretization D1 = fvm_cv_discretize(cell_group1, {gids_cg1}, neuron_parameter_defaults, *context);
 
     auto gj_cvs_0 = fvm_build_gap_junction_cv_map(cell_group0, gids_cg0, D0);
     auto gj_cvs_1 = fvm_build_gap_junction_cv_map(cell_group1, gids_cg1, D1);
@@ -1353,7 +1360,7 @@ TEST(fvm_layout, density_norm_area) {
 
     std::vector<cell_gid_type> gids = {0};
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}};
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters);
     fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
     // Grab the HH parameters from the mechanism.
@@ -1429,7 +1436,7 @@ TEST(fvm_layout, density_norm_area_partial) {
 
     std::vector<cell_gid_type> gids = {0};
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}};
-    fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+    auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters);
     fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
     // Grab the HH parameters from the mechanism.
@@ -1466,7 +1473,7 @@ TEST(fvm_layout, valence_verify) {
     cable_cell_global_properties gprop;
     gprop.default_parameters = neuron_parameter_defaults;
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, neuron_parameter_defaults);
+    auto D = fvm_cv_discretize(cells, {gids}, neuron_parameter_defaults);
 
     gprop.catalogue = make_unit_test_catalogue();
 
@@ -1557,7 +1564,7 @@ TEST(fvm_layout, ion_weights) {
         std::vector<cable_cell> cells{desc};
         std::vector<cell_gid_type> gids = {0};
         std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}};
-        fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+        auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
         ASSERT_EQ(1u, M.ions.count("ca"s));
@@ -1612,7 +1619,7 @@ TEST(fvm_layout, revpot) {
         std::vector<cable_cell> cells{descriptions[0], descriptions[1]};
         std::vector<cell_gid_type> gids = {0,1};
         std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-        fvm_cv_discretization D = fvm_cv_discretize(cells, test_gprop.default_parameters);
+        auto D = fvm_cv_discretize(cells, {gids}, test_gprop.default_parameters);
         EXPECT_THROW(fvm_build_mechanism_data(test_gprop, cells, gids, gj_conns, D), cable_cell_error);
     }
 
@@ -1626,7 +1633,7 @@ TEST(fvm_layout, revpot) {
         std::vector<cable_cell> cells{descriptions[0], descriptions[1]};
         std::vector<cell_gid_type> gids = {0,1};
         std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-        fvm_cv_discretization D = fvm_cv_discretize(cells, test_gprop.default_parameters);
+        auto D = fvm_cv_discretize(cells, {gids}, test_gprop.default_parameters);
         EXPECT_THROW(fvm_build_mechanism_data(test_gprop, cells, gids, gj_conns, D), cable_cell_error);
     }
 
@@ -1637,9 +1644,9 @@ TEST(fvm_layout, revpot) {
         descriptions[1].decorations.set_default(ion_reversal_potential_method{"c", write_eb_ec});
 
         std::vector<cable_cell> cells{descriptions[0], descriptions[1]};
-        std::vector<cell_gid_type> gids = {0,1};
+        std::vector<cell_gid_type> gids = {0, 1};
         std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns = {{0, {}}, {1, {}}};
-        fvm_cv_discretization D = fvm_cv_discretize(cells, gprop.default_parameters);
+        auto D = fvm_cv_discretize(cells, {gids}, gprop.default_parameters);
         fvm_mechanism_data M = fvm_build_mechanism_data(gprop, cells, gids, gj_conns, D);
 
         // Only CV which needs write_multiple_eX/x=b,y=c is the soma (first CV)
@@ -1666,7 +1673,7 @@ TEST(fvm_layout, vinterp_cable) {
     // Expect voltage reference locations to be CV modpoints.
     d.set_default(cv_policy_fixed_per_branch(5));
     cable_cell cell{m, d};
-    fvm_cv_discretization D = fvm_cv_discretize(cell, neuron_parameter_defaults);
+    auto D = fvm_cv_discretize(cell, neuron_parameter_defaults);
 
     // Test locations, either side of CV midpoints plus extrema, CV boundaries.
     double site_pos[] = { 0., 0.03, 0.11, 0.2, 0.28, 0.33, 0.4, 0.46, 0.55, 0.6, 0.75, 0.8, 0.83, 0.95, 1.};
@@ -1726,7 +1733,7 @@ TEST(fvm_layout, vinterp_forked) {
     mlocation_list cv_ends{{1, 0.}, {2, 0.}};
     d.set_default(cv_policy_explicit(cv_ends));
     cable_cell cell{m, d};
-    fvm_cv_discretization D = fvm_cv_discretize(cell, neuron_parameter_defaults);
+    auto D = fvm_cv_discretize(cell, neuron_parameter_defaults);
 
     // Points in branch 0 should only get CV 0 for interpolation.
     {
@@ -1772,7 +1779,9 @@ TEST(fvm_layout, iinterp) {
     using namespace common_morphology;
 
     std::vector<cable_cell> cells;
+    std::vector<cell_gid_type> gids;
     std::vector<std::string> label;
+    auto gid = 0;
     for (auto& p: test_morphologies) {
         if (p.second.empty()) continue;
         decor d;
@@ -1780,13 +1789,18 @@ TEST(fvm_layout, iinterp) {
         d.set_default(cv_policy_fixed_per_branch(3));
         cells.emplace_back(cable_cell{p.second, d});
         label.push_back(p.first+": forks-at-end"s);
+        gids.emplace_back(gid);
+        gid++;
 
         d.set_default(cv_policy_fixed_per_branch(3, cv_policy_flag::interior_forks));
         cells.emplace_back(cable_cell{p.second, d});
         label.push_back(p.first+": interior-forks"s);
+        gids.emplace_back(gid);
+        gid++;
     }
 
-    fvm_cv_discretization D = fvm_cv_discretize(cells, neuron_parameter_defaults);
+    auto P = fvm_population_info{gids};
+    auto D = fvm_cv_discretize(cells, P, neuron_parameter_defaults);
     for (unsigned cell_idx = 0; cell_idx<cells.size(); ++cell_idx) {
         SCOPED_TRACE(label[cell_idx]);
         unsigned n_branch = D.geometry.n_branch(cell_idx);

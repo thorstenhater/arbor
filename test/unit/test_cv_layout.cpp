@@ -44,6 +44,8 @@ TEST(cv_layout, trivial) {
     // embedding, and that membrane-properties are equal to defaults.
 
     std::vector<cable_cell> cells;
+    std::vector<cell_gid_type> gids;
+    cell_gid_type gid = 0;
     unsigned n_cv = 0;
     for (auto& p: test_morphologies) {
         // Skip morpohologies with more than one root branch, becaue
@@ -52,10 +54,12 @@ TEST(cv_layout, trivial) {
 
         cells.emplace_back(p.second, decor{});
         n_cv += !p.second.empty(); // one cv per non-empty cell
+        gids.emplace_back(gid);
+        gid++;
     }
 
     auto n_cells = cells.size();
-    fvm_cv_discretization D = fvm_cv_discretize(cells, params);
+    fvm_cv_discretization D = fvm_cv_discretize(cells, {{gids}}, params);
 
     EXPECT_EQ(n_cv, D.size());
     for (unsigned i = 0; i<n_cells; ++i) {

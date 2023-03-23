@@ -174,9 +174,33 @@ struct fvm_cv_discretization {
 // (Returns reference to first argument.)
 ARB_ARBOR_API fvm_cv_discretization& append(fvm_cv_discretization&, const fvm_cv_discretization&);
 
+// Population and instance information
+struct fvm_population_info {
+    std::vector<cell_gid_type> ids;
+    std::unordered_map<cell_gid_type, std::vector<cell_gid_type>> indices; // pop_id -> [local_cell_id_per_cell_group]
+    std::vector<cell_gid_type> prototypes; // = keys(indices)
+
+    fvm_population_info(const std::vector<cell_gid_type>& pops) { // one population per local_cell_id
+        auto ncell = pops.size();
+        // Scan populations once to get
+        // * cell -> pop
+        // * pop -> [cell]
+        for (std::size_t ix = 0; ix < ncell; ++ix) {
+            auto pop = pops[ix];
+            ids.emplace_back(pop);
+            indices[pop].emplace_back(ix);
+        }
+        // Extract the populations on this group
+        for (const auto&[k, _v]: indices) prototypes.emplace_back(k);
+        std::sort(prototypes.begin(), prototypes.end());
+    }
+    // empty
+    fvm_population_info() = default;
+};
+
 // Construct fvm_cv_discretization from one or more cells.
 ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const cable_cell& cell, const cable_cell_parameter_set& global_dflt);
-ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const std::vector<cable_cell>& cells, const cable_cell_parameter_set& global_defaults, const arb::execution_context& ctx={});
+ARB_ARBOR_API fvm_cv_discretization fvm_cv_discretize(const std::vector<cable_cell>& cells, const fvm_population_info& pop, const cable_cell_parameter_set& global_defaults, const arb::execution_context& ctx={});
 
 
 // Interpolant data for voltage, axial current probes.
@@ -194,7 +218,6 @@ ARB_ARBOR_API fvm_voltage_interpolant fvm_interpolate_voltage(const cable_cell& 
 
 // Axial current as linear combiantion of voltages.
 ARB_ARBOR_API fvm_voltage_interpolant fvm_axial_current(const cable_cell& cell, const fvm_cv_discretization& D, arb_size_type cell_idx, const mlocation& site);
-
 
 // Post-discretization data for point and density mechanism instantiation.
 
@@ -309,12 +332,12 @@ struct fvm_mechanism_data {
     bool post_events = false;
 };
 
-ARB_ARBOR_API fvm_mechanism_data fvm_build_mechanism_data(
-    const cable_cell_global_properties& gprop,
-    const std::vector<cable_cell>& cells,
-    const std::vector<cell_gid_type>& gids,
-    const std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>>& gj_conns,
-    const fvm_cv_discretization& D,
-    const arb::execution_context& ctx={});
+ARB_ARBOR_API fvm_mechanism_data fvm_build_mechanism_data(const cable_cell_global_properties& gprop,
+                                                          const std::vector<cable_cell>& cells,
+                                                          const std::vector<cell_gid_type>& gids,
+                                                          const fvm_population_info& pop,
+                                                          const std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>>& gj_conns,
+                                                          const fvm_cv_discretization& D,
+                                                          const arb::execution_context& ctx={});
 
 } // namespace arb
