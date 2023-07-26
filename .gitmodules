@@ -26,3 +26,6 @@
 	path = ext/pugixml
 	url = https://github.com/zeux/pugixml.git
 	branch = master
+[submodule "ext/pdgqsort"]
+	path = ext/pdgqsort
+	url = https://github.com/orlp/pdqsort.git
