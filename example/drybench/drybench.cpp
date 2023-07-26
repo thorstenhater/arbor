@@ -79,7 +79,6 @@ std::ostream& operator<<(std::ostream& o, const bench_params& p);
 using arb::cell_gid_type;
 using arb::cell_lid_type;
 using arb::cell_size_type;
-using arb::cell_member_type;
 using arb::cell_kind;
 using arb::time_type;
 

@@ -62,6 +62,7 @@ void communicator::update_connections(const connectivity& rec,
     PE(init:communicator:update:clear);
     // Forget all lingering information
     connections_.clear();
+    ext_connections_.clear();
     connection_part_.clear();
     index_divisions_.clear();
     PL();
@@ -123,8 +124,8 @@ void communicator::update_connections(const connectivity& rec,
     // to do this in place.
     // NOTE: The connections are partitioned by the domain of their source gid.
     PE(init:communicator:update:connections);
-    connections_.resize(n_cons);
-    ext_connections_.resize(n_ext_cons);
+    std::vector<connection> connections(n_cons);
+    std::vector<connection> ext_connections(n_ext_cons);
     auto offsets = connection_part_; // Copy, as we use this as the list of current target indices to write into
     std::size_t ext = 0;
     auto src_domain = src_domains.begin();
@@ -140,7 +141,7 @@ void communicator::update_connections(const connectivity& rec,
             auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
             auto offset  = offsets[*src_domain]++;
             ++src_domain;
-            connections_[offset] = {{src_gid, src_lid}, tgt_lid, conn.weight, conn.delay, index};
+            connections[offset] = {{src_gid, src_lid}, tgt_lid, conn.weight, conn.delay, index};
         }
         for (const auto cidx: util::make_span(part_ext_connections[index], part_ext_connections[index+1])) {
             const auto& conn = gid_ext_connections[cidx];
@@ -148,7 +149,7 @@ void communicator::update_connections(const connectivity& rec,
             auto src_gid = conn.source.rid;
             if(is_external(src_gid)) throw arb::source_gid_exceeds_limit(tgt_gid, src_gid);
             auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
-            ext_connections_[ext] = {src, tgt_lid, conn.weight, conn.delay, index};
+            ext_connections[ext] = {src, tgt_lid, conn.weight, conn.delay, index};
             ++ext;
         }
     }
@@ -168,10 +169,13 @@ void communicator::update_connections(const connectivity& rec,
     const auto& cp = connection_part_;
     threading::parallel_for::apply(0, num_domains_, thread_pool_.get(),
                                    [&](cell_size_type i) {
-                                       util::sort(util::subrange_view(connections_, cp[i], cp[i+1]));
+                                       util::sort(util::subrange_view(connections, cp[i], cp[i+1]));
                                    });
-    std::sort(ext_connections_.begin(), ext_connections_.end());
+    std::sort(ext_connections.begin(), ext_connections.end());
     PL();
+
+    connections_.make(connections);
+    ext_connections_.make(ext_connections);
 }
 
 std::pair<cell_size_type, cell_size_type> communicator::group_queue_range(cell_size_type i) {
@@ -181,12 +185,12 @@ std::pair<cell_size_type, cell_size_type> communicator::group_queue_range(cell_s
 
 time_type communicator::min_delay() {
     time_type res = std::numeric_limits<time_type>::max();
-    res = std::accumulate(connections_.begin(), connections_.end(),
-                                res,
-                                [](auto&& acc, auto&& el) { return std::min(acc, time_type(el.delay)); });
-    res = std::accumulate(ext_connections_.begin(), ext_connections_.end(),
-                                res,
-                                [](auto&& acc, auto&& el) { return std::min(acc, time_type(el.delay)); });
+    res = std::accumulate(connections_.delays.begin(), connections_.delays.end(),
+                          res,
+                          [](auto&& acc, auto&& el) { return std::min(acc, time_type(el)); });
+    res = std::accumulate(ext_connections_.delays.begin(), ext_connections_.delays.end(),
+                          res,
+                          [](auto&& acc, auto&& el) { return std::min(acc, time_type(el)); });
     res = distributed_->min(res);
     return res;
 }
@@ -240,7 +244,7 @@ void append_events_from_domain(C cons,
     };
 
     auto sp = spks.begin(), se = spks.end();
-    auto cn = cons.begin(), ce = cons.end();
+    auto cn = cons.srcs.begin(), ce = cons.srcs.end();
     // We have a choice of whether to walk spikes or connections:
     // i.e., we can iterate over the spikes, and for each spike search
     // the for connections that have the same source; or alternatively
@@ -251,24 +255,39 @@ void append_events_from_domain(C cons,
     // complexity of order max(S log(C), C log(S)), where S is the
     // number of spikes, and C is the number of connections.
     if (cons.size() < spks.size()) {
-        while (cn != ce && sp != se) {
-            auto sources = std::equal_range(sp, se, cn->source, spike_pred());
-            for (auto s: util::make_range(sources)) {
-                queues[cn->index_on_domain].push_back(make_event(*cn, s));
+        PE(communication:walkspikes:con_lt_spk);
+        for (size_t cidx = 0; cidx != cons.size() && sp != se; ++cidx) {
+            auto idx = cons.idx_on_domain[cidx];
+            auto dest = cons.dests[cidx];
+            auto src = cons.srcs[cidx];
+            auto weight = cons.weights[cidx];
+            auto delay = cons.delays[cidx];
+            sp = std::lower_bound(sp, se, src, spike_pred());
+            auto& queue = queues[idx];
+            for (; sp != se && sp->source == src; ++sp) {
+                queue.push_back({dest, sp->time + delay, weight});
             }
-            sp = sources.first;
-            ++cn;
         }
+        PL();
     }
     else {
+        PE(communication:walkspikes:spk_lt_con);
         while (cn != ce && sp != se) {
-            auto targets = std::equal_range(cn, ce, sp->source);
-            for (auto c: util::make_range(targets)) {
-                queues[c.index_on_domain].push_back(make_event(c, *sp));
+            cn = std::lower_bound(cn, ce, sp->source);
+            auto t = sp->time;
+            for (size_t cidx = cn - cons.srcs.begin(); *cn == sp->source; ++cn, ++cidx) {
+                auto idx = cons.idx_on_domain[cidx];
+                auto dest = cons.dests[cidx];
+                auto weight = cons.weights[cidx];
+                auto delay = cons.delays[cidx];
+                queues[idx].push_back({dest, t + delay, weight});
             }
-            cn = targets.first;
+            // if no element is found, we get `ce` from lower bound, so iff we
+            // stepped `cn` from the start, back off one element.
+            if (cn != cons.srcs.begin()) --cn;
             ++sp;
         }
+        PL();
     }
 }
 
@@ -304,10 +323,6 @@ void communicator::set_num_spikes(std::uint64_t n) {
 
 cell_size_type communicator::num_local_cells() const {
     return num_local_cells_;
-}
-
-const std::vector<connection>& communicator::connections() const {
-    return connections_;
 }
 
 void communicator::reset() {

@@ -406,9 +406,7 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
         PL();
 
         // Append events formed from global spikes to per-cell pending event queues.
-        PE(communication:walkspikes);
         communicator_.make_event_queues(global_spikes, pending_events_, remote_spikes);
-        PL();
     };
 
     // Enqueue task: build event_lanes for next epoch from pending events, event-generator events for the

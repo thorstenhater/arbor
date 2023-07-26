@@ -18,6 +18,7 @@
 #include <arbor/profile/profiler.hpp>
 #include <arbor/simple_sampler.hpp>
 #include <arbor/simulation.hpp>
+#include <arbor/symmetric_recipe.hpp>
 #include <arbor/recipe.hpp>
 #include <arbor/version.hpp>
 
@@ -50,10 +51,11 @@ void write_trace_json(std::string fname, const arb::trace_data<double>& trace);
 arb::cable_cell branch_cell(arb::cell_gid_type gid, const cell_parameters& params);
 arb::cable_cell complex_cell(arb::cell_gid_type gid, const cell_parameters& params);
 
-class ring_recipe: public arb::recipe {
+class ring_recipe: public arb::tile {
 public:
     ring_recipe(ring_params params):
         num_cells_(params.num_cells),
+        num_tiles_(params.num_tiles),
         min_delay_(params.min_delay),
         event_weight_(params.event_weight),
         params_(params)
@@ -110,6 +112,9 @@ public:
         return cons;
     }
 
+    cell_size_type num_tiles() const override { return num_tiles_; }
+
+
     // Return one event generator on the first cell of each ring.
     // This generates a single event that will kick start the spiking on the sub-ring.
     std::vector<arb::event_generator> event_generators(cell_gid_type gid) const override {
@@ -128,6 +133,7 @@ public:
 
 private:
     cell_size_type num_cells_;
+    cell_size_type num_tiles_;
     double min_delay_;
     float event_weight_;
     ring_params params_;
@@ -192,11 +198,11 @@ int main(int argc, char** argv) {
 #ifdef ARB_MPI_ENABLED
         arbenv::with_mpi guard(argc, argv, false);
         resources.gpu_id = arbenv::find_private_gpu(MPI_COMM_WORLD);
-        auto context = arb::make_context(resources, MPI_COMM_WORLD);
+        auto context = arb::make_context(resources, arb::dry_run_info(params.num_tiles, params.num_cells));
         root = arb::rank(context) == 0;
 #else
         resources.gpu_id = arbenv::default_gpu();
-        auto context = arb::make_context(resources);
+        auto context = arb::make_context(resources, arb::dry_run_info(params.num_tiles, params.num_cells));
 #endif
 
 #ifdef ARB_PROFILE_ENABLED
@@ -215,9 +221,7 @@ int main(int argc, char** argv) {
         meters.start(context);
 
         // Create an instance of our recipe.
-        ring_recipe recipe(params);
-        cell_stats stats(recipe);
-        if (root) std::cout << stats << "\n";
+        arb::symmetric_recipe recipe(std::make_unique<ring_recipe>(params));
         // Make decomposition
         auto decomp = arb::partition_load_balance(recipe, context, {{arb::cell_kind::cable, params.hint}});
         // Construct the model.

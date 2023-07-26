@@ -74,8 +74,6 @@ public:
 
     cell_size_type num_local_cells() const;
 
-    const std::vector<connection>& connections() const;
-
     void reset();
 
     // used for commmunicate to coupled simulations
@@ -90,13 +88,41 @@ public:
     void set_remote_spike_filter(const spike_predicate&);
 
 private:
+
+    struct connection_soa {
+        std::vector<cell_size_type> idx_on_domain;
+        std::vector<cell_member_type> srcs;
+        std::vector<cell_lid_type> dests;
+        std::vector<float> weights;
+        std::vector<float> delays;
+
+        void make(const std::vector<connection>& cons) {
+            std::transform(cons.begin(), cons.end(), std::back_inserter(idx_on_domain), [](auto& c) { return c.index_on_domain; });
+            std::transform(cons.begin(), cons.end(), std::back_inserter(srcs), [](auto& c) { return c.source; });
+            std::transform(cons.begin(), cons.end(), std::back_inserter(dests), [](auto& c) { return c.destination; });
+            std::transform(cons.begin(), cons.end(), std::back_inserter(weights), [](auto& c) { return c.weight; });
+            std::transform(cons.begin(), cons.end(), std::back_inserter(delays), [](auto& c) { return c.delay; });
+        }
+
+        void clear() {
+            idx_on_domain.clear();
+            srcs.clear();
+            dests.clear();
+            weights.clear();
+            delays.clear();
+        }
+
+        size_t size() { return srcs.size(); }
+    };
+
     cell_size_type num_total_cells_ = 0;
     cell_size_type num_local_cells_ = 0;
     cell_size_type num_local_groups_ = 0;
     cell_size_type num_domains_ = 0;
     // Arbor internal connections
-    std::vector<connection> connections_;
+
     // partition of connections over the domains of the sources' ids.
+    connection_soa connections_;
     std::vector<cell_size_type> connection_part_;
     std::vector<cell_size_type> index_divisions_;
     util::partition_view_type<std::vector<cell_size_type>> index_part_;
@@ -105,7 +131,7 @@ private:
 
     // Connections from external simulators into Arbor.
     // Currently we have no partitions/indices/acceleration structures
-    std::vector<connection> ext_connections_;
+    connection_soa ext_connections_;
 
     distributed_context_handle distributed_;
     task_system_handle thread_pool_;

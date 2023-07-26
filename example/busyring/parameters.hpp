@@ -34,6 +34,7 @@ struct ring_params {
 
     std::string name = "default";
     unsigned num_cells = 5000;
+    unsigned num_tiles = 4;
     unsigned ring_size = 5;
     double min_delay = 5;
     double duration = 200;
@@ -77,6 +78,7 @@ ring_params read_options(int argc, char** argv) {
 
     param_from_json(params.name, "name", json);
     param_from_json(params.num_cells, "num-cells", json);
+    param_from_json(params.num_tiles, "num-tiles", json);
     param_from_json(params.ring_size, "ring-size", json);
     param_from_json(params.duration, "duration", json);
     param_from_json(params.dt, "dt", json);
