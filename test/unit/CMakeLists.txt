@@ -111,7 +111,6 @@ set(unit_sources
     test_padded.cpp
     test_partition.cpp
     test_partition_by_constraint.cpp
-    test_path.cpp
     test_piecewise.cpp
     test_pp_util.cpp
     test_probe.cpp
@@ -119,6 +118,7 @@ set(unit_sources
     test_range.cpp
     test_recipe.cpp
     test_ratelem.cpp
+    test_serdes.cpp
     test_schedule.cpp
     test_scope_exit.cpp
     test_sde.cpp
