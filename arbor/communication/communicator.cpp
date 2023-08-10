@@ -233,8 +233,10 @@ void communicator::remote_ctrl_send_continue(const epoch& e) { distributed_->rem
 void communicator::remote_ctrl_send_done() { distributed_->remote_ctrl_send_done(); }
 
 // Internal helper to append to the event queues
-template<typename S, typename C>
-void append_events_from_domain(C cons,
+template<typename S>
+void append_events_from_domain(const communicator::connection_list& cons,
+                               size_t c0,
+                               size_t ce,
                                S spks,
                                std::vector<pse_vector>& queues) {
     // Predicate for partitioning
@@ -244,7 +246,12 @@ void append_events_from_domain(C cons,
     };
 
     auto sp = spks.begin(), se = spks.end();
-    auto cn = cons.srcs.begin(), ce = cons.srcs.end();
+
+    auto cs = ce - c0;
+    auto ss = spks.size();
+
+    auto cn = c0;
+
     // We have a choice of whether to walk spikes or connections:
     // i.e., we can iterate over the spikes, and for each spike search
     // the for connections that have the same source; or alternatively
@@ -254,9 +261,9 @@ void append_events_from_domain(C cons,
     // We iterate over whichever set is the smallest, which has
     // complexity of order max(S log(C), C log(S)), where S is the
     // number of spikes, and C is the number of connections.
-    if (cons.size() < spks.size()) {
+    if (cs < ss) {
         PE(communication:walkspikes:con_lt_spk);
-        for (size_t cidx = 0; cidx != cons.size() && sp != se; ++cidx) {
+        for (size_t cidx = cn; cidx != ce && sp != se; ++cidx) {
             auto idx = cons.idx_on_domain[cidx];
             auto dest = cons.dests[cidx];
             auto src = cons.srcs[cidx];
@@ -273,9 +280,9 @@ void append_events_from_domain(C cons,
     else {
         PE(communication:walkspikes:spk_lt_con);
         while (cn != ce && sp != se) {
-            cn = std::lower_bound(cn, ce, sp->source);
+            cn = std::lower_bound(cons.srcs.begin() + cn, cons.srcs.begin() + ce, sp->source) - cons.srcs.begin();
             auto t = sp->time;
-            for (size_t cidx = cn - cons.srcs.begin(); *cn == sp->source; ++cn, ++cidx) {
+            for (size_t cidx = cn; cons.srcs[cidx] == sp->source; ++cn, ++cidx) {
                 auto idx = cons.idx_on_domain[cidx];
                 auto dest = cons.dests[cidx];
                 auto weight = cons.weights[cidx];
@@ -284,22 +291,21 @@ void append_events_from_domain(C cons,
             }
             // if no element is found, we get `ce` from lower bound, so iff we
             // stepped `cn` from the start, back off one element.
-            if (cn != cons.srcs.begin()) --cn;
+            if (cn != c0) --cn;
             ++sp;
         }
         PL();
     }
 }
 
-void communicator::make_event_queues(
-        const gathered_vector<spike>& global_spikes,
-        std::vector<pse_vector>& queues,
-        const std::vector<spike>& external_spikes) {
+void communicator::make_event_queues(const gathered_vector<spike>& global_spikes,
+                                     std::vector<pse_vector>& queues,
+                                     const std::vector<spike>& external_spikes) {
     arb_assert(queues.size()==num_local_cells_);
     const auto& sp = global_spikes.partition();
     const auto& cp = connection_part_;
     for (auto dom: util::make_span(num_domains_)) {
-        append_events_from_domain(util::subrange_view(connections_,           cp[dom], cp[dom+1]),
+        append_events_from_domain(connections_, cp[dom], cp[dom+1],
                                   util::subrange_view(global_spikes.values(), sp[dom], sp[dom+1]),
                                   queues);
     }
@@ -310,7 +316,9 @@ void communicator::make_event_queues(
     std::for_each(spikes.begin(),
                   spikes.end(),
                   [](auto& s) { s.source = global_cell_of(s.source); });
-    append_events_from_domain(ext_connections_, spikes, queues);
+    append_events_from_domain(ext_connections_, 0, ext_connections_.size(),
+                              spikes,
+                              queues);
 }
 
 std::uint64_t communicator::num_spikes() const {

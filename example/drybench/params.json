@@ -7,5 +7,5 @@
     "realtime-ratio": 0.01,
     "spike-frequency": 40,
     "threads": 4,
-    "ranks": 16000
+    "ranks": 8000
 }

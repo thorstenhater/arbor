@@ -170,8 +170,7 @@ int main(int argc, char** argv) {
         std::cout << "\n" << ns << " spikes generated at rate of "
                   << ns/total_cells << " spikes per cell\n\n";
 
-        auto profile = arb::profile::profiler_summary();
-        std::cout << profile << "\n";
+        arb::profile::print_profiler_summary(std::cout, 5.0);
 
         auto report = arb::profile::make_meter_report(meters, ctx);
         std::cout << report;
