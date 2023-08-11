@@ -38,14 +38,12 @@ auto split_sorted_range(Seq&& seq, const Value& v, Less cmp = Less{}) {
 
 // Create a new cell event_lane vector from sorted pending events, previous event_lane events,
 // and events from event generators for the given interval.
-ARB_ARBOR_API void merge_cell_events(
-    time_type t_from,
-    time_type t_to,
-    event_span old_events,
-    event_span pending,
-    std::vector<event_generator>& generators,
-    pse_vector& new_events)
-{
+ARB_ARBOR_API void merge_cell_events(time_type t_from,
+                                     time_type t_to,
+                                     event_span old_events,
+                                     event_span pending,
+                                     std::vector<event_generator>& generators,
+                                     pse_vector& new_events) {
     PE(communication:enqueue:setup);
     new_events.clear();
     old_events = split_sorted_range(old_events, t_from, event_time_less()).second;
@@ -80,11 +78,14 @@ ARB_ARBOR_API void merge_cell_events(
         pending = pending_split.second;
     }
 
-    // Merge (remaining) old and pending events.
+    // Merge (remaining) old and pending events and put the result
+    // into new events.
     PE(communication:enqueue:merge);
     auto n = new_events.size();
-    new_events.resize(n+pending.size()+old_events.size());
-    std::merge(pending.begin(), pending.end(), old_events.begin(), old_events.end(), new_events.begin()+n);
+    new_events.resize(n + pending.size() + old_events.size());
+    std::merge(pending.begin(), pending.end(),
+               old_events.begin(), old_events.end(),
+               new_events.begin() + n);
     PL();
 }
 
@@ -470,7 +471,14 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
                 event_span pending = util::range_pointer_view(pending_events_[i]);
                 event_span old_events = util::range_pointer_view(event_lanes(next.id-1)[i]);
 
-                merge_cell_events(next.t0, next.t1, old_events, pending, event_generators_[i], event_lanes(next.id)[i]);
+                // After this, event_lanes[next][i] will contain whatever remains
+                // unconsumed from  old_events and pending...
+                merge_cell_events(next.t0, next.t1,
+                                  old_events,
+                                  pending,
+                                  event_generators_[i],
+                                  event_lanes(next.id)[i]);
+                // ...thus we can trash this.
                 pending_events_[i].clear();
             });
     };

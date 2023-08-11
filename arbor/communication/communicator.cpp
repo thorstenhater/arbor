@@ -232,6 +232,17 @@ void communicator::set_remote_spike_filter(const spike_predicate& p) { remote_sp
 void communicator::remote_ctrl_send_continue(const epoch& e) { distributed_->remote_ctrl_send_continue(e); }
 void communicator::remote_ctrl_send_done() { distributed_->remote_ctrl_send_done(); }
 
+template <class ForwardIt, class T>
+constexpr ForwardIt sb_lower_bound(ForwardIt first, ForwardIt last, const T& value) {
+    auto length = last - first;
+    while (length > 0) {
+        auto half = length / 2;
+        if (first[half] < value) first += length - half;
+        length = half;
+    }
+    return first;
+}
+
 // Internal helper to append to the event queues
 template<typename S>
 void append_events_from_domain(const communicator::connection_list& cons,
@@ -280,7 +291,12 @@ void append_events_from_domain(const communicator::connection_list& cons,
     else {
         PE(communication:walkspikes:spk_lt_con);
         while (cn != ce && sp != se) {
-            cn = std::lower_bound(cons.srcs.begin() + cn, cons.srcs.begin() + ce, sp->source) - cons.srcs.begin();
+            // TODO: Urgh. This basically gives us the index on which we found
+            // our source.
+            cn = sb_lower_bound(cons.srcs.begin() + cn,
+                                cons.srcs.begin() + ce,
+                                sp->source)
+                - cons.srcs.begin();
             auto t = sp->time;
             for (size_t cidx = cn; cons.srcs[cidx] == sp->source; ++cn, ++cidx) {
                 auto idx = cons.idx_on_domain[cidx];
