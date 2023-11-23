@@ -779,29 +779,28 @@ fvm_mechanism_data& append(fvm_mechanism_data& left, const fvm_mechanism_data& r
     return left;
 }
 
-ARB_ARBOR_API std::unordered_map<cell_member_type, arb_size_type> fvm_build_gap_junction_cv_map(
-    const std::vector<cable_cell>& cells,
-    const std::vector<cell_gid_type>& gids,
-    const fvm_cv_discretization& D)
+ARB_ARBOR_API gap_junction_cv_map
+fvm_build_gap_junction_cv_map(const std::vector<cable_cell>& cells,
+                              const std::vector<cell_gid_type>& gids,
+                              const fvm_cv_discretization& D)
 {
     arb_assert(cells.size() == gids.size());
-    std::unordered_map<cell_member_type, arb_size_type> gj_cvs;
+    gap_junction_cv_map gj_cvs;
     for (auto cell_idx: util::make_span(0, cells.size())) {
         for (const auto& mech : cells[cell_idx].junctions()) {
             for (const auto& gj: mech.second) {
-                gj_cvs.insert({cell_member_type{gids[cell_idx], gj.lid}, D.geometry.location_cv(cell_idx, gj.loc, cv_prefer::cv_nonempty)});
+                gj_cvs.insert({cell_member_type<gap_junction_connection>{gids[cell_idx], gj.lid}, D.geometry.location_cv(cell_idx, gj.loc, cv_prefer::cv_nonempty)});
             }
         }
     }
     return gj_cvs;
 }
 
-ARB_ARBOR_API std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> fvm_resolve_gj_connections(
-    const std::vector<cell_gid_type>& gids,
-    const cell_label_range& gj_data,
-    const std::unordered_map<cell_member_type, arb_size_type>& gj_cvs,
-    const recipe& rec)
-{
+ARB_ARBOR_API std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>>
+fvm_resolve_gj_connections(const std::vector<cell_gid_type>& gids,
+                           const cell_label_range& gj_data,
+                           const gap_junction_cv_map& gj_cvs,
+                           const recipe& rec) {
     // Construct and resolve all gj_connections.
     std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> gj_conns;
     label_resolution_map resolution_map({gj_data, gids});

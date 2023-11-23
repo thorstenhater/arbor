@@ -489,12 +489,26 @@ ARB_ARBOR_API void deserialize(::arb::serializer& ser, const K& k, std::array<V,
     }
 
 
-// #define ARB_SERDES_ENABLE(T, ...)
-// #define ARB_SERDES_ENABLE_EXT(T, ...)
-// #define ARB_SERDES_ENABLE_ENUM(T)
-
 // from common_types
-ARB_SERDES_ENABLE_EXT(arb::cell_member_type, gid, index);
+template <typename K, typename T> inline
+ARB_ARBOR_API void serialize(::arb::serializer& ser,
+                             const K& k,
+                             const arb::cell_member_type<T>& t) {
+    ser.begin_write_map(::arb::to_serdes_key(k));
+    ARB_SERDES_WRITE(gid);
+    ARB_SERDES_WRITE(index);
+    ser.end_write_map();
+}
+template <typename K, typename T> inline
+ARB_ARBOR_API void deserialize(::arb::serializer& ser,
+                               const K& k,
+                               arb::cell_member_type<T>& t) {
+    ser.begin_read_map(::arb::to_serdes_key(k));
+    ARB_SERDES_READ(gid);
+    ARB_SERDES_READ(index);
+    ser.end_read_map();
+}
+
 ARB_SERDES_ENABLE_ENUM(arb::lid_selection_policy);
 ARB_SERDES_ENABLE_EXT(arb::cell_local_label_type, tag, policy);
 ARB_SERDES_ENABLE_EXT(arb::cell_global_label_type, gid, label);

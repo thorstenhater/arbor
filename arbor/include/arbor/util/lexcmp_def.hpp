@@ -30,6 +30,20 @@ ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_(std::tie,>=,type,a_fields,b_fields) \
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_(std::tie,!=,type,a_fields,b_fields) \
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_(std::tie,==,type,a_fields,b_fields)
 
+#define ARB_DEFINE_LEXICOGRAPHIC_ORDERING_T(type,arg,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,<,type,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,>,type,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,<=,type,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,>=,type,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,!=,type,a_fields,b_fields) \
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,std::tie,==,type,a_fields,b_fields)
+
+
+#define ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_T_(arg,proxy,op,type,a_fields,b_fields) \
+template<typename T>\
+inline bool operator op(const type<T>& a, const type<T>& b) { return proxy a_fields op proxy b_fields; }
+
+
 #define ARB_DEFINE_LEXICOGRAPHIC_ORDERING_BY_VALUE(type,a_fields,b_fields) \
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_(std::make_tuple,<,type,a_fields,b_fields) \
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING_IMPL_(std::make_tuple,>,type,a_fields,b_fields) \

@@ -1,5 +1,4 @@
 #include <memory>
-#include <set>
 #include <vector>
 
 #include <arbor/export.hpp>
@@ -15,13 +14,10 @@
 #include "cell_group.hpp"
 #include "cell_group_factory.hpp"
 #include "communication/communicator.hpp"
-#include "execution_context.hpp"
 #include "merge_events.hpp"
 #include "thread_private_spike_store.hpp"
 #include "threading/threading.hpp"
-#include "util/filter.hpp"
 #include "util/maputil.hpp"
-#include "util/partition.hpp"
 #include "util/span.hpp"
 #include "profile/profiler_macro.hpp"
 
@@ -86,8 +82,7 @@ ARB_ARBOR_API void merge_cell_events(time_type t_from,
     PL();
 }
 
-class simulation_state {
-public:
+struct simulation_state {
     simulation_state(const recipe& rec, const domain_decomposition& decomp, context ctx, arb_seed_type seed);
 
     void update(const connectivity& rec);
@@ -106,9 +101,7 @@ public:
 
     std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const;
 
-    std::size_t num_spikes() const {
-        return communicator_.num_spikes();
-    }
+    std::size_t num_spikes() const { return communicator_.num_spikes(); }
 
     void set_remote_spike_filter(const spike_predicate& p) { return communicator_.set_remote_spike_filter(p); }
 

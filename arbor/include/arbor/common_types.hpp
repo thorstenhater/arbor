@@ -51,6 +51,7 @@ using cell_local_size_type = std::make_unsigned_t<cell_lid_type>;
 //  * identify an item within a cell-local collection by the member `index`
 //    (see: cell_lid_type).
 
+template<typename Item>
 struct cell_member_type {
     cell_gid_type gid;
     cell_lid_type index;
@@ -125,8 +126,8 @@ struct cell_remote_label_type {
 };
 
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING(cell_remote_label_type,(a.rid,a.index),(b.rid,b.index))
-ARB_DEFINE_LEXICOGRAPHIC_ORDERING(cell_member_type,(a.gid,a.index),(b.gid,b.index))
 ARB_DEFINE_LEXICOGRAPHIC_ORDERING(lid_range,(a.begin, a.end),(b.begin,b.end))
+ARB_DEFINE_LEXICOGRAPHIC_ORDERING_T(cell_member_type,Item,(a.gid,a.index),(b.gid,b.index))
 
 // For storing time values [ms]
 
@@ -155,11 +156,20 @@ enum class ARB_SYMBOL_VISIBLE cell_kind {
 };
 
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, lid_selection_policy m);
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_member_type m);
+template<typename Item>
+ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_member_type<Item> m) { return o << m.gid << ':' << m.index; }
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_kind k);
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, backend_kind k);
 
 } // namespace arb
 
 ARB_DEFINE_HASH(arb::cell_address_type, a.gid, a.tag)
-ARB_DEFINE_HASH(arb::cell_member_type, a.gid, a.index)
+
+namespace std {
+template <typename Item>
+struct hash<arb::cell_member_type<Item>> {
+    std::size_t operator()(const arb::cell_member_type<Item>& cm) const {
+        return ::arb::hash_value(cm.gid, cm.index);
+    }
+};
+}

@@ -283,17 +283,19 @@ struct fvm_stimulus_config {
     std::vector<std::vector<double>> envelope_amplitude; // [A/m²]
 };
 
+using gap_junction_cv_map = std::unordered_map<cell_member_type<gap_junction_connection>, arb_size_type>;
+
 // Maps gj {gid, lid} locations on a cell to their CV indices.
-ARB_ARBOR_API std::unordered_map<cell_member_type, arb_size_type> fvm_build_gap_junction_cv_map(
-    const std::vector<cable_cell>& cells,
-    const std::vector<cell_gid_type>& gids,
-    const fvm_cv_discretization& D);
+ARB_ARBOR_API gap_junction_cv_map
+fvm_build_gap_junction_cv_map(const std::vector<cable_cell>& cells,
+                              const std::vector<cell_gid_type>& gids,
+                              const fvm_cv_discretization& D);
 
 // Resolves gj_connections into {gid, lid} pairs, then to CV indices and a weight.
 ARB_ARBOR_API std::unordered_map<cell_gid_type, std::vector<fvm_gap_junction>> fvm_resolve_gj_connections(
     const std::vector<cell_gid_type>& gids,
     const cell_label_range& gj_data,
-    const std::unordered_map<cell_member_type, arb_size_type>& gj_cv,
+    const gap_junction_cv_map& gj_cv,
     const recipe& rec);
 
 struct fvm_mechanism_data {

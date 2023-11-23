@@ -1,10 +1,8 @@
-#include <ostream>
-#include <string>
-
 #include <pybind11/pybind11.h>
 
 #include <arbor/common_types.hpp>
 
+#include "arbor/cable_cell_param.hpp"
 #include "strprintf.hpp"
 
 namespace pyarb {
@@ -101,7 +99,7 @@ void register_identifiers(py::module& m) {
 
     py::implicitly_convertible<py::tuple, arb::cell_global_label_type>();
 
-    py::class_<arb::cell_member_type> cell_member(m, "cell_member",
+    py::class_<arb::cell_member_type<arb::threshold_detector>> cell_member(m, "cell_member",
         "For global identification of a cell-local item.\n\n"
         "Items of cell_member must:\n"
         "  (1) be associated with a unique cell, identified by the member gid;\n"
@@ -110,7 +108,7 @@ void register_identifiers(py::module& m) {
     cell_member
         .def(py::init(
             [](arb::cell_gid_type gid, arb::cell_lid_type idx) {
-                return arb::cell_member_type{gid, idx};
+                return arb::cell_member_type<arb::threshold_detector>{gid, idx};
             }),
             "gid"_a, "index"_a,
             "Construct a cell member identifier with arguments:\n"
@@ -118,19 +116,19 @@ void register_identifiers(py::module& m) {
             "  index:   The cell-local index of the item.\n")
         .def(py::init([](py::tuple t) {
                 if (py::len(t)!=2) throw std::runtime_error("tuple length != 2");
-                return arb::cell_member_type{t[0].cast<arb::cell_gid_type>(), t[1].cast<arb::cell_lid_type>()};
+                return arb::cell_member_type<arb::threshold_detector>{t[0].cast<arb::cell_gid_type>(), t[1].cast<arb::cell_lid_type>()};
             }),
             "Construct a cell member identifier with tuple argument (gid, index):\n"
             "  gid:     The global identifier of the cell.\n"
             "  index:   The cell-local index of the item.\n")
-        .def_readwrite("gid",   &arb::cell_member_type::gid,
+        .def_readwrite("gid",   &arb::cell_member_type<arb::threshold_detector>::gid,
             "The global identifier of the cell.")
-        .def_readwrite("index", &arb::cell_member_type::index,
+        .def_readwrite("index", &arb::cell_member_type<arb::threshold_detector>::index,
             "Cell-local index of the item.")
-        .def("__str__", [](arb::cell_member_type m) {return pprintf("<arbor.cell_member: gid {}, index {}>", m.gid, m.index);})
-        .def("__repr__",[](arb::cell_member_type m) {return pprintf("<arbor.cell_member: gid {}, index {}>", m.gid, m.index);});
+        .def("__str__", [](arb::cell_member_type<arb::threshold_detector> m) {return pprintf("<arbor.cell_member: gid {}, index {}>", m.gid, m.index);})
+        .def("__repr__",[](arb::cell_member_type<arb::threshold_detector> m) {return pprintf("<arbor.cell_member: gid {}, index {}>", m.gid, m.index);});
 
-    py::implicitly_convertible<py::tuple, arb::cell_member_type>();
+    py::implicitly_convertible<py::tuple, arb::cell_member_type<arb::threshold_detector>>();
 
     py::enum_<arb::cell_kind>(m, "cell_kind",
         "Enumeration used to identify the cell kind, used by the model to group equal kinds in the same cell group.")

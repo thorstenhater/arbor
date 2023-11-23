@@ -75,11 +75,6 @@ zero_thread_requested_error::zero_thread_requested_error(unsigned nbt):
     nbt(nbt)
 {}
 
-bad_probeset_id::bad_probeset_id(cell_member_type probeset_id):
-    arbor_exception(pprintf("bad probe id {}", probeset_id)),
-    probeset_id(probeset_id)
-{}
-
 gj_unsupported_lid_selection_policy::gj_unsupported_lid_selection_policy(cell_gid_type gid, cell_tag_type label):
     arbor_exception(pprintf("Model building error on cell {}: gap junction site label \"{}\" must be univalent.", gid, label)),
     gid(gid),

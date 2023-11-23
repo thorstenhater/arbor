@@ -16,10 +16,6 @@ ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, lid_selection_policy pol
     return o;
 }
 
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, arb::cell_member_type m) {
-    return o << m.gid << ':' << m.index;
-}
-
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, arb::cell_kind k) {
     o << "cell_kind::";
     switch (k) {

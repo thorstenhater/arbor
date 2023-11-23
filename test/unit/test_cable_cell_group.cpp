@@ -7,7 +7,6 @@
 #include "epoch.hpp"
 #include "fvm_lowered_cell.hpp"
 #include "cable_cell_group.hpp"
-#include "util/rangeutil.hpp"
 
 #include "common.hpp"
 #include "../common_cells.hpp"
@@ -36,7 +35,7 @@ namespace {
 }
 
 ACCESS_BIND(
-    std::vector<cell_member_type> cable_cell_group::*,
+    std::vector<cell_member_type<threshold_detector>> cable_cell_group::*,
     private_spike_sources_ptr,
     &cable_cell_group::spike_sources_)
 

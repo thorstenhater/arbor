@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <unordered_set>
 
 #include <arbor/export.hpp>
 #include <arbor/common_types.hpp>
@@ -88,7 +87,7 @@ public:
     // TODO: This is public for now.
     struct connection_list {
         std::vector<cell_size_type> idx_on_domain;
-        std::vector<cell_member_type> srcs;
+        std::vector<cell_member_type<threshold_detector>> srcs;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <arbor/cable_cell_param.hpp>
 #include <ostream>
 #include <type_traits>
 #include <functional>
@@ -26,7 +27,7 @@ struct basic_spike {
 };
 
 /// Standard specialization:
-using spike = basic_spike<cell_member_type>;
+using spike = basic_spike<cell_member_type<threshold_detector>>;
 
 using spike_predicate = std::function<bool(const spike&)>;
 

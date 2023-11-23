@@ -21,7 +21,6 @@
 #include "util/maputil.hpp"
 #include "util/rangeutil.hpp"
 #include "util/span.hpp"
-#include "io/sepval.hpp"
 
 #include "common.hpp"
 #include "common_morphologies.hpp"
@@ -666,8 +665,8 @@ TEST(fvm_lowered, gj_example_0) {
 
     EXPECT_EQ(2u, gj_cvs.size());
 
-    EXPECT_EQ(cv_0, gj_cvs.at(cell_member_type{0, 0}));
-    EXPECT_EQ(cv_1, gj_cvs.at(cell_member_type{1, 0}));
+    EXPECT_EQ(cv_0, gj_cvs.at({0, 0}));
+    EXPECT_EQ(cv_1, gj_cvs.at({1, 0}));
 
     // Check the resolved GJ connections
     fvm_cell fvcell(*context);
@@ -813,15 +812,15 @@ TEST(fvm_lowered, gj_example_1) {
     auto gj_cvs = fvm_build_gap_junction_cv_map(cells, gids, D);
 
     EXPECT_EQ(9u, gj_cvs.size());
-    EXPECT_EQ(c0_gj_cv[0], gj_cvs.at(cell_member_type{0, 0}));
-    EXPECT_EQ(c0_gj_cv[1], gj_cvs.at(cell_member_type{0, 1}));
-    EXPECT_EQ(c1_gj_cv[0], gj_cvs.at(cell_member_type{1, 0}));
-    EXPECT_EQ(c1_gj_cv[1], gj_cvs.at(cell_member_type{1, 1}));
-    EXPECT_EQ(c1_gj_cv[2], gj_cvs.at(cell_member_type{1, 2}));
-    EXPECT_EQ(c1_gj_cv[3], gj_cvs.at(cell_member_type{1, 3}));
-    EXPECT_EQ(c2_gj_cv[0], gj_cvs.at(cell_member_type{2, 0}));
-    EXPECT_EQ(c2_gj_cv[1], gj_cvs.at(cell_member_type{2, 1}));
-    EXPECT_EQ(c2_gj_cv[2], gj_cvs.at(cell_member_type{2, 2}));
+    EXPECT_EQ(c0_gj_cv[0], gj_cvs.at({0, 0}));
+    EXPECT_EQ(c0_gj_cv[1], gj_cvs.at({0, 1}));
+    EXPECT_EQ(c1_gj_cv[0], gj_cvs.at({1, 0}));
+    EXPECT_EQ(c1_gj_cv[1], gj_cvs.at({1, 1}));
+    EXPECT_EQ(c1_gj_cv[2], gj_cvs.at({1, 2}));
+    EXPECT_EQ(c1_gj_cv[3], gj_cvs.at({1, 3}));
+    EXPECT_EQ(c2_gj_cv[0], gj_cvs.at({2, 0}));
+    EXPECT_EQ(c2_gj_cv[1], gj_cvs.at({2, 1}));
+    EXPECT_EQ(c2_gj_cv[2], gj_cvs.at({2, 2}));
 
     // Check the resolved GJ connections
     fvm_cell fvcell(*context);
@@ -1005,16 +1004,16 @@ TEST(fvm_layout, gj_example_2) {
     auto gj_cvs = fvm_build_gap_junction_cv_map(cells, gids, D);
 
     EXPECT_EQ(10u, gj_cvs.size());
-    EXPECT_EQ(cvs_1[0], gj_cvs.at(cell_member_type{1, 0}));
-    EXPECT_EQ(cvs_1[1], gj_cvs.at(cell_member_type{1, 1}));
-    EXPECT_EQ(cvs_1[2], gj_cvs.at(cell_member_type{1, 2}));
-    EXPECT_EQ(cvs_1[3], gj_cvs.at(cell_member_type{1, 3}));
-    EXPECT_EQ(cvs_1[4], gj_cvs.at(cell_member_type{1, 4}));
-    EXPECT_EQ(cvs_2[0], gj_cvs.at(cell_member_type{2, 0}));
-    EXPECT_EQ(cvs_2[1], gj_cvs.at(cell_member_type{2, 1}));
-    EXPECT_EQ(cvs_3[0], gj_cvs.at(cell_member_type{3, 0}));
-    EXPECT_EQ(cvs_5[0], gj_cvs.at(cell_member_type{5, 0}));
-    EXPECT_EQ(cvs_5[1], gj_cvs.at(cell_member_type{5, 1}));
+    EXPECT_EQ(cvs_1[0], gj_cvs.at({1, 0}));
+    EXPECT_EQ(cvs_1[1], gj_cvs.at({1, 1}));
+    EXPECT_EQ(cvs_1[2], gj_cvs.at({1, 2}));
+    EXPECT_EQ(cvs_1[3], gj_cvs.at({1, 3}));
+    EXPECT_EQ(cvs_1[4], gj_cvs.at({1, 4}));
+    EXPECT_EQ(cvs_2[0], gj_cvs.at({2, 0}));
+    EXPECT_EQ(cvs_2[1], gj_cvs.at({2, 1}));
+    EXPECT_EQ(cvs_3[0], gj_cvs.at({3, 0}));
+    EXPECT_EQ(cvs_5[0], gj_cvs.at({5, 0}));
+    EXPECT_EQ(cvs_5[1], gj_cvs.at({5, 1}));
 
     // Check the resolved GJ connections
     fvm_cell fvcell(*context);

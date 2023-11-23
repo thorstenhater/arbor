@@ -83,11 +83,6 @@ struct ARB_SYMBOL_VISIBLE bad_global_property: arbor_exception {
     cell_kind kind;
 };
 
-struct ARB_SYMBOL_VISIBLE bad_probeset_id: arbor_exception {
-    explicit bad_probeset_id(cell_member_type id);
-    cell_member_type probeset_id;
-};
-
 struct ARB_SYMBOL_VISIBLE gj_kind_mismatch: arbor_exception {
     gj_kind_mismatch(cell_gid_type gid_0, cell_gid_type gid_1);
     cell_gid_type gid_0, gid_1;

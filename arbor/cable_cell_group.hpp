@@ -67,7 +67,7 @@ private:
     fvm_lowered_cell_ptr lowered_;
 
     // Spike detectors attached to the cell.
-    std::vector<cell_member_type> spike_sources_;
+    std::vector<cell_member_type<threshold_detector>> spike_sources_;
 
     // Spikes that are generated.
     std::vector<spike> spikes_;
