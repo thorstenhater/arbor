@@ -103,7 +103,6 @@
 
 #include "util/iterutil.hpp"
 #include "util/transform.hpp"
-#include "util/meta.hpp"
 #include "util/partition.hpp"
 
 namespace arb {
@@ -243,7 +242,7 @@ struct pw_elements {
         using reference = pw_element<X>;
 
         reference operator[](difference_type j) const { return (*pw_)[j+*c_]; }
-        reference operator*() const { return (*pw_)[*c_]; }
+        const reference operator*() const { return pw_->operator[](*c_); }
         pointer operator->() const { return pointer{(*pw_)[*c_]}; }
 
         // (required for iterator_adaptor)

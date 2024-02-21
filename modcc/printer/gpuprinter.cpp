@@ -207,7 +207,7 @@ ARB_LIBMODCC_API std::string emit_gpu_cu_source(const Module& module_, const pri
     emit_api_kernel(init_api);
     if (init_api && !init_api->body()->statements().empty()) {
         out << fmt::format(FMT_COMPILE("__global__\n"
-                                       "void multiply(arb_mechanism_ppack params_) {{\n"
+                                       "[[maybe_unused]] void multiply(arb_mechanism_ppack params_) {{\n"
                                        "    PPACK_IFACE_BLOCK;\n"
                                        "    auto tid_ = threadIdx.x + blockDim.x*blockIdx.x;\n"
                                        "    auto idx_ = blockIdx.y;"

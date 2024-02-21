@@ -24,6 +24,7 @@
 #include "label_resolution.hpp"
 #include "profile/profiler_macro.hpp"
 #include "util/maputil.hpp"
+#include "util/span.hpp"
 #include "util/meta.hpp"
 #include "util/rangeutil.hpp"
 #include "util/strprintf.hpp"
@@ -288,7 +289,7 @@ void fvm_lowered_cell_impl<Backend>::update_ion_state() {
 
 template <typename Backend>
 void fvm_lowered_cell_impl<Backend>::assert_voltage_bounded(arb_value_type bound) {
-    auto v_minmax = state_->voltage_bounds();
+    const auto& v_minmax = state_->voltage_bounds();
     if (v_minmax.first>=-bound && v_minmax.second<=bound) {
         return;
     }
