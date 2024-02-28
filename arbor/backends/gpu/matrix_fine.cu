@@ -482,9 +482,9 @@ solve_matrix_combined(arb_value_type* voltage,               // in/out: membrane
 
 
     auto threads_per_block = blocksize;
-    auto n_block = std::max(num_blocks,
-                            impl::block_count(n, blocksize));
-    launch(n_block,
+    auto cuda_blocks = std::max(num_blocks,
+                                impl::block_count(n, blocksize));
+    launch(cuda_blocks,
            threads_per_block,
            kernels::combined_solve_matrix_fine<arb_value_type, arb_index_type>,
            rhs,
