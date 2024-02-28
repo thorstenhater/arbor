@@ -51,7 +51,8 @@ solve_matrix_combined(arb_value_type* voltage,               // in/out: membrane
                       unsigned num_blocks,                   // number of blocks
                       unsigned blocksize,                    // (max) size of a block
                       arb_index_type* perm,                  // (un)packing
-                      unsigned n);                           // # CV
+                      unsigned n,                            // # CV
+                      unsigned nb);                          // # Block
 
 
 } // namespace gpu

@@ -466,7 +466,8 @@ public:
                               num_cells_in_block.size(),
                               max_branches_per_level,
                               perm.data(),
-                              size());
+                              size(),
+                              data_partition.size());
     }
 
     std::size_t size() const { return matrix_size; }
