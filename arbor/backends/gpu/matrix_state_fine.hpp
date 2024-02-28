@@ -455,6 +455,7 @@ public:
                               dt,
                               rhs.data(),
                               d.data(),
+                              invariant_d.data(),
                               u.data(),
                               level_meta.data(),
                               level_lengths.data(),
