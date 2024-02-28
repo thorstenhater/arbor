@@ -401,8 +401,7 @@ ARB_ARBOR_API void assemble_matrix_fine(arb_value_type* d,
                                         const arb_value_type* area,
                                         const arb_value_type  dt,
                                         const arb_index_type* perm,
-                                        unsigned n,
-                                        unsigned n_block) {
+                                        unsigned n) {
     launch_1d(n, 128,
               kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
               d,
@@ -415,8 +414,7 @@ ARB_ARBOR_API void assemble_matrix_fine(arb_value_type* d,
               area,
               dt,
               perm,
-              n,
-              n_block);
+              n);
 }
 
 
@@ -474,7 +472,8 @@ solve_matrix_combined(arb_value_type* voltage,               // in/out: membrane
                       unsigned num_blocks,                   // number of blocks
                       unsigned blocksize,                    // (max) size of a block
                       arb_index_type* perm,                  // (un)packing
-                      unsigned n) {                          // # CV
+                      unsigned n,
+                      unsigned n_block) {                          // # CV
     // NB. Launch config
     // we need to launch the fused kernels s.t. we have
     // 1. >=n threads in total
@@ -504,7 +503,8 @@ solve_matrix_combined(arb_value_type* voltage,               // in/out: membrane
            block_index,
            num_cells,  // number of packed matrices = number of cells
            perm,
-           n);          // number of CVs
+           n,
+           n_block);          // number of CVs
 
 }
 
