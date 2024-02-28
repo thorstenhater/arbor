@@ -3,8 +3,6 @@
 
 #include "fine.hpp"
 
-#include <ostream>
-
 namespace arb {
 namespace gpu {
 ARB_ARBOR_API void assemble_matrix_fine(
@@ -32,6 +30,29 @@ ARB_ARBOR_API void solve_matrix_fine(
     arb_index_type* padded_size,           // length of rhs, d, u, including padding
     unsigned num_blocks,                   // number of blocks
     unsigned blocksize);                   // size of each block
+
+ARB_ARBOR_API void
+solve_matrix_combined(arb_value_type* voltage,               // in/out: membrane potential
+                      const arb_value_type* current,         // total ion current
+                      const arb_value_type* conductivity,    // membrane conductivity
+                      const arb_value_type* capacitance,     //          capacitance
+                      const arb_value_type* area,            //          area
+                      arb_value_type dt,                     // time step
+                      arb_value_type* rhs,                   // scratch space for rhs
+                      arb_value_type* d,                     // diagonal values; everything, scratch
+                      const arb_value_type* invariant_d,     // diagonal values; invariant part
+                      const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)
+                      const level_metadata* level_meta,      // information pertaining to each level
+                      const arb_index_type* level_lengths,   // lengths of branches of every level concatenated
+                      const arb_index_type* level_parents,   // parents of branches of every level concatenated
+                      const arb_index_type* block_index,     // start index into levels for each gpu block
+                      arb_index_type* num_cells,             // the number of cells packed into this single matrix
+                      arb_index_type* padded_size,           // length of rhs, d, u, including padding
+                      unsigned num_blocks,                   // number of blocks
+                      unsigned blocksize,                    // (max) size of a block
+                      arb_index_type* perm,                  // (un)packing
+                      unsigned n);                           // # CV
+
 
 } // namespace gpu
 } // namespace arb

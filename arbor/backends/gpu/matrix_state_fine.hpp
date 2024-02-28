@@ -3,7 +3,6 @@
 #include <cstring>
 
 #include <vector>
-#include <type_traits>
 
 #include <arbor/common_types.hpp>
 
@@ -87,11 +86,10 @@ public:
 
     // constructor for fine-grained matrix.
     matrix_state_fine(const std::vector<size_type>& p,
-                 const std::vector<size_type>& cell_cv_divs,
-                 const std::vector<value_type>& cap,
-                 const std::vector<value_type>& face_conductance,
-                 const std::vector<value_type>& area)
-    {
+                      const std::vector<size_type>& cell_cv_divs,
+                      const std::vector<value_type>& cap,
+                      const std::vector<value_type>& face_conductance,
+                      const std::vector<value_type>& area) {
         using util::make_span;
         constexpr unsigned npos = unsigned(-1);
 
@@ -409,18 +407,17 @@ public:
     //   current density [A/m²]
     //   conductivity [kS/m²]
     void assemble(const T dt, const_view voltage, const_view current, const_view conductivity) {
-        assemble_matrix_fine(
-            d.data(),
-            rhs.data(),
-            invariant_d.data(),
-            voltage.data(),
-            current.data(),
-            conductivity.data(),
-            cv_capacitance.data(),
-            cv_area.data(),
-            dt,
-            perm.data(),
-            size());
+        assemble_matrix_fine(d.data(),
+                             rhs.data(),
+                             invariant_d.data(),
+                             voltage.data(),
+                             current.data(),
+                             conductivity.data(),
+                             cv_capacitance.data(),
+                             cv_area.data(),
+                             dt,
+                             perm.data(),
+                             size());
     }
 
     void solve(array& to) {
@@ -440,10 +437,35 @@ public:
     }
 
 
+    // void solve(array& voltage,
+               // const T dt, const_view current, const_view conductivity) {
+        // assemble(dt, voltage, current, conductivity);
+        // solve(voltage);
+    // }
+
     void solve(array& voltage,
-               const T dt, const_view current, const_view conductivity) {
-        assemble(dt, voltage, current, conductivity);
-        solve(voltage);
+               const T dt,
+               const_view current,
+               const_view conductivity) {
+        solve_matrix_combined(voltage.data(),
+                              current.data(),
+                              conductivity.data(),
+                              cv_capacitance.data(),
+                              cv_area.data(),
+                              dt,
+                              rhs.data(),
+                              d.data(),
+                              u.data(),
+                              level_meta.data(),
+                              level_lengths.data(),
+                              level_parents.data(),
+                              block_index.data(),
+                              num_cells_in_block.data(),
+                              data_partition.data(),
+                              num_cells_in_block.size(),
+                              max_branches_per_level,
+                              perm.data(),
+                              size());
     }
 
     std::size_t size() const { return matrix_size; }
