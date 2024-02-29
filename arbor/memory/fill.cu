@@ -15,20 +15,22 @@ void fill_kernel(T* __restrict__ const v, T value, I n) {
     }
 }
 
+constexpr static int block_size = 128;
+
 void fill8(uint8_t* v, uint8_t value, std::size_t n) {
-    launch_1d(n, 64, fill_kernel<uint8_t, std::size_t>, v, value, n);
+    launch_1d(n, block_size, fill_kernel<uint8_t, std::size_t>, v, value, n);
 };
 
 void fill16(uint16_t* v, uint16_t value, std::size_t n) {
-    launch_1d(n, 64, fill_kernel<uint16_t, std::size_t>, v, value, n);
+    launch_1d(n, block_size, fill_kernel<uint16_t, std::size_t>, v, value, n);
 };
 
 void fill32(uint32_t* v, uint32_t value, std::size_t n) {
-    launch_1d(n, 64, fill_kernel<uint32_t, std::size_t>, v, value, n);
+    launch_1d(n, block_size, fill_kernel<uint32_t, std::size_t>, v, value, n);
 };
 
-void fill64(uint64_t* v, uint64_t value, std::size_t n) {
-    launch_1d(n, 64, fill_kernel<uint64_t, std::size_t>, v, value, n);
+void fill128(uint128_t* v, uint128_t value, std::size_t n) {
+    launch_1d(n, block_size, fill_kernel<uint128_t, std::size_t>, v, value, n);
 };
 
 } // namespace gpu
