@@ -29,8 +29,8 @@ void fill32(uint32_t* v, uint32_t value, std::size_t n) {
     launch_1d(n, block_size, fill_kernel<uint32_t, std::size_t>, v, value, n);
 };
 
-void fill128(uint128_t* v, uint128_t value, std::size_t n) {
-    launch_1d(n, block_size, fill_kernel<uint128_t, std::size_t>, v, value, n);
+void fill128(uint64_t* v, uint64_t value, std::size_t n) {
+    launch_1d(n, block_size, fill_kernel<uint64_t, std::size_t>, v, value, n);
 };
 
 } // namespace gpu
