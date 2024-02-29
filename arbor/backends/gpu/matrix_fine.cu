@@ -351,31 +351,30 @@ void combined_solve_matrix_fine(T* __restrict__ const rhs,
 
                 // Addresses of the first elements of level_lengths and level_parents
                 // that belong to this level
-                const auto lvl_lengths = level_lengths + lvl_meta.level_data_index;
-                const auto lvl_parents = level_parents + lvl_meta.level_data_index;
-
-                const unsigned width = lvl_meta.num_branches;
-                const unsigned parent_index = block_level_meta[l].matrix_data_index;
+                const auto lvl_index   = lvl_meta.level_data_index;
+                const auto lvl_lengths = level_lengths + lvl_index;
+                const auto lvl_parents = level_parents + lvl_index;
+                const auto lvl_width   = lvl_meta.num_branches;
+                const auto lvl_parent   = block_level_meta[l].matrix_data_index;
 
                 __syncthreads();
 
                 // Perform forward-substitution for each branch on this level.
                 // One thread per branch.
-                if (tid < width) {
+                if (tid < lvl_width) {
                     // Find the index of the first node in this branch.
                     const unsigned len = lvl_lengths[tid];
-                    unsigned pos = lvl_meta.matrix_data_index + (len-1)*width + tid;
-
-                    if (d[pos]!=0) {
+                    unsigned pos = lvl_index + (len - 1)*lvl_width + tid;
+                    if (d[pos] != 0) {
                         // Load the rhs value for the parent node of this branch.
-                        const unsigned p = parent_index + lvl_parents[tid];
+                        const unsigned p = lvl_parent + lvl_parents[tid];
                         T rhsp = rhs[p];
                         // each branch perform substitution
-                        for (unsigned i=0; i<len; ++i) {
+                        for (unsigned i = 0; i < len; ++i) {
                             rhsp = rhs[pos] - u[pos]*rhsp;
                             rhsp /= d[pos];
                             rhs[pos] = rhsp;
-                            pos -= width;
+                            pos -= lvl_width;
                         }
                     }
                 }
