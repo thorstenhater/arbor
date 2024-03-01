@@ -4,8 +4,6 @@
 #include <arbor/arbexcept.hpp>
 #include <arbor/version.hpp>
 
-#include "util.hpp"
-
 #ifdef ARB_GPU_ENABLED
 
 #include <arbor/gpu/gpu_api.hpp>
@@ -90,6 +88,11 @@ namespace memory {
 void gpu_memcpy_d2d(void* dest, const void* src, std::size_t n) {
     NOGPU;
 }
+
+void device_memset_async(void *dest, int v, std::size_t n) {
+    NOGPU;
+}
+
 
 void gpu_memcpy_d2h(void* dest, const void* src, std::size_t n) {
     NOGPU;

@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "array.hpp"
-#include "definitions.hpp"
 #include "host_coordinator.hpp"
 #include "device_coordinator.hpp"
 

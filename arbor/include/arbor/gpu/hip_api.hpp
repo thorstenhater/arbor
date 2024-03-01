@@ -1,6 +1,5 @@
 #include <utility>
 #include <string>
-#include <type_traits>
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
@@ -68,6 +67,11 @@ inline api_error_type device_memcpy(ARGS&&... args) {
 template <typename... ARGS>
 inline api_error_type device_memcpy_async(ARGS &&... args) {
     return hipMemcpyAsync(std::forward<ARGS>(args)...);
+}
+
+template <typename... ARGS>
+inline api_error_type device_memset_async(ARGS &&... args) {
+    return hipMemsetAsync(std::forward<ARGS>(args)...);
 }
 
 template <typename... ARGS>

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <exception>
-
 #include <arbor/assert.hpp>
 
 #include "allocator.hpp"
@@ -257,7 +254,11 @@ public:
     // fill memory
     void set(view_type &rng, value_type value) {
         if (rng.size()) {
-            arb::gpu::fill<value_type>(rng.data(), value, rng.size());
+            if (value != 0) {
+                arb::gpu::fill<value_type>(rng.data(), value, rng.size());
+            } else {
+                device_memset_async(rng.data(), 0, sizeof(value_type));
+            }
         }
     }
 

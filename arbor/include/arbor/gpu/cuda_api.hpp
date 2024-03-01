@@ -71,6 +71,11 @@ inline api_error_type device_memcpy_async(ARGS &&... args) {
 }
 
 template <typename... ARGS>
+inline api_error_type device_memset_async(ARGS &&... args) {
+    return cudaMemsetAsync(std::forward<ARGS>(args)...);
+}
+
+template <typename... ARGS>
 inline api_error_type host_register(ARGS &&... args) {
     return cudaHostRegister(std::forward<ARGS>(args)...);
 }
