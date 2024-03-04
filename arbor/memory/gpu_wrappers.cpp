@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <string>
 
+#include "util.hpp"
+
 #include <arbor/arbexcept.hpp>
 #include <arbor/version.hpp>
 
@@ -92,7 +94,6 @@ void gpu_memcpy_d2d(void* dest, const void* src, std::size_t n) {
 void device_memset_async(void *dest, int v, std::size_t n) {
     NOGPU;
 }
-
 
 void gpu_memcpy_d2h(void* dest, const void* src, std::size_t n) {
     NOGPU;
