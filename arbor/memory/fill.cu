@@ -18,7 +18,7 @@ void fill_kernel(T* __restrict__ const v, T value, I n) {
 __global__
 void fill_kernel_vec(std::uint64_t* __restrict__ const v, std::uint64_t value, std::size_t n) {
     auto tid = threadIdx.x + blockDim.x*blockIdx.x;
-    auto v4 = reinterpret_cast<ulong4>(v);
+    auto v4 = reinterpret_cast<ulong4*>(v);
     ulong4 value4 = make_ulong4(value, value, value, value);
     size_t n4 = n/4;
     // Bulk write
