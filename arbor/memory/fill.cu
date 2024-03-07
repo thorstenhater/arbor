@@ -15,6 +15,19 @@ void fill_kernel(T* __restrict__ const v, T value, I n) {
     }
 }
 
+__global__
+void fill_kernel_vec(std::uint64_t* __restrict__ const v, std::uint64_t value, std::size_t n) {
+    auto tid = threadIdx.x + blockDim.x*blockIdx.x;
+    auto v4 = reinterpret_cast<ulong4>(v);
+    ulong4 value4 = make_ulong4(value, value, value, value);
+    size_t n4 = n/4;
+    // Bulk write
+    if(tid < n4) v4[tid] = value4;
+    // First threads handle the remainder at the tail end
+    if(tid == n % 4) v[tid + 4*n4] = value;
+}
+
+
 constexpr static int block_size = 128;
 
 void fill8(uint8_t* v, uint8_t value, std::size_t n) {
@@ -30,7 +43,8 @@ void fill32(uint32_t* v, uint32_t value, std::size_t n) {
 };
 
 void fill64(uint64_t* v, uint64_t value, std::size_t n) {
-    launch_1d(n, block_size, fill_kernel<uint64_t, std::size_t>, v, value, n);
+    auto len = (n + 3)/4;
+    launch_1d(len, block_size, fill_kernel_vec, v, value, n);
 };
 
 } // namespace gpu
