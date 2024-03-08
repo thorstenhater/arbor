@@ -1,6 +1,7 @@
 #include <arbor/gpu/gpu_common.hpp>
 
 #include <cstdint>
+#include <iostream>
 
 namespace arb {
 namespace gpu {
@@ -47,6 +48,7 @@ void fill32(uint32_t* v, uint32_t value, std::size_t n) {
 
 void fill64(uint64_t* v, uint64_t value, std::size_t n) {
     auto len = (n + 3)/4;
+    std::cout << v << '\n';
     launch_1d(len, block_size, fill_kernel_vec, v, value, n);
 }
 
