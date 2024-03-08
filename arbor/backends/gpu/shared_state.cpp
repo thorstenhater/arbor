@@ -219,6 +219,7 @@ void shared_state::instantiate(mechanism& m,
     using util::ptr_by_key;
     using util::value_by_key;
 
+    alignment = 256;
     bool mult_in_place = !pos_data.multiplicity.empty();
     bool peer_indices = !pos_data.peer_cv.empty();
 
