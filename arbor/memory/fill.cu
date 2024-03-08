@@ -27,25 +27,29 @@ void fill_kernel_vec(std::uint64_t* __restrict__ const v, std::uint64_t value, s
     if(tid == n % 4) v[tid + 4*n4] = value;
 }
 
-
 constexpr static int block_size = 128;
 
 void fill8(uint8_t* v, uint8_t value, std::size_t n) {
     launch_1d(n, block_size, fill_kernel<uint8_t, std::size_t>, v, value, n);
-};
+}
 
 void fill16(uint16_t* v, uint16_t value, std::size_t n) {
     launch_1d(n, block_size, fill_kernel<uint16_t, std::size_t>, v, value, n);
-};
+}
 
 void fill32(uint32_t* v, uint32_t value, std::size_t n) {
     launch_1d(n, block_size, fill_kernel<uint32_t, std::size_t>, v, value, n);
-};
+}
 
 void fill64(uint64_t* v, uint64_t value, std::size_t n) {
-    auto len = (n + 3)/4;
-    launch_1d(len, block_size, fill_kernel_vec, v, value, n);
-};
+    if (n >= 4) {
+        auto len = (n + 3)/4;
+        launch_1d(len, block_size, fill_kernel_vec, v, value, n);
+    }
+    else {
+        launch_1d(n, block_size, fill_kernel, v, value, n);
+    }
+}
 
 } // namespace gpu
 } // namespace arb
