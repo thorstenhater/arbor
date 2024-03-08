@@ -269,7 +269,7 @@ public:
 
     static constexpr
     auto alignment() {
-        return Allocator_::alignment();
+        return 256; Allocator_::alignment();
     }
 
     static constexpr
