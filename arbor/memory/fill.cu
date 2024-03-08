@@ -23,8 +23,12 @@ void fill_kernel_vec(std::uint64_t* __restrict__ const v, std::uint64_t value, s
     size_t n4 = n/4;
     // Bulk write
     if(tid < n4) v4[tid] = value4;
-    // First threads handle the remainder at the tail end
-    if(tid == n % 4) v[tid + 4*n4] = value;
+    // First thread handles the remainder at the tail end
+    if(tid == 0) {
+        for (int ix = 0; ix < n%4; ++ix) {
+            v[ix + 4*n4] = value;
+        }
+    }
 }
 
 constexpr static int block_size = 128;
@@ -42,13 +46,8 @@ void fill32(uint32_t* v, uint32_t value, std::size_t n) {
 }
 
 void fill64(uint64_t* v, uint64_t value, std::size_t n) {
-    if (n >= 4) {
-        auto len = (n + 3)/4;
-        launch_1d(len, block_size, fill_kernel_vec, v, value, n);
-    }
-    else {
-        launch_1d(n, block_size, fill_kernel, v, value, n);
-    }
+    auto len = (n + 3)/4;
+    launch_1d(len, block_size, fill_kernel_vec, v, value, n);
 }
 
 } // namespace gpu
