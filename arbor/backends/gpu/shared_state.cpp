@@ -13,12 +13,10 @@
 #include "backends/event_stream_state.hpp"
 #include "backends/gpu/chunk_writer.hpp"
 #include "memory/copy.hpp"
-#include "memory/gpu_wrappers.hpp"
 #include "memory/wrappers.hpp"
 #include "util/index_into.hpp"
 #include "util/rangeutil.hpp"
 #include "util/maputil.hpp"
-#include "util/meta.hpp"
 #include "util/range.hpp"
 #include "util/strprintf.hpp"
 
@@ -369,12 +367,17 @@ void shared_state::reset() {
 }
 
 void shared_state::zero_currents() {
+    std::cout << "i_m = 0\n";
     memory::fill(current_density, 0);
+    std::cout << "g = 0\n";
     memory::fill(conductivity, 0);
     for (auto& i: ion_data) {
+        std::cout << "i_" << i.first << " = 0\n";
         i.second.zero_current();
     }
+    std::cout << "i_m = 0\n";
     stim_data.zero_current();
+    std::cout << "Zeroing Done\n";
 }
 
 std::pair<arb_value_type, arb_value_type> shared_state::voltage_bounds() const {
