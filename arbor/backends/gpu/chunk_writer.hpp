@@ -47,6 +47,7 @@ struct chunk_writer {
         arb_assert(n <= stride);
         std::size_t r = stride - n;
         auto p = append_freely(std::forward<Seq>(seq));
+        std::cout << "Chunk writer end=" << end << '\n';
         memory::fill(memory::device_view<typename util::sequence_traits<Seq>::value_type>(end, r), value);
         end += r;
         return p;
