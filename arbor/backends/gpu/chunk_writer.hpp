@@ -4,6 +4,8 @@
 #include "memory/copy.hpp"
 #include "util/meta.hpp"
 
+#include <iostream>
+
 #pragma once
 
 namespace arb {
@@ -32,6 +34,7 @@ struct chunk_writer {
     }
 
     T* fill(T value) {
+        std::cout << "Chunk writer end=" << end << '\n';
         memory::fill(memory::device_view<T>(end, stride), value);
         auto p = end;
         end += stride;
