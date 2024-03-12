@@ -48,6 +48,9 @@ void fill32(uint32_t* v, uint32_t value, std::size_t n) {
 
 void fill64(uint64_t* v, uint64_t value, std::size_t n) {
     if (n >= 4) {
+        if ((uint64_t)v % 256) {
+            throw std::runtime_error{"Address not aligned."};
+        }
         auto len = (n + 3)/4;
         std::cout << "[VEC] val=" << value << " ptr=" << v << " cnt=" << n << '\n';
         launch_1d(len, block_size, fill_kernel_vec, v, value, n);
