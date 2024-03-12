@@ -31,7 +31,7 @@ class stack {
     using value_type = T;
 
     template <typename U>
-    using allocator = memory::gpu_allocator<U>;
+    using allocator = memory::pinned_allocator<U>;
 
     using storage_type = stack_storage<value_type>;
 
