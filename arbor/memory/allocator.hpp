@@ -267,8 +267,8 @@ template <class T, size_t alignment=1024>
 using pinned_allocator = allocator<T, impl::gpu::pinned_policy<alignment>>;
 
 // use 256 as default alignment, because that is the default for cudaMalloc
-template <class T, size_t alignment=1024>
-using gpu_allocator = allocator<T, impl::gpu::pinned_policy<alignment>>;
+template <class T, size_t alignment=256>
+using gpu_allocator = allocator<T, impl::gpu::device_policy>;
 
 } // namespace memory
 } // namespace arb
