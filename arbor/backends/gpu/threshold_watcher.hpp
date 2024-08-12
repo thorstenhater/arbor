@@ -70,9 +70,8 @@ public:
         is_crossed_(n_detectors_),
         thresholds_(memory::make_const_view(thresholds)),
         v_prev_(num_cv),
-        // TODO: allocates enough space for 10 spikes per watch.
-        // A more robust approach might be needed to avoid overflows.
-        stack_(100*size(), context.gpu)
+        // pre-allocate space for N spikes per watch; overflow will result in an exception.
+        stack_(ARB_GPU_SPIKE_BUFFER_SIZE*size(), context.gpu)
     {
         crossings_.reserve(stack_.capacity());
         // reset() needs to be called before this is ready for use

@@ -56,6 +56,10 @@ option(ARB_VECTORIZE "use explicit SIMD code in generated mechanisms" OFF)
 option(ARB_USE_HWLOC "request support for thread pinning via HWLOC" OFF)
 mark_as_advanced(ARB_USE_HWLOC)
 
+# How many spikes (max) per watch
+set(ARB_GPU_SPIKE_BUFFER_SIZE 100 CACHE INT "How many spikes (max) per watch")
+mark_as_advanced(ARB_GPU_SPIKE_BUFFER_SIZE)
+
 # Use externally built modcc?
 
 set(ARB_MODCC "" CACHE STRING "path to external modcc NMODL compiler")
