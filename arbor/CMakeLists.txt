@@ -136,7 +136,7 @@ endif()
 add_library(arbor ${arbor_sources} ${arbor-builtin-mechanisms})
 target_link_libraries(arbor PRIVATE arbor-private-deps arbor-private-headers)
 target_link_libraries(arbor PUBLIC arbor-public-deps arbor-public-headers)
-target_compile_definitions(arbor ARB_GPU_SPIKE_BUFFER_SIZE=${ARB_GPU_SPIKE_BUFFER_SIZE})
+target_compile_definitions(arbor PUBLIC "ARB_GPU_SPIKE_BUFFER_SIZE=${ARB_GPU_SPIKE_BUFFER_SIZE}")
 
 if(ARB_WITH_CUDA_CLANG)
     target_link_libraries(arbor PRIVATE ${CUDA_LIBRARIES})
