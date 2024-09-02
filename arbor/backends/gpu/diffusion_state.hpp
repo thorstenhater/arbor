@@ -385,14 +385,6 @@ public:
         // the invariant part of d and cv_area are in flat form
         cv_area = memory::make_const_view(area);
         invariant_d = memory::make_const_view(invariant_d_tmp);
-
-        // calculate the cv -> cell mappings
-        std::vector<size_type> cv_to_cell_tmp(matrix_size);
-        size_type ci = 0;
-        for (auto cv_span: util::partition_view(cell_cv_divs)) {
-            util::fill(util::subrange_view(cv_to_cell_tmp, cv_span), ci);
-            ++ci;
-        }
     }
 
     // Assemble the matrix

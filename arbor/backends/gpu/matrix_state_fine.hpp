@@ -3,12 +3,10 @@
 #include <cstring>
 
 #include <vector>
-#include <type_traits>
 
 #include <arbor/common_types.hpp>
 
 #include "memory/memory.hpp"
-#include "util/partition.hpp"
 #include "util/rangeutil.hpp"
 #include "util/span.hpp"
 #include "tree.hpp"
@@ -21,7 +19,6 @@ namespace gpu {
 
 template <typename T, typename I>
 struct matrix_state_fine {
-public:
     using value_type = T;
     using size_type = I;
 
@@ -90,8 +87,7 @@ public:
                  const std::vector<size_type>& cell_cv_divs,
                  const std::vector<value_type>& cap,
                  const std::vector<value_type>& face_conductance,
-                 const std::vector<value_type>& area)
-    {
+                 const std::vector<value_type>& area) {
         using util::make_span;
         constexpr unsigned npos = unsigned(-1);
 
@@ -106,7 +102,6 @@ public:
         // While the total number of branches on each level of theses cells in a
         // block are less than `max_branches_per_level` we add more cells. If
         // one block is full, we start a new gpu block.
-
         unsigned current_block = 0;
         std::vector<unsigned> block_num_branches_per_depth;
         std::vector<unsigned> block_ix(num_cells);
@@ -314,43 +309,14 @@ public:
         // set matrix state
         matrix_size = p.size();
 
-        // form the permutation index used to reorder vectors to/from the
-        // ordering used by the fine grained matrix storage.
-        std::vector<size_type> perm_tmp(matrix_size);
-        for (auto block: make_span(branch_maps.size())) {
-            const auto& branch_map = branch_maps[block];
-            const auto first_level = temp_block_index[block];
-
-            for (auto i: make_span(temp_block_index[block + 1] - first_level)) {
-                const auto& l = temp_meta[first_level + i];
-                for (auto j: make_span(l.num_branches)) {
-                    const auto& b = branch_map[i][j];
-                    auto j_lvl_length = temp_lengths[l.level_data_index + j];
-                    auto to = l.matrix_data_index + j + l.num_branches*(j_lvl_length-1);
-                    auto from = b.start_idx;
-                    for (auto k: make_span(b.length)) {
-                        perm_tmp[from + k] = to - k*l.num_branches;
-                    }
-                }
-            }
-        }
-
         level_meta     = memory::make_const_view(temp_meta);
         level_lengths  = memory::make_const_view(temp_lengths);
         level_parents  = memory::make_const_view(temp_parents);
         data_partition = memory::make_const_view(temp_data_part);
         block_index    = memory::make_const_view(temp_block_index);
 
-        auto perm_balancing = trees.permutation();
-
-        // apppy permutation form balancing
-        std::vector<size_type> perm_tmp2(matrix_size);
-        for (auto i: make_span(matrix_size)) {
-             // This is CORRECT! verified by using the ring benchmark with root=0 (where the permutation is actually not id)
-            perm_tmp2[perm_balancing[i]] = perm_tmp[i];
-        }
-        // copy permutation to device memory
-        perm = memory::make_const_view(perm_tmp2);
+        const auto& perm_tmp = write_perm(matrix_size, trees.permutation(), branch_maps, temp_meta, temp_block_index, temp_lengths);
+        perm = memory::make_const_view(perm_tmp);
 
 
         // Summary of fields and their storage format:
@@ -393,14 +359,6 @@ public:
         // to be stored in flat format
         cv_capacitance = memory::make_const_view(cap);
         invariant_d = memory::make_const_view(invariant_d_tmp);
-
-        // calculate the cv -> cell mappings
-        std::vector<size_type> cv_to_cell_tmp(matrix_size);
-        size_type ci = 0;
-        for (auto cv_span: util::partition_view(cell_cv_divs)) {
-            util::fill(util::subrange_view(cv_to_cell_tmp, cv_span), ci);
-            ++ci;
-        }
     }
 
     // Assemble the matrix
@@ -461,6 +419,43 @@ private:
         arb_assert(to.size()==matrix_size);
 
         gather(from.data(), to.data(), perm.data(), perm.size());
+    }
+
+    // Helpers for construction.
+
+    // permutation index used to reorder vectors to/from the ordering used by
+    // the fine grained matrix storage.
+    static const std::vector<size_t>& write_perm(size_t matrix_size,
+                                                 const std::vector<size_type>& perm_balancing,
+                                                 const std::vector<std::vector<std::vector<branch>>>& branch_maps,
+                                                 const std::vector<level_metadata>& temp_meta,
+                                                 const std::vector<size_type>& temp_block_index,
+                                                 const std::vector<size_type>& temp_lengths) {
+        std::vector<size_type> perm_tmp(matrix_size);
+        for (auto block: util::make_span(branch_maps.size())) {
+            const auto& branch_map = branch_maps[block];
+            const auto first_level = temp_block_index[block];
+
+            for (auto i: make_span(temp_block_index[block + 1] - first_level)) {
+                const auto& l = temp_meta[first_level + i];
+                for (auto j: make_span(l.num_branches)) {
+                    const auto& b = branch_map[i][j];
+                    auto j_lvl_length = temp_lengths[l.level_data_index + j];
+                    auto to = l.matrix_data_index + j + l.num_branches*(j_lvl_length-1);
+                    auto from = b.start_idx;
+                    for (auto k: make_span(b.length)) {
+                        perm_tmp[from + k] = to - k*l.num_branches;
+                    }
+                }
+            }
+        }
+        // apply permutation from balancing
+        std::vector<size_type> res(matrix_size);
+        for (auto i: util::make_span(matrix_size)) {
+             // This is CORRECT! verified by using the ring benchmark with root=0 (where the permutation is actually not id)
+            res[perm_balancing[i]] = perm_tmp[i];
+        }
+        return res;
     }
 };
 
