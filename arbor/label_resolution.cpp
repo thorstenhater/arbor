@@ -104,22 +104,19 @@ label_resolution_map::label_resolution_map(const cell_labels_and_gids& clg) {
     const auto& ranges = clg.label_range.ranges;
     const auto& sizes = clg.label_range.sizes;
 
-    std::vector<cell_size_type> label_divs;
-    std::unordered_set<cell_gid_type> seen;
-    auto partn = util::make_partition(label_divs, sizes);
-    for (auto i: util::count_along(partn)) {
-        auto gid = gids[i];
-        if (seen.contains(gid)) throw arb::arbor_internal_error("label_resolution_map: duplicate gid");
-        seen.insert(gid);
-        for (auto label_idx: util::make_span(partn[i])) {
+    map.reserve(labels.size());
+    auto lo = 0;
+    for (auto idx: util::count_along(gids)) {
+        auto gid = gids[idx];
+        auto size = sizes[idx];
+        for (auto label_idx: util::make_span(lo, lo + size)) {
             const auto range = ranges[label_idx];
-            auto size = int(range.end - range.begin);
-            if (size < 0) throw arb::arbor_internal_error("label_resolution_map: invalid lid_range");
             auto& label = labels[label_idx];
             auto& range_set = map[std::make_pair(gid, label)];
             range_set.ranges.push_back(range);
-            range_set.size += size;
+            range_set.size += range.end - range.begin;
         }
+        lo += size;
     }
 }
 
