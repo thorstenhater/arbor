@@ -1,7 +1,6 @@
 #include <iterator>
 #include <vector>
 #include <numeric>
-#include <unordered_set>
 
 #include <arbor/assert.hpp>
 #include <arbor/arbexcept.hpp>
@@ -10,6 +9,7 @@
 #include <arbor/util/hash_def.hpp>
 
 #include "label_resolution.hpp"
+#include "arbor/assert_macro.hpp"
 #include "util/partition.hpp"
 #include "util/span.hpp"
 
@@ -81,7 +81,9 @@ bool cell_labels_and_gids::check_invariant() const {
 */
 cell_lid_type label_resolution_map::range_set::at(unsigned idx) const {
     if (0 == size) throw arbor_internal_error("no valid lids");
-    for (const auto& [beg, end]: ranges) {
+    for (auto it = lo; it < hi; ++idx) {
+        // if (idx >= data_->size()) throw arbor_internal_error("Oops");
+        const auto& [beg, end] = data_->at(it);
         auto len = end - beg;
         if (idx < len) return idx + beg;
         idx -= len;
@@ -89,7 +91,7 @@ cell_lid_type label_resolution_map::range_set::at(unsigned idx) const {
     throw arbor_internal_error("invalid lid");
 }
 
-const label_resolution_map::range_set& label_resolution_map::at(cell_gid_type gid, hash_type hash) const {
+const label_resolution_map::range_set label_resolution_map::at(cell_gid_type gid, hash_type hash) const {
     return map.at(std::make_pair(gid, hash));
 }
 
@@ -101,25 +103,31 @@ label_resolution_map::label_resolution_map(const cell_labels_and_gids& clg) {
     arb_assert(clg.label_range.check_invariant());
     const auto& gids = clg.gids;
     const auto& labels = clg.label_range.labels;
-    const auto& ranges = clg.label_range.ranges;
     const auto& sizes = clg.label_range.sizes;
+    // NOTE this could be a move!
+    ranges_ = clg.label_range.ranges;
 
-    std::vector<cell_size_type> label_divs;
-    std::unordered_set<cell_gid_type> seen;
-    auto partn = util::make_partition(label_divs, sizes);
-    for (auto i: util::count_along(partn)) {
-        auto gid = gids[i];
-        if (seen.contains(gid)) throw arb::arbor_internal_error("label_resolution_map: duplicate gid");
-        seen.insert(gid);
-        for (auto label_idx: util::make_span(partn[i])) {
-            const auto range = ranges[label_idx];
-            auto size = int(range.end - range.begin);
-            if (size < 0) throw arb::arbor_internal_error("label_resolution_map: invalid lid_range");
+    map.reserve(labels.size());
+
+    auto lo = 0;
+    for (auto ix = 0; ix < gids.size(); ++ix) {
+        auto gid = gids[ix];
+        auto hi = lo + sizes[ix];
+        for (auto label_idx: util::make_span(lo, hi)) {
             auto& label = labels[label_idx];
-            auto& range_set = map[std::make_pair(gid, label)];
-            range_set.ranges.push_back(range);
-            range_set.size += size;
+            auto key = std::make_pair(gid, label);
+            const auto& range = ranges_[label_idx];
+            auto size = range.end - range.begin;
+            arb_assert(size >= 0);
+            auto& set = map[key];
+            if (set.lo == 0 && set.lo == set.hi) {
+                set.lo = label_idx;
+                set.hi = label_idx;
+            }
+            set.size += size;
+            set.hi += 1;
         }
+        lo = hi;
     }
 }
 

@@ -67,30 +67,31 @@ struct ARB_ARBOR_API cell_labels_and_gids {
 struct ARB_ARBOR_API label_resolution_map {
     struct range_set {
         std::size_t size = 0;
-        std::vector<lid_range> ranges;
-        cell_lid_type at(unsigned idx) const;
+        // std::vector<lid_range> ranges;
+        // std::vector<size_t> indices;
+        std::size_t lo = 0;
+        std::size_t hi = 0;
+        cell_lid_type at(unsigned idx, ) const;
     };
 
     label_resolution_map() = default;
     explicit label_resolution_map(const cell_labels_and_gids&);
 
-    const range_set& at(cell_gid_type gid, hash_type hash) const;
+    const range_set at(cell_gid_type gid, hash_type hash) const;
     std::size_t count(cell_gid_type gid, hash_type hash) const;
-    const range_set& at(cell_gid_type gid, const cell_tag_type& tag) const { return at(gid, hash_value(tag)); }
+    const range_set at(cell_gid_type gid, const cell_tag_type& tag) const { return at(gid, hash_value(tag)); }
     std::size_t count(cell_gid_type gid, const cell_tag_type& tag) const { return count(gid, hash_value(tag)); }
 
+    std::vector<lid_range> ranges_;
 private:
     using Key = std::pair<cell_gid_type, hash_type>;
 
 #if 0
-    struct Hasher {
-        std::size_t operator()(const Key& key) const { return hash_value(key.first, key.second); }
-    };
+    struct Hasher { std::size_t operator()(const Key& key) const { return hash_value(key.first, key.second); } };
     std::unordered_map<Key, range_set, Hasher> map;
 #else
     struct hasher {
         using is_avalanching = void;
-
         auto operator()(const Key& key) const noexcept -> uint64_t {
             struct S { uint64_t f; uint64_t s; };
             S s {.f=key.first, .s=key.second};
