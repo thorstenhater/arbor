@@ -400,6 +400,16 @@ else()
     message(FATAL_ERROR "Could not obtain tinyopt.")
 endif()
 
+CPMAddPackage(NAME unordered_dense
+              GITHUB_REPOSITORY martinus/unordered_dense
+              VERSION 4.5.0)
+if(unordered_dense_ADDED)
+    target_link_libraries(arbor-private-deps INTERFACE unordered_dense::unordered_dense)
+else()
+    find_package(unordered_dense CONFIG REQUIRED)
+    target_link_libraries(arbor-private-deps INTERFACE unordered_dense::unordered_dense)
+endif()
+
 # hide all internal vars
 mark_as_advanced(FORCE benchmark_DIR BENCHMARK_BUILD_32_BITS BENCHMARK_DOWNLOAD_DEPENDENCIES BENCHMARK_ENABLE_ASSEMBLY_TESTS BENCHMARK_ENABLE_DOXYGEN BENCHMARK_ENABLE_EXCEPTIONS BENCHMARK_ENABLE_GTEST_TESTS BENCHMARK_ENABLE_INSTALL BENCHMARK_ENABLE_LIBPFM BENCHMARK_ENABLE_LTO BENCHMARK_ENABLE_WERROR BENCHMARK_FORCE_WERROR BENCHMARK_INSTALL_DOCS BENCHMARK_USE_BUNDLED_GTEST BENCHMARK_USE_LIBCXX)
 mark_as_advanced(FORCE googletest_DIR BUILD_GMOCK)

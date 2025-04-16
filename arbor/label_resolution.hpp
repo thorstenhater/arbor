@@ -8,6 +8,8 @@
 #include <arbor/common_types.hpp>
 #include <arbor/util/expected.hpp>
 
+#include <ankerl/unordered_dense.h>
+
 #include <arbor/util/hash_def.hpp>
 
 namespace arb {
@@ -80,10 +82,23 @@ struct ARB_ARBOR_API label_resolution_map {
 private:
     using Key = std::pair<cell_gid_type, hash_type>;
 
+#if 0
     struct Hasher {
         std::size_t operator()(const Key& key) const { return hash_value(key.first, key.second); }
     };
     std::unordered_map<Key, range_set, Hasher> map;
+#else
+    struct hasher {
+        using is_avalanching = void;
+
+        auto operator()(const Key& key) const noexcept -> uint64_t {
+            struct S { uint64_t f; uint64_t s; };
+            S s {.f=key.first, .s=key.second};
+            return ankerl::unordered_dense::detail::wyhash::hash(&s, sizeof(s));
+        }
+    };
+    ankerl::unordered_dense::map<Key, range_set, hasher> map;
+#endif
 };
 
 // Struct used for resolving the lid of a (gid, label, lid_selection_policy) input.
