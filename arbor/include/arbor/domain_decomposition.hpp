@@ -60,6 +60,7 @@ private:
     std::vector<int> gid_rank_;
     std::vector<cell_size_type> gid_indx_;
 
+
     /// Number of distributed domains
     int num_domains_;
 
