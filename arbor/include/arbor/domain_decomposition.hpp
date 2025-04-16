@@ -56,10 +56,10 @@ public:
     const group_description& group(unsigned) const;
 
 private:
-    /// Return the domain id and index on domain of cell with gid.
-    /// Supplied by the load balancing algorithm that generates the domain
-    /// decomposition.
-    std::function<std::pair<int,cell_size_type>(cell_gid_type)> gid_domain_;
+    // TODO These scales as O(N_cells!!)
+    std::vector<int> gid_rank_;
+    std::vector<cell_size_type> gid_indx_;
+
 
     /// Number of distributed domains
     int num_domains_;
