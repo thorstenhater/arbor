@@ -109,6 +109,52 @@ void make_remote_connections(const std::vector<cell_gid_type>& gids,
     PL();
 }
 
+std::size_t make_connections_local(const recipe& rec,
+                                   resolver& target_resolver,
+                                   resolver& source_resolver,
+                                   const std::vector<cell_gid_type>& gids,
+                                   const domain_decomposition& dom_dec,
+                                   std::size_t num_total_cells_,
+                                   std::vector<std::vector<connection>>& connections_by_src_domain) {
+    // Construct connections from recipe callback
+    // NOTE: It'd great to parallelize here, however, as we write to different
+    //       src_domains *and* use the same resolvers, that's not feasible.
+    //       The only way to speed this up w/ more HW is to use more MPI tasks,
+    //       for now. The alternative is
+    //       - make coarsegrained parallel chunks,
+    //       - copy the resolvers into each
+    //       - generate one resultant vector each
+    //       - merge those serially
+    //       The word coarsegrained is load-bearing, as many small task will result
+    //       in many, many allocations and we don't have the proper primitives.
+    PE(init:communicator:update:connections:local);
+    target_resolver.clear();
+    std::size_t n_con = 0;
+    for (const auto tgt_gid: gids) {
+        auto iod = dom_dec.index_on_domain(tgt_gid);
+        source_resolver.clear();
+        for (const auto& conn: rec.connections_on(tgt_gid)) {
+            auto src_gid = conn.source.gid;
+            if(src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(tgt_gid, src_gid, num_total_cells_);
+            auto src_dom = dom_dec.gid_domain(src_gid);
+            auto src_lid = source_resolver.resolve(conn.source);
+            auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
+            // NOTE old compilers stumble over emplace_back here
+            connections_by_src_domain[src_dom].emplace_back(
+                connection{
+                .source={.gid=src_gid, .index=src_lid},
+                .target=tgt_lid,
+                .weight=conn.weight,
+                .delay=conn.delay,
+                .index_on_domain=iod
+            });
+            ++n_con;
+        }
+    }
+    PL();
+    return n_con;
+}
+
 void communicator::update_connections(const recipe& rec,
                                       const domain_decomposition& dom_dec,
                                       const label_resolution_map& source_resolution_map,
@@ -132,43 +178,9 @@ void communicator::update_connections(const recipe& rec,
     // Construct connection from external
     make_remote_connections(gids, rec, dom_dec, target_resolver, source_resolver, ext_connections_);
 
-    // Construct connections from recipe callback
-    // NOTE: It'd great to parallelize here, however, as we write to different
-    //       src_domains *and* use the same resolvers, that's not feasible.
-    //       The only way to speed this up w/ more HW is to use more MPI tasks,
-    //       for now. The alternative is
-    //       - make coarsegrained parallel chunks,
-    //       - copy the resolvers into each
-    //       - generate one resultant vector each
-    //       - merge those serially
-    //       The word coarsegrained is load-bearing, as many small task will result
-    //       in many, many allocations and we don't have the proper primitives.
-    PE(init:communicator:update:connections:local);
-    std::size_t n_con = 0;
+
     std::vector<std::vector<connection>> connections_by_src_domain(num_domains_);
-    target_resolver.clear();
-    for (const auto tgt_gid: gids) {
-        auto iod = dom_dec.index_on_domain(tgt_gid);
-        source_resolver.clear();
-        for (const auto& conn: rec.connections_on(tgt_gid)) {
-            auto src_gid = conn.source.gid;
-            if(src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(tgt_gid, src_gid, num_total_cells_);
-            auto src_dom = dom_dec.gid_domain(src_gid);
-            auto src_lid = source_resolver.resolve(conn.source);
-            auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
-            // NOTE old compilers stumble over emplace_back here
-            connections_by_src_domain[src_dom].emplace_back(
-                connection{
-                .source={.gid=src_gid, .index=src_lid},
-                .target=tgt_lid,
-                .weight=conn.weight,
-                .delay=conn.delay,
-                .index_on_domain=iod
-            });
-            ++n_con;
-        }
-    }
-    PL();
+    auto n_con = make_connections_local(rec, target_resolver, source_resolver, gids, dom_dec, num_total_cells_, connections_by_src_domain);
 
     // Construct connections from high-level specification.
     PE(init:communicator:update:connections:generated);
