@@ -64,7 +64,10 @@ struct cell_connection_base {
 };
 
 using cell_connection     = cell_connection_base<cell_global_label_type>;
+using raw_cell_connection = cell_connection_base<cell_member_type>;
 using ext_cell_connection = cell_connection_base<cell_remote_label_type>;
+
+using connections = std::vector<std::variant<cell_connection, raw_cell_connection>>;
 
 struct gap_junction_connection {
     cell_global_label_type peer;
@@ -78,40 +81,29 @@ struct gap_junction_connection {
 };
 
 struct ARB_ARBOR_API has_gap_junctions {
-    virtual std::vector<gap_junction_connection> gap_junctions_on(cell_gid_type) const {
-        return {};
-    }
+    virtual std::vector<gap_junction_connection> gap_junctions_on(cell_gid_type) const { return {}; }
     virtual ~has_gap_junctions() {}
 };
 
 struct ARB_ARBOR_API has_synapses {
-    virtual std::vector<cell_connection> connections_on(cell_gid_type) const {
-        return {};
-    }
+    virtual connections connections_on(cell_gid_type) const { return {}; }
+    virtual bool resolve_sources() const { return true; }
     // Optional network descriptions for generating cell connections
-    virtual std::optional<arb::network_description> network_description() const {
-        return std::nullopt;
-    };
+    virtual std::optional<arb::network_description> network_description() const { return std::nullopt; };
     virtual ~has_synapses() {}
 };
 
 struct ARB_ARBOR_API has_external_synapses {
-    virtual std::vector<ext_cell_connection> external_connections_on(cell_gid_type) const {
-        return {};
-    }
+    virtual std::vector<ext_cell_connection> external_connections_on(cell_gid_type) const { return {}; }
 };
 
 struct ARB_ARBOR_API has_probes {
-    virtual std::vector<probe_info> get_probes(cell_gid_type gid) const {
-        return {};
-    }
+    virtual std::vector<probe_info> get_probes(cell_gid_type gid) const { return {}; }
     virtual ~has_probes() {}
 };
 
 struct ARB_ARBOR_API has_generators {
-    virtual std::vector<event_generator> event_generators(cell_gid_type) const {
-        return {};
-    }
+    virtual std::vector<event_generator> event_generators(cell_gid_type) const { return {}; }
     virtual ~has_generators() {}
 };
 

@@ -1,4 +1,3 @@
-#include <numeric>
 #include <utility>
 #include <vector>
 #include <limits>
@@ -8,6 +7,7 @@
 #include <arbor/domain_decomposition.hpp>
 #include <arbor/recipe.hpp>
 #include <arbor/spike.hpp>
+#include <arbor/arbexcept.hpp>
 #include <include/arbor/arbexcept.hpp>
 
 #include "communication/gathered_vector.hpp"
@@ -129,23 +129,46 @@ std::size_t make_connections_local(const recipe& rec,
     //       in many, many allocations and we don't have the proper primitives.
     PE(init:communicator:update:connections:local);
     target_resolver.clear();
+    bool do_resolve = !rec.resolve_sources();
     std::size_t n_con = 0;
     for (const auto tgt_gid: gids) {
         auto iod = dom_dec.index_on_domain(tgt_gid);
         source_resolver.clear();
         for (const auto& conn: rec.connections_on(tgt_gid)) {
-            auto src_gid = conn.source.gid;
+            cell_gid_type src_gid = -1;
+            cell_lid_type src_lid = -1;
+            cell_lid_type tgt_lid = -1;
+            float weight = -1;
+            float delay = -1;
+            if (std::holds_alternative<cell_connection>(conn)) {
+                if (!do_resolve) throw
+                auto cn = std::get<cell_connection>(conn);
+                src_gid = cn.source.gid;
+                tgt_lid = target_resolver.resolve(tgt_gid, cn.target);
+                src_lid = source_resolver.resolve(cn.source);
+                weight = cn.weight;
+                delay = cn.delay;
+            }
+            else if (std::holds_alternative<raw_cell_connection>(conn)) {
+                auto cn = std::get<raw_cell_connection>(conn);
+                src_gid = cn.source.gid;
+                tgt_lid = target_resolver.resolve(tgt_gid, cn.target);
+                src_lid = cn.source.index;
+                weight = cn.weight;
+                delay = cn.delay;
+            }
+            else {
+                ARB_UNREACHABLE;
+            }
             if(src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(tgt_gid, src_gid, num_total_cells_);
             auto src_dom = dom_dec.gid_domain(src_gid);
-            auto src_lid = source_resolver.resolve(conn.source);
-            auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
             // NOTE old compilers stumble over emplace_back here
             connections_by_src_domain[src_dom].emplace_back(
                 connection{
                 .source={.gid=src_gid, .index=src_lid},
                 .target=tgt_lid,
-                .weight=conn.weight,
-                .delay=conn.delay,
+                .weight=weight,
+                .delay=delay,
                 .index_on_domain=iod
             });
             ++n_con;

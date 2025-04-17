@@ -34,7 +34,7 @@ public:
 
     std::vector<event_generator> event_generators(cell_gid_type i) const override;
 
-    std::vector<cell_connection> connections_on(cell_gid_type i) const override;
+    connections connections_on(cell_gid_type i) const override;
 
     std::vector<probe_info> get_probes(cell_gid_type i) const override;
 

@@ -17,7 +17,6 @@
 #include <arbor/simulation.hpp>
 #include <arbor/recipe.hpp>
 #include <arbor/version.hpp>
-#include <arbor/symmetric_recipe.hpp>
 
 #include <arborenv/default_env.hpp>
 #include <arborenv/gpu_env.hpp>
@@ -76,8 +75,8 @@ struct ring_recipe: public arb::recipe {
 
     // Each cell has one incoming connection, from cell with gid-1,
     // and fan_in-1 random connections with very low weight.
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        std::vector<arb::cell_connection> cons;
+    arb::connections connections_on(cell_gid_type gid) const override {
+        arb::connections cons;
         const auto ncons = params_.cell.synapses;
         cons.reserve(ncons);
 
@@ -86,7 +85,7 @@ struct ring_recipe: public arb::recipe {
         const auto group_start = s*group;
         const auto group_end = std::min(group_start+s, num_cells_);
         cell_gid_type src = gid==group_start? group_end-1: gid-1;
-        cons.push_back(arb::cell_connection({src, "d"}, {"p"}, event_weight_, min_delay_*U::ms));
+        cons.push_back(arb::raw_cell_connection({src, 0}, {"p"}, event_weight_, min_delay_*U::ms));
         return cons;
     }
 
@@ -119,8 +118,7 @@ struct tiled_recipe: arb::recipe {
     arb::cell_kind get_cell_kind(cell_gid_type gid) const override { return recipe_.get_cell_kind(gid % recipe_.num_cells()); }
     std::any get_global_properties(arb::cell_kind k) const override { return recipe_.get_global_properties(k); }
 
-    //
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
+    arb::connections connections_on(cell_gid_type gid) const override {
         if (gid >= recipe_.num_cells_) throw std::runtime_error{"Up"};
         // tile internal
         auto conns = recipe_.connections_on(gid % recipe_.num_cells());
@@ -134,10 +132,12 @@ struct tiled_recipe: arb::recipe {
             auto src = dist(src_gen);
             if (src==gid) ++src;
             const float delay = recipe_.min_delay_ + delay_dist(src_gen);
-            conns.push_back(arb::cell_connection({src, "d"}, {"p"}, 0.f, delay*U::ms));
+            conns.push_back(arb::raw_cell_connection({src, 0}, {"p"}, 0.f, delay*U::ms));
         }
         return conns;
     }
+
+    bool resolve_sources() const override { return false; }
 
     std::vector<arb::event_generator> event_generators(cell_gid_type gid) const override { return recipe_.event_generators(gid % recipe_.num_cells()); }
 

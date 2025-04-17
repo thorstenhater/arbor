@@ -21,16 +21,26 @@ std::vector<event_generator> symmetric_recipe::event_generators(cell_gid_type i)
 }
 
 // Take connections_on from the original tile recipe for the cell we are duplicating.
-// Transate the source and destination gids
-std::vector<cell_connection> symmetric_recipe::connections_on(cell_gid_type i) const {
+// Translate the source and destination gids
+connections symmetric_recipe::connections_on(cell_gid_type i) const {
     int n_local = tiled_recipe_->num_cells();
     int n_global = num_cells();
     int offset = (i / n_local) * n_local;
 
-    std::vector<cell_connection> conns = tiled_recipe_->connections_on(i % n_local);
+    auto conns = tiled_recipe_->connections_on(i % n_local);
 
     for (unsigned j = 0; j < conns.size(); j++) {
-        conns[j].source.gid = (conns[j].source.gid + offset) % n_global;
+        if (std::holds_alternative<cell_connection>(conns[j])) {
+            auto& cn = std::get<cell_connection>(conns[j]);
+            cn.source.gid  = (cn.source.gid + offset) % n_global;
+        }
+        else if (std::holds_alternative<raw_cell_connection>(conns[j])) {
+            auto& cn = std::get<raw_cell_connection>(conns[j]);
+            cn.source.gid  = (cn.source.gid + offset) % n_global;
+        }
+        else {
+            ARB_UNREACHABLE;
+        }
     }
     return conns;
 }
