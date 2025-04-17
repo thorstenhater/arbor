@@ -12,6 +12,8 @@
 
 #include <arbor/util/hash_def.hpp>
 
+#include "util/smallvec.hpp"
+
 namespace arb {
 
 // class containing the data required for {cell, label} to lid resolution.
@@ -67,7 +69,8 @@ struct ARB_ARBOR_API cell_labels_and_gids {
 struct ARB_ARBOR_API label_resolution_map {
     struct range_set {
         std::size_t size = 0;
-        std::vector<lid_range> ranges;
+        // most range sets have one entry
+        util::small_vector<lid_range, 1> ranges;
         cell_lid_type at(unsigned idx) const;
     };
 
@@ -78,27 +81,23 @@ struct ARB_ARBOR_API label_resolution_map {
     std::size_t count(cell_gid_type gid, hash_type hash) const;
     const range_set& at(cell_gid_type gid, const cell_tag_type& tag) const { return at(gid, hash_value(tag)); }
     std::size_t count(cell_gid_type gid, const cell_tag_type& tag) const { return count(gid, hash_value(tag)); }
+    auto find(cell_gid_type gid, hash_type hash) const { return map.find(Key{gid, hash}); }
+    auto end() const { return map.end(); }
 
 private:
-    using Key = std::pair<cell_gid_type, hash_type>;
-
-#if 0
-    struct Hasher {
-        std::size_t operator()(const Key& key) const { return hash_value(key.first, key.second); }
+    struct Key {
+        uint64_t f, s;
+        bool operator==(const Key&) const = default;
     };
-    std::unordered_map<Key, range_set, Hasher> map;
-#else
+
     struct hasher {
         using is_avalanching = void;
-
         auto operator()(const Key& key) const noexcept -> uint64_t {
-            struct S { uint64_t f; uint64_t s; };
-            S s {.f=key.first, .s=key.second};
-            return ankerl::unordered_dense::detail::wyhash::hash(&s, sizeof(s));
+            static_assert(std::has_unique_object_representations_v<Key>, "Key must be bit-hashable.");
+            return ankerl::unordered_dense::detail::wyhash::hash(&key, sizeof(key));
         }
     };
     ankerl::unordered_dense::map<Key, range_set, hasher> map;
-#endif
 };
 
 // Struct used for resolving the lid of a (gid, label, lid_selection_policy) input.

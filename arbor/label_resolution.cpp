@@ -1,7 +1,7 @@
 #include <iterator>
 #include <vector>
 #include <numeric>
-#include <unordered_set>
+#include <algorithm>
 
 #include <arbor/assert.hpp>
 #include <arbor/arbexcept.hpp>
@@ -10,7 +10,6 @@
 #include <arbor/util/hash_def.hpp>
 
 #include "label_resolution.hpp"
-#include "util/partition.hpp"
 #include "util/span.hpp"
 
 namespace arb {
@@ -80,22 +79,18 @@ bool cell_labels_and_gids::check_invariant() const {
        len0     len1
 */
 cell_lid_type label_resolution_map::range_set::at(unsigned idx) const {
-    if (0 == size) throw arbor_internal_error("no valid lids");
+    if (idx >= size) throw arbor_internal_error("invalid lid");
     for (const auto& [beg, end]: ranges) {
         auto len = end - beg;
         if (idx < len) return idx + beg;
         idx -= len;
     }
-    throw arbor_internal_error("invalid lid");
+    ARB_UNREACHABLE;
 }
 
-const label_resolution_map::range_set& label_resolution_map::at(cell_gid_type gid, hash_type hash) const {
-    return map.at(std::make_pair(gid, hash));
-}
+const label_resolution_map::range_set& label_resolution_map::at(cell_gid_type gid, hash_type hash) const { return map.at(Key{gid, hash}); }
 
-std::size_t label_resolution_map::count(cell_gid_type gid, hash_type hash) const {
-    return map.count(std::make_pair(gid, hash));
-}
+std::size_t label_resolution_map::count(cell_gid_type gid, hash_type hash) const { return map.count(Key{gid, hash}); }
 
 label_resolution_map::label_resolution_map(const cell_labels_and_gids& clg) {
     arb_assert(clg.label_range.check_invariant());
@@ -106,13 +101,15 @@ label_resolution_map::label_resolution_map(const cell_labels_and_gids& clg) {
 
     map.reserve(labels.size());
     auto lo = 0;
+    Key key;
     for (auto idx: util::count_along(gids)) {
         auto gid = gids[idx];
         auto size = sizes[idx];
+        key.f = gid;
         for (auto label_idx: util::make_span(lo, lo + size)) {
-            const auto range = ranges[label_idx];
-            auto& label = labels[label_idx];
-            auto& range_set = map[std::make_pair(gid, label)];
+            auto range = ranges[label_idx];
+            key.s = labels[label_idx];
+            auto& range_set = map[key];
             range_set.ranges.push_back(range);
             range_set.size += range.end - range.begin;
         }
@@ -125,23 +122,26 @@ cell_lid_type resolver::resolve(const cell_global_label_type& iden) { return res
 cell_lid_type resolver::resolve(cell_gid_type gid, const cell_local_label_type& label) {
     const auto& [tag, pol] = label;
     auto hash = hash_value(tag);
-    if (!label_map_->count(gid, hash)) throw arb::bad_connection_label(gid, tag, "label does not exist");
-    const auto& range_set = label_map_->at(gid, hash);
-    if (range_set.size <= 0) throw arb::bad_connection_label(gid, tag, "no valid lids");
-    auto idx = 0ul;
+    auto it = label_map_->find(gid, hash);
+    if (it == label_map_->end()) throw arb::bad_connection_label(gid, tag, "label does not exist");
+    auto rs_size = it->second.size;
+    if (rs_size <= 0) throw arb::bad_connection_label(gid, tag, "no valid lids");
     if (pol == lid_selection_policy::assert_univalent) {
         // must have single-entry range_set
-        if (range_set.size != 1) throw arb::bad_connection_label(gid, tag, "range is not univalent");
+        if (rs_size != 1) throw arb::bad_connection_label(gid, tag, "range is not univalent");
+        return it->second.at(0);
     }
     else if (pol == lid_selection_policy::round_robin) {
         // cycle through range_set
-        idx = rr_state_map_[gid][hash];
-        rr_state_map_[gid][hash] = (idx + 1) % range_set.size;
+        auto idx = rr_state_map_[gid][hash];
+        rr_state_map_[gid][hash] = (idx + 1) % rs_size;
+        return it->second.at(idx);
     }
     else if (pol == lid_selection_policy::round_robin_halt) {
         // use previous state of round_robin policy
-        idx = rr_state_map_[gid][hash];
+        auto idx = rr_state_map_[gid][hash];
+        return it->second.at(idx);
     }
-    return range_set.at(idx);
+    ARB_UNREACHABLE;
 }
 } // namespace arb
