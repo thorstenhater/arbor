@@ -3,6 +3,8 @@
 #include <arbor/export.hpp>
 #include <arbor/assert_macro.hpp>
 
+#define ARB_UNREACHABLE __builtin_unreachable()
+
 namespace arb {
 
 using failed_assertion_handler_t =
