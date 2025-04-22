@@ -213,7 +213,7 @@ namespace {
             return gid%2? cell_kind::cable: cell_kind::lif;
         }
 
-        std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
+        arb::connections_type connections_on(cell_gid_type gid) const override {
             // a single connection from the preceding cell, i.e. a ring
             // weight is the target gid
             // delay is 1
@@ -281,8 +281,8 @@ namespace {
             return cell_kind::cable;
         }
 
-        std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
-            std::vector<cell_connection> cons;
+        arb::connections_type connections_on(cell_gid_type gid) const override {
+            arb::connections_type cons;
             cons.reserve(size_);
             for (auto sid: util::make_span(0, size_)) {
                 cons.emplace_back(cell_connection{{sid, {"src", arb::lid_selection_policy::round_robin}}, // source
@@ -358,7 +358,7 @@ namespace {
             return gid%3 != 1? cell_kind::cable: cell_kind::lif;
         }
 
-        std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
+        arb::connections_type connections_on(cell_gid_type gid) const override {
             // Cells with gid%3 == 1 are senders, the others are receivers.
             // The following connections are formed; used to test out lid resolutions:
             // 7 from detectors_0 (round-robin) to synapses_0 (round-robin)
@@ -391,22 +391,22 @@ namespace {
             //   {1, 3} -> {2, 1}
             //   {1, 3} -> {2, 0}
             //   {1, 3} -> {2, 2}
-            std::vector<cell_connection> cons;
+            arb::connections_type cons;
             using pol = lid_selection_policy;
             if (gid%3 != 1) {
                 for (auto sid: util::make_span(0, ncells_)) {
                     if (sid%3 == 1) {
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_0", pol::round_robin}, {"synapses_1", pol::assert_univalent}, 1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_1", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_1", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
-                        cons.push_back({{sid, "detectors_1", pol::assert_univalent}, {"synapses_1", pol::round_robin}, 1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_0", pol::round_robin}, {"synapses_1", pol::assert_univalent}, 1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_1", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_1", pol::round_robin}, {"synapses_0", pol::round_robin},      1.0, 1.0*U::ms});
+                        cons.push_back(arb::cell_connection{{sid, "detectors_1", pol::assert_univalent}, {"synapses_1", pol::round_robin}, 1.0, 1.0*U::ms});
                     }
                 }
             }

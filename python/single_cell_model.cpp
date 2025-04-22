@@ -106,17 +106,11 @@ struct single_cell_recipe: arb::recipe {
     }
 
     // connections and event generators
+    virtual arb::connections_type connections_on(arb::cell_gid_type gid) const override {return {}; }
 
-    virtual std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
-        return {};
-    }
-
-    virtual std::vector<arb::event_generator> event_generators(arb::cell_gid_type) const override {
-        return event_generators_;
-    }
+    virtual std::vector<arb::event_generator> event_generators(arb::cell_gid_type) const override { return event_generators_; }
 
     // probes
-
     virtual std::vector<arb::probe_info> get_probes(arb::cell_gid_type gid) const override {
         // For now only voltage can be selected for measurement.
         std::vector<arb::probe_info> pinfo;

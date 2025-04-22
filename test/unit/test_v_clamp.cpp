@@ -21,7 +21,6 @@ struct v_proc_recipe: public arb::recipe {
 
     arb::cell_size_type num_cells() const override { return 1; }
     arb::cell_kind get_cell_kind(arb::cell_gid_type gid) const override { return arb::cell_kind::cable; }
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override { return {}; }
     arb::util::unique_any get_cell_description(arb::cell_gid_type gid) const override {
         auto tree = arb::segment_tree{};
         auto p = arb::mnpos;

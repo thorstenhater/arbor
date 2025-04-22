@@ -67,7 +67,7 @@ using cell_connection     = cell_connection_base<cell_global_label_type>;
 using raw_cell_connection = cell_connection_base<cell_member_type>;
 using ext_cell_connection = cell_connection_base<cell_remote_label_type>;
 
-using connections = std::vector<std::variant<cell_connection, raw_cell_connection>>;
+using connections_type = std::vector<std::variant<cell_connection, raw_cell_connection>>;
 
 struct gap_junction_connection {
     cell_global_label_type peer;
@@ -86,7 +86,7 @@ struct ARB_ARBOR_API has_gap_junctions {
 };
 
 struct ARB_ARBOR_API has_synapses {
-    virtual connections connections_on(cell_gid_type) const { return {}; }
+    virtual connections_type connections_on(cell_gid_type) const { return {}; }
     virtual bool resolve_sources() const { return true; }
     // Optional network descriptions for generating cell connections
     virtual std::optional<arb::network_description> network_description() const { return std::nullopt; };

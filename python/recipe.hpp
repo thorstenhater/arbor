@@ -38,9 +38,8 @@ public:
     virtual std::vector<pybind11::object> event_generators(arb::cell_gid_type gid) const {
         return {};
     }
-    virtual std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const {
-        return {};
-    }
+    virtual arb::connections_type connections_on(arb::cell_gid_type gid) const { return {}; }
+
     virtual std::vector<arb::ext_cell_connection> external_connections_on(arb::cell_gid_type gid) const {
         return {};
     }
@@ -84,8 +83,8 @@ public:
         PYBIND11_OVERRIDE(std::vector<pybind11::object>, recipe, event_generators, gid);
     }
 
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
-        PYBIND11_OVERRIDE(std::vector<arb::cell_connection>, recipe, connections_on, gid);
+    arb::connections_type connections_on(arb::cell_gid_type gid) const override {
+        PYBIND11_OVERRIDE(arb::connections_type, recipe, connections_on, gid);
     }
 
     std::vector<arb::ext_cell_connection> external_connections_on(arb::cell_gid_type gid) const override {
@@ -144,7 +143,7 @@ public:
 
     std::vector<arb::event_generator> event_generators(arb::cell_gid_type gid) const override;
 
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
+    arb::connections_type connections_on(arb::cell_gid_type gid) const override {
         return try_catch_pyexception([&](){ return impl_->connections_on(gid); }, msg);
     }
 

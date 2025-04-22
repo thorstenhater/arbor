@@ -30,12 +30,13 @@
 #include <arborenv/with_mpi.hpp>
 #endif
 
+using arb::cable_probe_membrane_voltage;
 using arb::cell_gid_type;
+using arb::cell_kind;
 using arb::cell_lid_type;
 using arb::cell_size_type;
-using arb::cell_kind;
+using arb::connections_type;
 using arb::time_type;
-using arb::cable_probe_membrane_voltage;
 
 using namespace arborio::literals;
 namespace U = arb::units;
@@ -78,32 +79,34 @@ public:
 
     // Each cell has one incoming connection, from cell with gid-1,
     // and fan_in-1 random connections with very low weight.
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        std::vector<arb::cell_connection> cons;
-        const auto ncons = params_.cell.synapses;
-        cons.reserve(ncons);
+    connections_type connections_on(cell_gid_type gid) const override {
+      connections_type cons;
+      const auto ncons = params_.cell.synapses;
+      cons.reserve(ncons);
 
-        const auto s = params_.ring_size;
-        const auto group = gid/s;
-        const auto group_start = s*group;
-        const auto group_end = std::min(group_start+s, num_cells_);
-        cell_gid_type src = gid==group_start? group_end-1: gid-1;
-        cons.push_back(arb::cell_connection({src, "d"}, {"p"}, event_weight_, min_delay_*U::ms));
+      const auto s = params_.ring_size;
+      const auto group = gid / s;
+      const auto group_start = s * group;
+      const auto group_end = std::min(group_start + s, num_cells_);
+      cell_gid_type src = gid == group_start ? group_end - 1 : gid - 1;
+      cons.push_back(arb::cell_connection({src, "d"}, {"p"}, event_weight_,
+                                          min_delay_ * U::ms));
 
-        // Used to pick source cell for a connection.
-        std::uniform_int_distribution<cell_gid_type> dist(0, num_cells_-2);
-        // Used to pick delay for a connection.
-        std::uniform_real_distribution<float> delay_dist(0, 2*min_delay_);
-        auto src_gen = std::mt19937(gid);
-        for (unsigned i=1; i<ncons; ++i) {
-            // Make a connection with weight 0.
-            // The source is randomly picked, with no self connections.
-            src = dist(src_gen);
-            if (src==gid) ++src;
-            const float delay = min_delay_+delay_dist(src_gen);
-            cons.push_back(
-                arb::cell_connection({src, "d"}, {"p"}, 0.f, delay*U::ms));
-        }
+      // Used to pick source cell for a connection.
+      std::uniform_int_distribution<cell_gid_type> dist(0, num_cells_ - 2);
+      // Used to pick delay for a connection.
+      std::uniform_real_distribution<float> delay_dist(0, 2 * min_delay_);
+      auto src_gen = std::mt19937(gid);
+      for (unsigned i = 1; i < ncons; ++i) {
+        // Make a connection with weight 0.
+        // The source is randomly picked, with no self connections.
+        src = dist(src_gen);
+        if (src == gid)
+          ++src;
+        const float delay = min_delay_ + delay_dist(src_gen);
+        cons.push_back(
+            arb::cell_connection({src, "d"}, {"p"}, 0.f, delay * U::ms));
+      }
         return cons;
     }
 

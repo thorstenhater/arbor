@@ -22,7 +22,7 @@ std::vector<event_generator> symmetric_recipe::event_generators(cell_gid_type i)
 
 // Take connections_on from the original tile recipe for the cell we are duplicating.
 // Translate the source and destination gids
-connections symmetric_recipe::connections_on(cell_gid_type i) const {
+connections_type symmetric_recipe::connections_on(cell_gid_type i) const {
     int n_local = tiled_recipe_->num_cells();
     int n_global = num_cells();
     int offset = (i / n_local) * n_local;

@@ -135,7 +135,7 @@ struct lif_chain: public recipe {
         };
     }
 
-    std::vector<cell_connection> connections_on(cell_gid_type target) const override {
+    connections_type connections_on(cell_gid_type target) const override {
         if (target) return {cell_connection({target-1, "src"}, {"tgt"}, weight_, delay_*U::ms)};
         return {};
     }

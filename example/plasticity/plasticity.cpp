@@ -33,7 +33,7 @@ struct recipe: public arb::recipe {
     arb::region all    = "(all)"_reg;           // Whole cell
     arb::cell_size_type n_ = 0;                 // Cell count
 
-    std::unordered_map<arb::cell_gid_type, std::vector<arb::cell_connection>> connected; // lookup table for connections
+    std::unordered_map<arb::cell_gid_type, arb::connections_type> connected; // lookup table for connections
     // Required but uninteresting methods
     recipe(arb::cell_size_type n): n_{n} {}
     arb::cell_size_type num_cells() const override { return n_; }
@@ -50,10 +50,8 @@ struct recipe: public arb::recipe {
         return {{arb::cable_probe_membrane_voltage{center}, "Um"}};
     }
     // Look up the (potential) connection to this cell
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
-        if (auto it = connected.find(gid); it != connected.end()) {
-            return it->second;
-        }
+    arb::connections_type connections_on(arb::cell_gid_type gid) const override {
+        if (auto it = connected.find(gid); it != connected.end()) return it->second;
         return {};
     }
     // Connect cell `to` to the spike source

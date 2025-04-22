@@ -1,5 +1,4 @@
 #include <string>
-#include <sstream>
 
 #include <arbor/arbexcept.hpp>
 #include <arbor/common_types.hpp>
@@ -24,6 +23,12 @@ arbor_internal_error::arbor_internal_error(const std::string& what):
 }
 
 domain_error::domain_error(const std::string& w): arbor_exception(w) {}
+
+no_resolver_configured::no_resolver_configured(cell_gid_type tgt_, cell_gid_type src_):
+    arbor_exception(pprintf("Your recpie asked for resolving labels for connecting gids {}. However the recipe disabled resolution completely.", src, tgt)),
+    src(src_), tgt(tgt_)
+{}
+
 
 bad_cell_probe::bad_cell_probe(cell_kind kind, cell_gid_type gid):
     arbor_exception(pprintf("Probe kind is not supported for cell with gid {} of kind {}. Possibly the cell kind is not probeable at all.", gid, kind)),

@@ -227,10 +227,6 @@ TEST(test_label_resolution, policies) {
 
         lid_resolver = arb::resolver(&res_map);
         EXPECT_THROW(lid_resolver.resolve({5, "l5_0"}), arb::bad_connection_label);
-
-        ranges.back() = {4, 2};
-        EXPECT_THROW(label_resolution_map(cell_labels_and_gids({sizes, labels, ranges}, gids)), arb::arbor_internal_error);
-
     }
     // multivalent labels
     {

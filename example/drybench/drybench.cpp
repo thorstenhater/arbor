@@ -73,9 +73,10 @@ bench_params read_options(int argc, char** argv);
 std::ostream& operator<<(std::ostream& o, const bench_params& p);
 
 using arb::cell_gid_type;
+using arb::cell_kind;
 using arb::cell_lid_type;
 using arb::cell_size_type;
-using arb::cell_kind;
+using arb::connections_type;
 using arb::time_type;
 
 class tile_desc: public arb::tile {
@@ -105,19 +106,19 @@ public:
 
     // Each cell has num_synapses incoming connections, from any cell in the
     // network spanning all ranks, src gid in {0, ..., num_cells_*num_tiles_ - 1}.
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        std::uniform_int_distribution<cell_gid_type>
-            source_distribution(0, num_cells_*num_tiles_ - 2);
-
-        std::vector<arb::cell_connection> conns;
-        auto src_gen = std::mt19937(gid);
-        for (unsigned i=0; i<params_.network.fan_in; ++i) {
-            auto src = source_distribution(src_gen);
-            if (src>=gid) ++src;
-            conns.push_back(arb::cell_connection({src, "src"}, {"tgt"}, 1.f, params_.network.min_delay*U::ms));
-        }
-
-        return conns;
+    connections_type connections_on(cell_gid_type gid) const override {
+      std::uniform_int_distribution<cell_gid_type> source_distribution(
+          0, num_cells_ * num_tiles_ - 2);
+      connections_type conns;
+      auto src_gen = std::mt19937(gid);
+      for (unsigned i = 0; i < params_.network.fan_in; ++i) {
+        auto src = source_distribution(src_gen);
+        if (src >= gid)
+          ++src;
+        conns.push_back(arb::cell_connection(
+            {src, "src"}, {"tgt"}, 1.f, params_.network.min_delay * U::ms));
+      }
+      return conns;
     }
 
 private:

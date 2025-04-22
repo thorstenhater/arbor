@@ -36,13 +36,11 @@ struct ring_recipe: public arb::recipe {
         return cell_kind::lif;
     }
 
-    std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
-        if (gid == 0) {
-            return {};
-        }
+    arb::connections_type connections_on(cell_gid_type gid) const override {
+        if (gid == 0) return {};
 
         // In a ring, each cell has just one incoming connection.
-        std::vector<cell_connection> connections;
+        arb::connections_type connections;
         // gid-1 >= 0 since gid != 0
         auto src_gid = (gid - 1) % n_lif_cells_;
         cell_connection conn({src_gid, "src"}, {"tgt"}, weight_, delay_*U::ms);
@@ -90,9 +88,9 @@ public:
         return cell_kind::lif;
     }
 
-    std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
+    arb::connections_type connections_on(cell_gid_type gid) const override {
         if (gid == 0) return {};
-        return {{{gid-1, "src"}, {"tgt"}, weight_, delay_*U::ms}};
+        return {arb::cell_connection{{gid-1, "src"}, {"tgt"}, weight_, delay_*U::ms}};
     }
 
     util::unique_any get_cell_description(cell_gid_type gid) const override {
@@ -125,13 +123,17 @@ public:
     cell_kind get_cell_kind(cell_gid_type gid) const override {
         return cell_kind::lif;
     }
-    std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
-        std::vector<cell_connection> res;
+
+    arb::connections_type connections_on(cell_gid_type gid) const override {
+        arb::connections_type res;
         // Use a fictious GID
-        for (size_t ix = 0; ix < n_conn_; ++ix) res.emplace_back(cell_global_label_type{0, "src"},
-                                                                 cell_local_label_type{"tgt"},
-                                                                 0.0,
-                                                                 5*U::us);
+        for (size_t ix = 0; ix < n_conn_; ++ix) {
+                res.emplace_back(
+                        arb::cell_connection{cell_global_label_type{0, "src"},
+                                             cell_local_label_type{"tgt"},
+                                             0.0,
+                                             5*U::us});
+        }
         return res;
     }
     util::unique_any get_cell_description(cell_gid_type gid) const override {
@@ -166,14 +168,13 @@ TEST(lif_cell_group, throw) {
     EXPECT_NO_THROW(simulation(rec, context, decomp));
 }
 
-TEST(lif_cell_group, recipe)
-{
+TEST(lif_cell_group, recipe) {
     ring_recipe rr(100, 1, 0.1);
     EXPECT_EQ(101u, rr.num_cells());
     EXPECT_EQ(2u, rr.connections_on(1u).size());
     EXPECT_EQ(1u, rr.connections_on(55u).size());
-    EXPECT_EQ(0u, rr.connections_on(1u)[0].source.gid);
-    EXPECT_EQ(100u, rr.connections_on(1u)[1].source.gid);
+    EXPECT_EQ(0u, std::get<arb::cell_connection>(rr.connections_on(1u)[0]).source.gid);
+    EXPECT_EQ(100u, std::get<arb::cell_connection>(rr.connections_on(1u)[1]).source.gid);
 }
 
 TEST(lif_cell_group, spikes) {

@@ -54,6 +54,12 @@ struct ARB_SYMBOL_VISIBLE invalid_mechanism_kind: arbor_exception {
     arb_mechanism_kind kind;
 };
 
+struct ARB_SYMBOL_VISIBLE no_resolver_configured: arbor_exception {
+    no_resolver_configured(cell_gid_type tgt, cell_gid_type src);
+    cell_gid_type src;
+    cell_gid_type tgt;
+};
+
 struct ARB_SYMBOL_VISIBLE bad_cell_description: arbor_exception {
     bad_cell_description(cell_kind kind, cell_gid_type gid);
     cell_gid_type gid;

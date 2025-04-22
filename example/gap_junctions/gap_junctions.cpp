@@ -82,10 +82,8 @@ public:
         return cell_kind::cable;
     }
 
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
-        if(gid % params_.n_cells_per_cable || (int)gid - 1 < 0) {
-            return{};
-        }
+    arb::connections_type connections_on(cell_gid_type gid) const override {
+        if(gid % params_.n_cells_per_cable || (int)gid - 1 < 0) return{};
         return {arb::cell_connection({gid - 1, "detector"}, {"syn"}, params_.event_weight, params_.event_min_delay*U::ms)};
     }
 

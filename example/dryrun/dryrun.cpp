@@ -90,7 +90,7 @@ public:
 
     // Each cell has one incoming connection, from any cell in the network spanning all ranks:
     // src gid in {0, ..., num_cells_*num_tiles_ - 1}.
-    std::vector<arb::cell_connection> connections_on(cell_gid_type gid) const override {
+    arb::connections_type connections_on(cell_gid_type gid) const override {
         std::uniform_int_distribution<cell_gid_type> source_distribution(0, num_cells_*num_tiles_ - 2);
 
         auto src_gen = std::mt19937(gid);

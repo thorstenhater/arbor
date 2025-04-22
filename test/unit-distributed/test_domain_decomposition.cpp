@@ -47,15 +47,6 @@ namespace {
                 cell_kind::cable;
         }
 
-        std::vector<cell_connection> connections_on(cell_gid_type) const override {
-            return {};
-        }
-
-        std::vector<event_generator> event_generators(cell_gid_type) const override {
-            return {};
-        }
-
-
     private:
         cell_size_type size_;
     };

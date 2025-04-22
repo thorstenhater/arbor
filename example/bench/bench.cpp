@@ -101,9 +101,9 @@ public:
         return arb::cell_kind::benchmark;
     }
 
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
+    arb::connections_type connections_on(arb::cell_gid_type gid) const override {
         const auto n = params_.network.fan_in;
-        std::vector<arb::cell_connection> cons;
+        arb::connections_type cons;
         cons.reserve(n);
         using rng_type = std::mt19937_64;
         rng_type rng(gid);

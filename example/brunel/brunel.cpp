@@ -4,7 +4,6 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
-#include <set>
 #include <vector>
 
 #include <tinyopt/tinyopt.h>
@@ -73,7 +72,7 @@ void add_subset(cell_gid_type gid,
                 unsigned m,
                 const std::string& src, const std::string& tgt,
                 float weight, float delay,
-                std::vector<cell_connection>& conns);
+                connections_type& conns);
 
 /*
    A Brunel network consists of nexc excitatory LIF neurons and ninh inhibitory
@@ -142,8 +141,8 @@ public:
         }
     }
 
-    std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
-        std::vector<cell_connection> connections;
+    connections_type connections_on(cell_gid_type gid) const override {
+        connections_type connections;
         // Add incoming excitatory and inhibitory connections.
         add_subset(gid, 0,           ncells_exc_,               in_degree_exc_, "src", "tgt", weight_exc_, delay_, connections);
         add_subset(gid, ncells_exc_, ncells_inh_ + ncells_exc_, in_degree_inh_, "src", "tgt", weight_inh_, delay_, connections);
@@ -349,7 +348,7 @@ void add_subset(cell_gid_type gid,
                 unsigned m,
                 const std::string& src, const std::string& tgt,
                 float weight, float delay,
-                std::vector<cell_connection>& conns) {
+                arb::connections_type& conns) {
     // We can only add this many connections!
     auto gid_in_range = int(gid >= start && gid < end);
     if (m + start + gid_in_range >= end) throw std::runtime_error("Requested too many connections from the given range of gids.");

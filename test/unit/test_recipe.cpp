@@ -22,7 +22,7 @@ namespace U = arb::units;
 namespace {
 struct custom_recipe: public recipe {
     custom_recipe(std::vector<cable_cell> cells,
-                  std::vector<std::vector<cell_connection>> conns,
+                  std::vector<connections_type> conns,
                   std::vector<std::vector<gap_junction_connection>> gjs,
                   std::vector<std::vector<arb::event_generator>> gens):
         num_cells_(cells.size()),
@@ -37,13 +37,13 @@ struct custom_recipe: public recipe {
     arb::util::unique_any get_cell_description(cell_gid_type gid) const override { return cells_.at(gid); }
     cell_kind get_cell_kind(cell_gid_type gid) const override { return cell_kind::cable; }
     std::vector<gap_junction_connection> gap_junctions_on(cell_gid_type gid) const override { return gap_junctions_.at(gid); }
-    std::vector<cell_connection> connections_on(cell_gid_type gid) const override { return connections_.at(gid); }
+    connections_type connections_on(cell_gid_type gid) const override { return connections_.at(gid); }
     std::vector<arb::event_generator> event_generators(cell_gid_type gid) const override { return event_generators_.at(gid); }
     std::any get_global_properties(cell_kind) const override { return gprop; }
 
 private:
     cell_size_type num_cells_;
-    std::vector<std::vector<cell_connection>> connections_;
+    std::vector<connections_type> connections_;
     std::vector<std::vector<gap_junction_connection>> gap_junctions_;
     std::vector<std::vector<arb::event_generator>> event_generators_;
     std::vector<cable_cell> cells_;
@@ -127,61 +127,49 @@ TEST(recipe, connections)
 
     auto cell_0 = custom_cell(1, 2, 0);
     auto cell_1 = custom_cell(2, 1, 0);
-    std::vector<arb::cell_connection> conns_0, conns_1;
+    connections_type conns_0, conns_1;
     {
-        conns_0 = {{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
-
-        conns_1 = {{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
-
+        conns_0 = {arb::cell_connection{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
+        conns_1 = {arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
         auto recipe_0 = custom_recipe({cell_0, cell_1}, {conns_0, conns_1}, {{}, {}},  {{}, {}});
         auto decomp_0 = partition_load_balance(recipe_0, context);
-
         EXPECT_NO_THROW(simulation(recipe_0, context, decomp_0));
     }
     {
-        conns_0 = {{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{2, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
-
-        conns_1 = {{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
-
+        conns_0 = {arb::cell_connection{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{2, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
+        conns_1 = {arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
         auto recipe_1 = custom_recipe({cell_0, cell_1}, {conns_0, conns_1}, {{}, {}},  {{}, {}});
         auto decomp_1 = partition_load_balance(recipe_1, context);
-
         EXPECT_THROW(simulation(recipe_1, context, decomp_1), arb::bad_connection_source_gid);
     }
     {
-        conns_0 = {{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector3"}, {"synapse1"}, 0.2, 0.4*U::ms}};
-
-        conns_1 = {{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
-
+        conns_0 = {arb::cell_connection{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector3"}, {"synapse1"}, 0.2, 0.4*U::ms}};
+        conns_1 = {arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.3, 0.1*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
         auto recipe_2 = custom_recipe({cell_0, cell_1}, {conns_0, conns_1}, {{}, {}},  {{}, {}});
         auto decomp_2 = partition_load_balance(recipe_2, context);
-
         EXPECT_THROW(simulation(recipe_2, context, decomp_2), arb::bad_connection_label);
     }
     {
-        conns_0 = {{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
-                   {{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
-
-        conns_1 = {{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
-                   {{0, "detector0"}, {"synapse9"}, 0.3, 0.1*U::ms},
-                   {{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
-
+        conns_0 = {arb::cell_connection{{1, "detector0"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector1"}, {"synapse0"}, 0.1, 0.1*U::ms},
+                   arb::cell_connection{{1, "detector0"}, {"synapse1"}, 0.2, 0.4*U::ms}};
+        conns_1 = {arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.2*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse9"}, 0.3, 0.1*U::ms},
+                   arb::cell_connection{{0, "detector0"}, {"synapse0"}, 0.1, 0.8*U::ms}};
         auto recipe_4 = custom_recipe({cell_0, cell_1}, {conns_0, conns_1}, {{}, {}},  {{}, {}});
         auto decomp_4 = partition_load_balance(recipe_4, context);
-
         EXPECT_THROW(simulation(recipe_4, context, decomp_4), arb::bad_connection_label);
     }
 }

@@ -75,8 +75,8 @@ struct ring_recipe: public arb::recipe {
 
     // Each cell has one incoming connection, from cell with gid-1,
     // and fan_in-1 random connections with very low weight.
-    arb::connections connections_on(cell_gid_type gid) const override {
-        arb::connections cons;
+    arb::connections_type connections_on(cell_gid_type gid) const override {
+        arb::connections_type cons;
         const auto ncons = params_.cell.synapses;
         cons.reserve(ncons);
 
@@ -118,8 +118,7 @@ struct tiled_recipe: arb::recipe {
     arb::cell_kind get_cell_kind(cell_gid_type gid) const override { return recipe_.get_cell_kind(gid % recipe_.num_cells()); }
     std::any get_global_properties(arb::cell_kind k) const override { return recipe_.get_global_properties(k); }
 
-    arb::connections connections_on(cell_gid_type gid) const override {
-        if (gid >= recipe_.num_cells_) throw std::runtime_error{"Up"};
+    arb::connections_type connections_on(cell_gid_type gid) const override {
         // tile internal
         auto conns = recipe_.connections_on(gid % recipe_.num_cells());
         auto ncons = recipe_.params_.cell.synapses;

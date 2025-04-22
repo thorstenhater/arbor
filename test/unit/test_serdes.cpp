@@ -158,13 +158,13 @@ struct serdes_recipe: public arb::recipe {
         return arb::cable_cell({tree}, decor);
     }
 
-    std::vector<arb::cell_connection> connections_on(arb::cell_gid_type gid) const override {
+    arb::connections_type connections_on(arb::cell_gid_type gid) const override {
         if (num <= 1) return {};
         auto src = (gid ? gid : num) - 1;
-        return {{{src, "detector"},
-                 {"synapse"},
-                 0.5,
-                 0.125*U::ms}};
+        return {arb::cell_connection{{src, "detector"},
+                                     {"synapse"},
+                                     0.5,
+                                     0.125*U::ms}};
     }
 
     std::vector<arb::event_generator> event_generators(arb::cell_gid_type gid) const override {
