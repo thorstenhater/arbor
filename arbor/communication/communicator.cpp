@@ -252,21 +252,43 @@ time_type communicator::min_delay() {
     return res;
 }
 
-std::vector<std::vector<spike>>
+gathered_vector<spike>
 generate_all_to_all_vector(const std::vector<spike>& spikes, 
                            const std::unordered_map<cell_gid_type, std::vector<cell_size_type>>& src_ranks_,
-                           int num_domains){
-
-    std::vector<std::vector<spike>> spikes_per_rank(num_domains);
-    for (const spike& s : spikes) {
-        auto it = src_ranks_.find(s.source.gid);
+                           int num_domains) {
+    using count_type = gathered_vector<spike>::count_type;
+    // compute bucket sizes
+    std::vector<count_type> offsets(num_domains + 1, 0);
+    for (const spike& spk: spikes) {
+        auto it = src_ranks_.find(spk.source.gid);
         if (it != src_ranks_.end()) {
-            for (cell_size_type rank : it->second) {
-                spikes_per_rank[rank].push_back(s);
+            for (cell_size_type rank: it->second) {
+                ++offsets[rank + 1];
             }
         }
     }
-    return spikes_per_rank;
+    // left scan to make partition
+    std::size_t size = 0;
+    for (auto& off: offsets) {
+        size += off;
+        off = size;
+    }
+    // sort spikes into buckets
+    // allocate result with total size
+    std::vector<spike> spikes_per_rank(size);
+    // NB. make a mutable copy
+    auto rank_indices = offsets;
+    for (const spike& spk: spikes) {
+        auto it = src_ranks_.find(spk.source.gid);
+        if (it != src_ranks_.end()) {
+            for (cell_size_type rank: it->second) {
+                auto& index = rank_indices[rank];
+                spikes_per_rank[index] = spk;
+                index++;
+            }
+        }
+    }
+    return gathered_vector<spike>(std::move(spikes_per_rank), std::move(offsets));
 }
 
 communicator::spikes
@@ -303,7 +325,7 @@ communicator::exchange(std::vector<spike>& local_spikes) {
     // sort, since we cannot trust our peers
     std::sort(remote_spikes.begin(), remote_spikes.end());
     PL();
-    return {global_spikes, remote_spikes};
+    return {std::move(global_spikes), std::move(remote_spikes)};
 }
 
 void communicator::set_remote_spike_filter(const spike_predicate& p) { remote_spike_filter_ = p; }
@@ -315,71 +337,26 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                                const S& spks,
                                std::vector<pse_vector>& queues) {
     auto sp = spks.begin(), se = spks.end();
-    // We have a choice of whether to walk spikes or connections:
-    // i.e., we can iterate over the spikes, and for each spike search
-    // the for connections that have the same source; or alternatively
-    // for each connection, we can search the list of spikes for spikes
-    // with the same source.
-    //
-    // We iterate over whichever set is the smallest, which has
-    // complexity of order max(S log(C), C log(S)), where S is the
-    // number of spikes, and C is the number of connections.
-    // Thus the whole algorithm has O(min(S, C) log max(S, C))
     while (sp < se && cn < ce) {
-        if ((ce - cn) < size_t(se - sp)) {
-            auto src = cons.srcs[cn];
-            // identify range of spikes to enqueue.
-            auto fst = sp;
-            if (fst->source != src) {
-                fst = std::lower_bound(sp, se,
-                                       src,
-                                       [](const auto& spk, const auto& src) { return spk.source < src; });
-            }
-            for (; cn < ce && cons.srcs[cn] == src; ++cn) {
-                auto dst = cons.dests[cn];
-                auto del = cons.delays[cn];
-                auto wgt = cons.weights[cn];
-                auto dom = cons.idx_on_domain[cn];
-                auto& que = queues[dom];
-                // Handle all connections with the same source
-                // scan the range of spikes, once per connection
-                for (sp = fst; sp < se && sp->source == src; ++sp) {
-                    que.emplace_back(dst, sp->time + del, wgt);
-                }
-            }
-            // once we leave here, sp will be at the end of the eglible range
-            // and all connections with the same source will have been treated.
-            // so, we can just leave sp at this end.
-        }
-        else { // less spikes than connections, so iterate spikes linearly and bsearch connections
-            auto spk = sp;
-            auto src = spk->source;
-            // Here, `cn` is the index of the first connection whose source
-            // is larger or equal to the spike's source. It may be `ce` if
-            // all elements compare < to spk.source.
-            auto fst = cn;
-            if (cons.srcs[fst] != src) {
-                fst = std::lower_bound(cons.srcs.begin() + cn,
-                                       cons.srcs.begin() + ce,
-                                       src,
-                                       [](auto a, auto b) { return a < b; })
-                    - cons.srcs.begin();
-            }
-            for (sp = spk; sp < se && sp->source == src; ++sp) {
-                for (cn = fst; cn < ce && cons.srcs[cn] == src; ++cn) {
-                    auto dst = cons.dests[cn];
-                    auto del = cons.delays[cn];
-                    auto wgt = cons.weights[cn];
-                    auto dom = cons.idx_on_domain[cn];
-                    auto& que = queues[dom];
-                    // If we ever get multiple spikes from the same source, treat
-                    // them all. This is mostly rare.
-                    // NB: Reset the spike iterator as we walk the same sub-range
-                    // for each connection with the same source.
-                    que.emplace_back(dst, sp->time + del, wgt);
-                }
+        auto src = cons.srcs[cn];
+        while (sp < se && sp->source < src) ++sp;
+        if (sp >= se) continue;
+        auto fst = sp;
+        for (; cn < ce && cons.srcs[cn] == src; ++cn) {
+            auto dom = cons.idx_on_domain[cn];
+            auto& que = queues[dom];
+            auto dst = cons.dests[cn];
+            auto del = cons.delays[cn];
+            auto wgt = cons.weights[cn];
+            // Handle all connections with the same source
+            // scan the range of spikes, once per connection
+            for (sp = fst; sp < se && sp->source == src; ++sp) {
+                que.emplace_back(dst, sp->time + del, wgt);
             }
         }
+        // once we leave here, sp will be at the end of the eglible range
+        // and all connections with the same source will have been treated.
+        // so, we can just leave sp at this end.
     }
 }
 
@@ -398,7 +375,9 @@ void communicator::make_event_queues(communicator::spikes& spikes,
     // - turn all gids into externals
     std::for_each(spikes.from_remote.begin(), spikes.from_remote.end(),
                   [](auto& s) { s.source = global_cell_of(s.source); });
-    append_events_from_domain(ext_connections_, 0, ext_connections_.size(), spikes.from_remote, queues);
+    append_events_from_domain(ext_connections_, 0, ext_connections_.size(),
+                              spikes.from_remote,
+                              queues);
 }
 
 std::uint64_t communicator::num_spikes() const { return num_spikes_; }

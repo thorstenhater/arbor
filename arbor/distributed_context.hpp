@@ -97,7 +97,7 @@ public:
         return impl_->gather_spikes(local_spikes);
     }
     
-    gathered_vector<spike> all_to_all_spikes(const std::vector<std::vector<spike>>& local_spikes) const {
+    gathered_vector<spike> all_to_all_spikes(const gathered_vector<spike>& local_spikes) const {
         return impl_->all_to_all_spikes(local_spikes);
     }
 
@@ -168,7 +168,7 @@ private:
         virtual gathered_vector<spike>
         gather_spikes(const spike_vector& local_spikes) const = 0;
         virtual gathered_vector<spike> 
-        all_to_all_spikes(const std::vector<std::vector<spike>>& local_spikes) const = 0;
+        all_to_all_spikes(const gathered_vector<spike>& local_spikes) const = 0;
         virtual spike_vector
         remote_gather_spikes(const spike_vector& local_spikes) const = 0;
         virtual gathered_vector<cell_gid_type>
@@ -214,7 +214,7 @@ private:
             return wrapped.gather_spikes(local_spikes);
         }
         gathered_vector<spike>
-        all_to_all_spikes(const std::vector<std::vector<spike>>& local_spikes) const override {
+        all_to_all_spikes(const gathered_vector<spike>& local_spikes) const override {
             return wrapped.all_to_all_spikes(local_spikes);
         }
         gathered_vector<cell_gid_type>
@@ -280,18 +280,11 @@ struct local_context {
             {0u, static_cast<count_type>(local_spikes.size())}
         );
     }
-    gathered_vector<spike> all_to_all_spikes(const std::vector<std::vector<spike>>& local_spikes) const {
+    gathered_vector<spike> all_to_all_spikes(const gathered_vector<spike>& local) const {
         using count_type = typename gathered_vector<spike>::count_type;
-
-        std::vector<spike> gathered;
-        std::vector<count_type> partition;
-        partition.push_back(0);
-
-        for (const auto& s : local_spikes[0]) {
-            gathered.push_back(s);
-        }
-
-        partition.push_back(static_cast<count_type>(gathered.size()));
+        std::vector<count_type> partition{0, local.count(0)};
+        const auto& spikes = local.values();
+        std::vector<spike> gathered(spikes.begin(), spikes.begin() + local.count(0));
         return gathered_vector<spike>(std::move(gathered), std::move(partition));
     }
     std::vector<spike>

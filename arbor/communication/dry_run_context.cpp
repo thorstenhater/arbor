@@ -19,33 +19,26 @@ struct dry_run_context_impl {
         return {};
     }
     gathered_vector<spike>
-    all_to_all_spikes(const std::vector<std::vector<spike>>& local_spikes) const {
-        using count_type = gathered_vector<spike>::count_type;
-        int local_size = local_spikes[0].size();
-
+    all_to_all_spikes(const gathered_vector<spike>& local_spikes) const {
+        auto local_size = local_spikes.count(0);
+        const auto& local = local_spikes.values();
         std::vector<spike> gathered_spikes;
         gathered_spikes.reserve(local_size*num_ranks_);
-
-        for (count_type i = 0; i < num_ranks_; i++) {
-            util::append(gathered_spikes, local_spikes[0]);
-        }
-
-        for (count_type i = 0; i < num_ranks_; i++) {
-            for (count_type j = i*local_size; j < (i+1)*local_size; j++){
-                gathered_spikes[j].source.gid += num_cells_per_tile_*i;
-            }
-        }
-
         std::vector<count_type> partition;
-        for (count_type i = 0; i <= num_ranks_; i++) {
-            partition.push_back(static_cast<count_type>(i*local_size));
+        partition.reserve(num_ranks_ + 1);
+        partition.push_back(0);
+        for (std::size_t ridx = 0; ridx < num_ranks_; ridx++) {
+            for (std::size_t lidx = 0; lidx < local_size; ++lidx) {
+                auto spike = local[lidx];
+                spike.source.gid += num_cells_per_tile_*ridx;
+                gathered_spikes.push_back(spike);
+            }
+            partition.push_back(gathered_spikes.size());
         }
-
         return gathered_vector<spike>(std::move(gathered_spikes), std::move(partition));
     }
     gathered_vector<spike>
     gather_spikes(const std::vector<spike>& local_spikes) const {
-
         count_type local_size = local_spikes.size();
 
         std::vector<spike> gathered_spikes;
