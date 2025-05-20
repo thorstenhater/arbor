@@ -105,7 +105,7 @@ public:
         return impl_->gather_gids(local_gids);
     }
 
-    gathered_vector<cell_gid_type> all_to_all_gids_domains(const std::vector<std::vector<cell_size_type>>& local_spikes) const {
+    gathered_vector<cell_gid_type> all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& local_spikes) const {
         return impl_->all_to_all_gids_domains(local_spikes);
     }
 
@@ -306,9 +306,11 @@ struct local_context {
         std::vector<count_type> partition;
         partition.push_back(0);
 
-        for (const auto& s : gids_domains[0]) {
-            gathered.push_back(s);
-        }
+        gathered.insert(
+            gathered.end(),
+            std::make_move_iterator(gids_domains[0].begin()),
+            std::make_move_iterator(gids_domains[0].end())
+        );
 
         partition.push_back(static_cast<count_type>(gathered.size()));
         return gathered_vector<cell_gid_type>(std::move(gathered), std::move(partition));

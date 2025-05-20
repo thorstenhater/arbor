@@ -703,8 +703,9 @@ Inhomogeneous Expressions
 
 .. label:: (distance scale:real reg:region)
 
-    The minimum distance to the region ``reg``. Evaluates to zero within the region. The scaling parameter ``scale`` has unit :math:`{\mu m}^{-1}` 
-    and is multiplied by the distance, such that the result is unitless.
+    The minimum distance to the region ``reg``. Evaluates to zero within the
+    region. The scaling parameter ``scale`` has unit :math:`{\mu m}^{-1}` and is
+    multiplied by the distance, such that the result is unitless.
 
 .. label:: (distance reg:region)
 
@@ -712,8 +713,9 @@ Inhomogeneous Expressions
 
 .. label:: (proximal-distance scale:real loc:locset)
 
-    The minimum distance in proximal direction from the points within the locset ``loc``. The scaling parameter ``scale`` has unit :math:`{\mu m}^{-1}` 
-    and is multiplied by the distance, such that the result is unitless.
+    The minimum distance in proximal direction from the points within the locset
+    ``loc``. The scaling parameter ``scale`` has unit :math:`{\mu m}^{-1}` and
+    is multiplied by the distance, such that the result is unitless.
 
     .. figure:: ../gen-images/iexpr_prox_dis.svg
       :width: 600
