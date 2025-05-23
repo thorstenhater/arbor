@@ -2,7 +2,6 @@
 #include <utility>
 #include <vector>
 #include <limits>
-#include <unordered_set>
 
 #include <arbor/assert.hpp>
 #include <arbor/common_types.hpp>
@@ -31,7 +30,6 @@ communicator::communicator(const recipe& rec, const domain_decomposition& dom_de
     num_local_cells_{dom_dec.num_local_cells()},
     num_local_groups_{dom_dec.num_groups()},
     num_domains_{(cell_size_type)ctx->distributed->size()},
-    src_ranks_{{},{0}},
     ctx_(std::move(ctx)) {}
 
 constexpr inline
@@ -147,38 +145,37 @@ void communicator::update_connections(const recipe& rec,
     //       in many, many allocations and we don't have the proper primitives.
     std::size_t n_con = 0;
     std::vector<std::vector<connection>> connections_by_src_domain(num_domains_);
-    auto my_rank = ctx_->distributed->id();
-    std::vector<std::vector<cell_gid_type>> gids_domains(num_domains_);
+    std::vector<std::vector<cell_member_type>> gids_domains(num_domains_);
 
     // helper for adding a connection
     auto push_connection = [&] (const auto& conn, cell_gid_type tgt_gid, cell_size_type tgt_iod) {
         auto src_gid = conn.source.gid;
         if(src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(tgt_gid, src_gid, num_total_cells_);
-            // strip off qualifiers and match on type to find the actual lid of source
-            auto src_lid = cell_lid_type(-1);
-            using C = std::decay_t<decltype(conn)>;
-            if constexpr (std::is_same_v<cell_connection, C>) {
-                src_lid = source_resolver.resolve(conn.source);
-            }
-            else if constexpr (std::is_same_v<raw_cell_connection, C>) {
-                src_lid = conn.source.index;
-            }
-            else {
-                ARB_UNREACHABLE;
-            }
-            // targets always get resolution
-            auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
-            // NOTE old compilers stumble over emplace_back here
-            auto src_dom = dom_dec.gid_domain(src_gid);
-            connections_by_src_domain[src_dom].emplace_back(
-                connection{
-                .source={.gid=src_gid, .index=src_lid},
-                .target=tgt_lid,
-                .weight=conn.weight,
-                .delay=conn.delay,
-                .index_on_domain=tgt_iod
-            });
-            gids_domains[src_dom].push_back(src_gid);
+        // strip off qualifiers and match on type to find the actual lid of source
+        auto src_lid = cell_lid_type(-1);
+        using C = std::decay_t<decltype(conn)>;
+        if constexpr (std::is_same_v<cell_connection, C>) {
+            src_lid = source_resolver.resolve(conn.source);
+        }
+        else if constexpr (std::is_same_v<raw_cell_connection, C>) {
+            src_lid = conn.source.index;
+        }
+        else {
+            ARB_UNREACHABLE;
+        }
+        // targets always get resolution
+        auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
+        // NOTE old compilers stumble over emplace_back here
+        auto src_dom = dom_dec.gid_domain(src_gid);
+        connections_by_src_domain[src_dom].emplace_back(
+            connection{
+            .source={.gid=src_gid, .index=src_lid},
+            .target=tgt_lid,
+            .weight=conn.weight,
+            .delay=conn.delay,
+            .index_on_domain=tgt_iod
+        });
+        gids_domains[src_dom].push_back(cell_member_type{src_gid, src_lid});
     };
 
     PE(init:communicator:update:connections:local);
@@ -217,13 +214,13 @@ void communicator::update_connections(const recipe& rec,
         if (src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(-1, src_gid, num_total_cells_);
         auto src_dom = dom_dec.gid_domain(src_gid);
         connections_by_src_domain[src_dom].push_back(conn);
-        gids_domains[src_dom].push_back(src_gid);
+        gids_domains[src_dom].push_back(conn.source);
         ++n_con;
     }
     PL();
     
     PE(init:communicator:update:connections:sort_unique);
-    for (auto& domain_gids : gids_domains) {
+    for (auto& domain_gids: gids_domains) {
         std::sort(domain_gids.begin(), domain_gids.end());
         domain_gids.erase(
             std::unique(domain_gids.begin(), domain_gids.end()),
@@ -232,12 +229,21 @@ void communicator::update_connections(const recipe& rec,
     }
     PL();
     
-    PE(init:communicator:update:connections:gids);
-    
-    auto global_gids_domains = ctx_->distributed->all_to_all_gids_domains(gids_domains);
-    src_ranks_ = std::move(global_gids_domains);
-    
-    PL();
+    {
+        PE(init:communicator:update:connections:gids);
+        auto srcs_by_rank = ctx_->distributed->all_to_all_gids_domains(gids_domains);
+        const auto& part = srcs_by_rank.partition();
+        const auto& srcs = srcs_by_rank.values();
+        for (auto domain: util::make_span(0, num_domains_)) {
+            auto beg = part[domain];
+            auto end = part[domain + 1];
+            for (auto idx: util::make_span(beg, end)) {
+                const auto& src = srcs[idx];
+                src_ranks_[src].push_back(domain);
+            }
+        }
+        PL();
+    }
     // Sort the connections for each domain; num_domains_ independent sorts
     // parallelized trivially.
     PE(init:communicator:update:sort:local);
@@ -274,56 +280,38 @@ time_type communicator::min_delay() {
 }
 
 gathered_vector<spike>
-generate_all_to_all_vector(const std::vector<spike>& spikes, 
-                           const gathered_vector<cell_gid_type>& src_ranks_, const context& ctx){
+generate_all_to_all_vector(const std::vector<spike>& spikes,
+                           const std::unordered_map<cell_member_type, std::vector<cell_size_type>>& src_ranks,
+                           std::size_t num_domains) {
     using count_type = gathered_vector<spike>::count_type;
-    const auto& vals = src_ranks_.values();
-    const auto& parts = src_ranks_.partition();
 
-    std::vector<count_type> offsets(parts.size() + 1, 0);
-    arb::threading::parallel_for::apply(0, parts.size() - 1,ctx->thread_pool.get(),
-                                   [&](auto domain){
-        auto start = parts[domain];
-        auto end = parts[domain + 1];
-        auto sp = spikes.begin();
-        auto se = spikes.end();
-        while (sp < se && start < end){
-            while (sp < se && sp->source.gid < vals[start]) sp++;
-            while (start < end && vals[start] < sp->source.gid) start++;
-            if(vals[start] == sp->source.gid){
-                ++offsets[domain + 1];
-                sp++;
-            }
+    // count outgoing spikes per rank
+    std::vector<count_type> offsets(num_domains + 1, 0);
+    for (const auto& spk: spikes) {
+        const auto& ranks = src_ranks.at(spk.source);
+        for (auto rank: ranks) {
+            ++offsets[rank + 1];
         }
-    });
-
-    // left scan to make partition
-    std::size_t size = 0;
-    for (auto& off: offsets) {
-        size += off;
-        off = size;
     }
 
+    // make partition so we can sort the spikes into bins
+    std::partial_sum(offsets.begin(), offsets.end(),
+                     offsets.begin());
+    auto size = offsets.back();
+
+    // we have the sizes per rank to send to, so deal spikes into bins.
     std::vector<spike> spikes_per_rank(size);
     auto rank_indices = offsets;
-    arb::threading::parallel_for::apply(0, parts.size() - 1,ctx->thread_pool.get(),
-                                   [&](auto domain){
-        auto start = parts[domain];
-        auto& index = rank_indices[domain];
-        auto end = parts[domain + 1];
-        auto sp = spikes.begin();
-        auto se = spikes.end();
-        while (sp < se && start < end){
-            while (sp < se && sp->source.gid < vals[start]) sp++;
-            while (start < end && vals[start] < sp->source.gid) start++;
-            if(vals[start] == sp->source.gid){
-                spikes_per_rank[index] = *sp;
-                index++;
-                sp++;
-            }
+    for (const auto& spk: spikes) {
+        const auto& ranks = src_ranks.at(spk.source);
+        for (auto rank: ranks) {
+            auto& index = rank_indices[rank];
+            spikes_per_rank[index] = spk;
+            ++index;
         }
-    });
-    return gathered_vector<spike>(std::move(spikes_per_rank), std::move(offsets));
+    }
+
+    return {std::move(spikes_per_rank), std::move(offsets)};
 }
 
 communicator::spikes
@@ -338,7 +326,7 @@ communicator::exchange(std::vector<spike>& local_spikes) {
     num_spikes_ += num_local_spikes_;
     PL();
 
-    auto spikes_per_rank = generate_all_to_all_vector(local_spikes, src_ranks_, ctx_);
+    auto spikes_per_rank = generate_all_to_all_vector(local_spikes, src_ranks_, num_domains_);
 
     PE(communication:exchange:all2all);
     // global all-to-all to gather a local copy of the global spike list on each node.

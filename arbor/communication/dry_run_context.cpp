@@ -89,12 +89,12 @@ struct dry_run_context_impl {
         return gathered_vector<cell_gid_type>(std::move(gathered_gids), std::move(partition));
     }
 
-    gathered_vector<cell_gid_type>
-    all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& gids_domains) const {
-        using count_type = gathered_vector<cell_gid_type>::count_type;
+    gathered_vector<cell_member_type>
+    all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
+        using count_type = gathered_vector<cell_member_type>::count_type;
         std::size_t local_size = gids_domains[0].size();
 
-        std::vector<cell_gid_type> gathered_gids;
+        std::vector<cell_member_type> gathered_gids;
         gathered_gids.reserve(static_cast<size_t>(local_size) * static_cast<size_t>(num_ranks_));
         for (count_type i = 0; i < num_ranks_; i++) {
             util::append(gathered_gids, gids_domains[0]);
@@ -105,7 +105,7 @@ struct dry_run_context_impl {
             partition.push_back(static_cast<count_type>(i*local_size));
         }
 
-        return gathered_vector<cell_gid_type>(std::move(gathered_gids), std::move(partition));
+        return {std::move(gathered_gids), std::move(partition)};
     }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {

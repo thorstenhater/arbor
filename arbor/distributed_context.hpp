@@ -105,8 +105,8 @@ public:
         return impl_->gather_gids(local_gids);
     }
 
-    gathered_vector<cell_gid_type> all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& local_spikes) const {
-        return impl_->all_to_all_gids_domains(local_spikes);
+    auto all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local) const {
+        return impl_->all_to_all_gids_domains(local);
     }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {
@@ -173,8 +173,8 @@ private:
         remote_gather_spikes(const spike_vector& local_spikes) const = 0;
         virtual gathered_vector<cell_gid_type>
         gather_gids(const gid_vector& local_gids) const = 0;
-        virtual gathered_vector<cell_size_type>
-        all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& local_spikes) const = 0;
+        virtual gathered_vector<cell_member_type>
+        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local) const = 0;
         virtual cell_label_range
         gather_cell_label_range(const cell_label_range& local_ranges) const = 0;
         virtual cell_labels_and_gids
@@ -221,8 +221,8 @@ private:
         gather_gids(const gid_vector& local_gids) const override {
             return wrapped.gather_gids(local_gids);
         }
-        gathered_vector<cell_gid_type>
-        all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& gids_domains) const override {
+        gathered_vector<cell_member_type>
+        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const override {
             return wrapped.all_to_all_gids_domains(gids_domains);
         }
         cell_label_range
@@ -299,10 +299,10 @@ struct local_context {
                 {0u, static_cast<count_type>(local_gids.size())}
         );
     }
-    gathered_vector<cell_gid_type> all_to_all_gids_domains(const std::vector<std::vector<cell_gid_type>>& gids_domains) const {
-        using count_type = typename gathered_vector<cell_gid_type>::count_type;
+    gathered_vector<cell_member_type> all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
+        using count_type = typename gathered_vector<cell_member_type>::count_type;
 
-        std::vector<cell_gid_type> gathered;
+        std::vector<cell_member_type> gathered;
         std::vector<count_type> partition;
         partition.push_back(0);
 
@@ -313,7 +313,7 @@ struct local_context {
         );
 
         partition.push_back(static_cast<count_type>(gathered.size()));
-        return gathered_vector<cell_gid_type>(std::move(gathered), std::move(partition));
+        return {std::move(gathered), std::move(partition)};
     }
     void remote_ctrl_send_continue(const epoch&) const {}
     void remote_ctrl_send_done() const {}
