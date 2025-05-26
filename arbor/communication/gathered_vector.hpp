@@ -20,6 +20,7 @@ public:
         arb_assert(std::is_sorted(partition_.begin(), partition_.end()));
         arb_assert(partition_.back() == values_.size());
     }
+
     gathered_vector(gathered_vector<T>&&) = default;
     gathered_vector<T>& operator=(gathered_vector<T>&&) = default;
 

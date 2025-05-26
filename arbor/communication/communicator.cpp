@@ -280,15 +280,13 @@ time_type communicator::min_delay() {
 }
 
 gathered_vector<spike>
-generate_all_to_all_vector(const std::vector<spike>& spikes,
-                           const std::unordered_map<cell_member_type, std::vector<cell_size_type>>& src_ranks,
-                           std::size_t num_domains) {
+communicator::generate_all_to_all_vector(const std::vector<spike>& spikes) const {
     using count_type = gathered_vector<spike>::count_type;
 
     // count outgoing spikes per rank
-    std::vector<count_type> offsets(num_domains + 1, 0);
+    std::vector<count_type> offsets(num_domains_ + 1, 0);
     for (const auto& spk: spikes) {
-        const auto& ranks = src_ranks.at(spk.source);
+        const auto& ranks = src_ranks_.at(spk.source);
         for (auto rank: ranks) {
             ++offsets[rank + 1];
         }
@@ -303,7 +301,7 @@ generate_all_to_all_vector(const std::vector<spike>& spikes,
     std::vector<spike> spikes_per_rank(size);
     auto rank_indices = offsets;
     for (const auto& spk: spikes) {
-        const auto& ranks = src_ranks.at(spk.source);
+        const auto& ranks = src_ranks_.at(spk.source);
         for (auto rank: ranks) {
             auto& index = rank_indices[rank];
             spikes_per_rank[index] = spk;
@@ -326,7 +324,7 @@ communicator::exchange(std::vector<spike>& local_spikes) {
     num_spikes_ += num_local_spikes_;
     PL();
 
-    auto spikes_per_rank = generate_all_to_all_vector(local_spikes, src_ranks_, num_domains_);
+    auto spikes_per_rank = generate_all_to_all_vector(local_spikes);
 
     PE(communication:exchange:all2all);
     // global all-to-all to gather a local copy of the global spike list on each node.

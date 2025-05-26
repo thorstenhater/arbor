@@ -53,6 +53,10 @@ int get_value(const arb::spike& s) {
     return s.source.index;
 }
 
+TEST(communicator, a2a_vector) {
+
+}
+
 // Test low level spike_gather function when each domain produces the same
 // number of spikes in the pattern used by dry run mode.
 TEST(communicator, gather_spikes_equal) {
@@ -489,8 +493,7 @@ test_ring(const domain_decomposition& D, communicator& C, F&& f) {
     return ::testing::AssertionSuccess();
 }
 
-TEST(communicator, ring)
-{
+TEST(communicator, ring) {
     using util::make_span;
 
     // construct a homogeneous network of 10*n_domain identical cells in a ring
