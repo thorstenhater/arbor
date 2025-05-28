@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include <ankerl/unordered_dense.h>
-
 #include <arbor/common_types.hpp>
 #include <arbor/context.hpp>
 #include <arbor/domain_decomposition.hpp>
@@ -137,8 +135,6 @@ public:
 
     const connection_list& connections() const;
 
-    gathered_vector<spike>  generate_all_to_all_vector(const std::vector<spike>&) const;
-
 private:
     cell_size_type num_total_cells_ = 0;
     cell_size_type num_local_cells_ = 0;
@@ -154,16 +150,7 @@ private:
     spike_predicate remote_spike_filter_;
 
     // sources with connections to other ranks
-    struct cell_member_type_hasher {
-        using is_avalanching = void;
-        auto operator()(const cell_member_type& key) const noexcept -> uint64_t {
-            static_assert(std::has_unique_object_representations_v<cell_member_type>);
-            return ankerl::unordered_dense::detail::wyhash::hash(&key, sizeof(key));
-        }
-    };
-
-    ankerl::unordered_dense::map<cell_member_type, std::vector<cell_size_type>, cell_member_type_hasher> src_ranks_;
-
+    std::unordered_map<cell_member_type, std::vector<cell_size_type>> src_ranks_;
 
     // Connections from external simulators into Arbor.
     // Currently we have no partitions/indices/acceleration structures

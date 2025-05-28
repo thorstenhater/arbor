@@ -105,8 +105,8 @@ public:
         return impl_->gather_gids(local_gids);
     }
 
-    auto all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local) const {
-        return impl_->all_to_all_gids_domains(local);
+    gathered_vector<cell_member_type> all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local_spikes) const {
+        return impl_->all_to_all_gids_domains(local_spikes);
     }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {
@@ -174,7 +174,7 @@ private:
         virtual gathered_vector<cell_gid_type>
         gather_gids(const gid_vector& local_gids) const = 0;
         virtual gathered_vector<cell_member_type>
-        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local) const = 0;
+        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& local_spikes) const = 0;
         virtual cell_label_range
         gather_cell_label_range(const cell_label_range& local_ranges) const = 0;
         virtual cell_labels_and_gids
@@ -222,7 +222,7 @@ private:
             return wrapped.gather_gids(local_gids);
         }
         gathered_vector<cell_member_type>
-        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const override {
+        all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
             return wrapped.all_to_all_gids_domains(gids_domains);
         }
         cell_label_range
@@ -306,14 +306,12 @@ struct local_context {
         std::vector<count_type> partition;
         partition.push_back(0);
 
-        gathered.insert(
-            gathered.end(),
-            std::make_move_iterator(gids_domains[0].begin()),
-            std::make_move_iterator(gids_domains[0].end())
-        );
+        for (const auto& v : gids_domains) {
+            gathered.insert(gathered.end(), v.begin(), v.end());
+        }
 
         partition.push_back(static_cast<count_type>(gathered.size()));
-        return {std::move(gathered), std::move(partition)};
+        return gathered_vector<cell_member_type>(std::move(gathered), std::move(partition));
     }
     void remote_ctrl_send_continue(const epoch&) const {}
     void remote_ctrl_send_done() const {}
