@@ -1,5 +1,4 @@
 #include <vector>
-#include <unordered_set>
 
 #include <arbor/common_types.hpp>
 #include <arbor/context.hpp>
@@ -9,9 +8,11 @@
 
 #include "execution_context.hpp"
 #include "util/partition.hpp"
-#include "util/span.hpp"
 #include "util/rangeutil.hpp"
+#include "util/strprintf.hpp"
+#include "util/span.hpp"
 
+#include <ankerl/unordered_dense.h>
 
 namespace arb {
 domain_decomposition::domain_decomposition(const recipe& rec,
@@ -28,24 +29,40 @@ domain_decomposition::domain_decomposition(const recipe& rec,
         if (g.backend == backend_kind::gpu && !has_gpu) throw invalid_backend(domain_id);
         if (g.backend == backend_kind::gpu && g.kind != cell_kind::cable) throw incompatible_backend(domain_id, g.kind);
 
-        std::unordered_set<cell_gid_type> gid_set(g.gids.begin(), g.gids.end());
+        ankerl::unordered_dense::set<cell_gid_type> gid_set(g.gids.begin(), g.gids.end());
         for (const auto& gid: g.gids) {
             if (gid >= num_global_cells) throw out_of_bounds(gid, num_global_cells);
             for (const auto& gj: rec.gap_junctions_on(gid)) {
                 if (!gid_set.count(gj.peer.gid)) throw invalid_gj_cell_group(gid, gj.peer.gid);
             }
+            local_gids.push_back(gid);
         }
-        local_gids.insert(local_gids.end(), g.gids.begin(), g.gids.end());
     }
     cell_size_type num_local_cells = local_gids.size();
 
     auto global_gids = dist->gather_gids(local_gids);
     if (global_gids.size() != num_global_cells) throw invalid_sum_local_cells(global_gids.size(), num_global_cells);
 
-    auto global_gid_vals = global_gids.values();
-    std::ranges::sort(global_gid_vals);
-    for (unsigned i = 1; i < global_gid_vals.size(); ++i) {
-        if (global_gid_vals[i] == global_gid_vals[i-1]) throw duplicate_gid(global_gid_vals[i]);
+    // SANITY checks
+    // for a given cell count N:
+    // 1. check that we have N gids in the list
+    // 2. sum up gids, which must run 0..N-1, thus the sum S must match
+    //    N*(N-1)/2 via Gauss'.
+    // If any check fails, try to find the misbehaving gid.
+    {
+        const auto& gids = global_gids.values();
+        auto N = std::size_t(num_global_cells);
+        auto S = std::size_t(0);
+        for (auto gid: gids) S += gid;
+        auto expected = N*(N - 1)/2;
+        if ((N != num_global_cells) || (S != expected)) {
+            ankerl::unordered_dense::set<cell_gid_type> seen;
+            seen.reserve(gids.size());
+            for (auto gid: gids) {
+                if (!seen.insert(gid).second) throw duplicate_gid(gid);
+            }
+            throw arbor_internal_error{util::pprintf("Unknown gid error occured. size {} /= {} OR gid_sum {} /= {}", N, num_global_cells, S, expected)};
+        }
     }
 
     num_domains_ = num_domains;
