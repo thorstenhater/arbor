@@ -5,8 +5,8 @@
 #include <gtest/gtest.h>
 
 #include <arbor/spike_event.hpp>
+#include <arbor/partitioned_vector.hpp>
 
-#include "communication/partitioned_vector.hpp"
 #include "timestep_range.hpp"
 #include "backends/event.hpp"
 #include "util/rangeutil.hpp"

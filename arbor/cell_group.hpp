@@ -9,6 +9,7 @@
 #include <arbor/spike.hpp>
 #include <arbor/serdes.hpp>
 
+
 #include "epoch.hpp"
 #include "event_lane.hpp"
 
@@ -43,6 +44,7 @@ public:
     virtual std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const { return {}; }
 
     virtual cell_size_type num_targets() const = 0;
+    // virtual const partitioned_vector<target_handle> targets = 0;
   
     // trampolines for serialization
     virtual void t_serialize(serializer& s, const std::string&) const = 0;

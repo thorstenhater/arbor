@@ -8,8 +8,8 @@
 #include <arbor/context.hpp>
 #include <arbor/spike.hpp>
 #include <arbor/util/pp_util.hpp>
+#include <arbor/partitioned_vector.hpp>
 
-#include "communication/partitioned_vector.hpp"
 #include "epoch.hpp"
 #include "label_resolution.hpp"
 

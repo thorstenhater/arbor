@@ -166,11 +166,20 @@ enum class ARB_SYMBOL_VISIBLE cell_kind {
     benchmark,    // Proxy cell used for benchmarking.
 };
 
+// Target identifier for event delivery targets and staged events.
+struct target_handle {
+    cell_local_size_type id    = -1; // per cell group identifier 
+    cell_local_size_type index = -1; // offset into the instance 
+
+    target_handle() = default;
+    target_handle(cell_local_size_type id_, cell_local_size_type index_): id(id_), index(index_) {}
+};
+    
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, lid_selection_policy m);
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_member_type m);
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_kind k);
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, backend_kind k);
-
+    
 } // namespace arb
 
 ARB_DEFINE_HASH(arb::cell_address_type, a.gid, a.tag)

@@ -12,8 +12,8 @@
 #include <arbor/export.hpp>
 #include <arbor/assert.hpp>
 #include <arbor/communication/mpi_error.hpp>
+#include <arbor/partitioned_vector.hpp>
 
-#include "communication/partitioned_vector.hpp"
 #include "profile/profiler_macro.hpp"
 #include "util/rangeutil.hpp"
 #include "util/partition.hpp"

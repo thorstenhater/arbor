@@ -5,32 +5,6 @@
 #include <arbor/serdes.hpp>
 #include <arbor/mechanism_abi.h>
 
-// Structures for the representation of event delivery targets and
-// staged events.
-
-namespace arb {
-
-// Post-synaptic spike events
-
-struct target_handle {
-    cell_local_size_type id;    // per cell group identifier 
-    cell_local_size_type index; // offset into the instance 
-
-    target_handle() = default;
-
-    target_handle(cell_local_size_type id_, cell_local_size_type index_):
-        id(id_), index(index_) {}
-
-    ARB_SERDES_ENABLE(target_handle, id, index);
-};
-
-}
-
-template<typename K>
-void serialize(arb::serializer &ser, const K &k, const arb::target_handle&);
-template<typename K>
-void deserialize(arb::serializer &ser, const K &k, arb::target_handle&);
-
 namespace arb {
 
 struct deliverable_event {

@@ -3,10 +3,10 @@
 #include <vector>
 
 #include <arbor/mechanism_abi.h>
+#include <arbor/partitioned_vector.hpp>
 
 #include "backends/event.hpp"
 #include "backends/event_stream_state.hpp"
-#include "communication/partitioned_vector.hpp"
 #include "event_lane.hpp"
 #include "timestep_range.hpp"
 #include "util/span.hpp"

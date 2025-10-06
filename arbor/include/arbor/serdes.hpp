@@ -500,4 +500,5 @@ ARB_SERDES_ENABLE_EXT(arb::cell_local_label_type, tag, policy);
 ARB_SERDES_ENABLE_EXT(arb::cell_global_label_type, gid, label);
 ARB_SERDES_ENABLE_ENUM(arb::backend_kind);
 ARB_SERDES_ENABLE_ENUM(arb::cell_kind);
+ARB_SERDES_ENABLE_EXT(arb::target_handle, id, index);
 } // arb

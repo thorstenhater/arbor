@@ -8,9 +8,9 @@
 #include <arbor/domain_decomposition.hpp>
 #include <arbor/recipe.hpp>
 #include <arbor/spike.hpp>
-#include <include/arbor/arbexcept.hpp>
+#include <arbor/partitioned_vector.hpp>
+#include <arbor/arbexcept.hpp>
 
-#include "communication/partitioned_vector.hpp"
 #include "connection.hpp"
 #include "distributed_context.hpp"
 #include "execution_context.hpp"

@@ -8,8 +8,8 @@
 #include <arbor/export.hpp>
 #include <arbor/recipe.hpp>
 #include <arbor/spike.hpp>
+#include <arbor/partitioned_vector.hpp>
 
-#include "communication/partitioned_vector.hpp"
 #include "connection.hpp"
 #include "epoch.hpp"
 #include "execution_context.hpp"

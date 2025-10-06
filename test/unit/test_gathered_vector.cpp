@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "arbor/common_types.hpp"
-#include "communication/partitioned_vector.hpp"
+#include <arbor/partitioned_vector.hpp>
 
 
 TEST(gathered_vector, invariants) {
