@@ -6,6 +6,7 @@
 
 #include <arbor/spike_event.hpp>
 
+#include "communication/partitioned_vector.hpp"
 #include "timestep_range.hpp"
 #include "backends/event.hpp"
 #include "util/rangeutil.hpp"
@@ -47,20 +48,17 @@ result<Stream> single_step() {
     // ===================================================================
     //               10
 
-    const std::vector<target_handle> handles = {
-        {0, 0},
-        {1, 0},
-        {0, 0},
-        {0, 1},
-        {1, 0},
-        {0, 0},
-        {0, 1},
-        {1, 0},
-        {1, 1},
-        {1, 2}
-    };
-
-    const std::vector<std::size_t> divs = {0, 2, 5, 10};
+    partitioned_vector<target_handle> targets({{0, 0},
+                                               {1, 0},
+                                               {0, 0},
+                                               {0, 1},
+                                               {1, 0},
+                                               {0, 0},
+                                               {0, 1},
+                                               {1, 0},
+                                               {1, 1},
+                                               {1, 2}},
+                                              {0, 2, 5, 10});
 
     std::vector<std::vector<spike_event>> events = {
         {{0, 0.0, 0.0f}, {1, 0.0, 1.0f}},
@@ -83,7 +81,7 @@ result<Stream> single_step() {
 
     // initialize event streams
     auto lanes = util::subrange_view(events, 0u, events.size());
-    initialize(lanes, handles, divs, res.steps, res.streams);
+    initialize(lanes, targets, res.steps, res.streams);
 
     return res;
 }
@@ -107,7 +105,7 @@ result<Stream> multi_step() {
     res.streams.resize(num_mechanisms);
 
     // compute handles and divs
-    std::vector<std::size_t> divs(num_cells+1, 0u);
+    std::vector<unsigned> divs(num_cells+1, 0u);
     std::vector<target_handle> handles;
     handles.reserve(num_cells*num_mechanisms*num_targets_per_mechanism_and_cell);
     for (std::size_t cell=0; cell<num_cells; ++cell) {
@@ -200,7 +198,9 @@ result<Stream> multi_step() {
 
     // initialize event streams
     auto lanes = util::subrange_view(events, 0u, events.size());
-    initialize(lanes, handles, divs, res.steps, res.streams);
+
+    auto targets = partitioned_vector<target_handle>{std::move(handles), std::move(divs)};
+    initialize(lanes, targets, res.steps, res.streams);
 
     return res;
 }

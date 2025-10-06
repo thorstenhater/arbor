@@ -76,14 +76,13 @@ struct fvm_lowered_cell_impl: public fvm_lowered_cell {
     std::vector<mechanism_ptr> voltage_mechanisms_;
 
     // Handles for accessing event targets.
-    std::vector<target_handle> target_handles_;
-    // Lookup table for target ids -> local target handle indices.
-    std::vector<std::size_t> target_handle_divisions_;
+    partitioned_vector<target_handle> targets_;
 
     // Optional non-physical voltage check threshold, tripped when |Um| > Ucrit
     std::optional<double> check_voltage_mV_;
 
-    cell_size_type num_targets() const override { return target_handles_.size(); }
+    cell_size_type num_targets() const override { return targets_.size(); }
+    const partitioned_vector<target_handle>& targets() const override { return targets_; }
   
     // random number generator seed value
     arb_seed_type seed_;
@@ -156,7 +155,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(const timestep_
     // Integration setup
     PE(advance:integrate:setup);
     // Push samples and events down to the state and reset the spike thresholds.
-    state_->begin_epoch(event_lanes, staged_samples, dts, target_handles_, target_handle_divisions_);
+    state_->begin_epoch(event_lanes, staged_samples, dts, targets_);
     PL();
 
     // loop over timesteps
@@ -440,7 +439,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
 
     // Keep track of mechanisms by name for probe lookup.
     std::unordered_map<std::string, mechanism*> mechptr_by_name;
-    target_handles_.resize(mech_data.n_target);
+    std::vector<target_handle> target_handles(mech_data.n_target, target_handle{});
     for (const auto& [name, config]: mech_data.mechanisms) {
         auto n_cv = config.cv.size();
         auto layout = mechanism_layout {
@@ -473,7 +472,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
             if (!config.target.empty()) {
                 if (config.multiplicity.empty()) {
                     for (auto i: util::count_along(config.cv)) {
-                        target_handles_[config.target[i]] = target_handle(id, i);
+                        target_handles[config.target[i]] = target_handle(id, i);
                     }
                 }
                 else {
@@ -481,7 +480,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
                     for (auto i: util::count_along(config.cv)) {
                         auto hi = lo + layout.multiplicity[i];
                         for (auto j: util::make_span(lo, hi)) {
-                            target_handles_[config.target[j]] = target_handle(id, i);
+                            target_handles[config.target[j]] = target_handle(id, i);
                         }
                         lo = hi;
                     }
@@ -549,13 +548,15 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
         }
     }
 
-    add_probes(gids, cells, rec, D, mechptr_by_name, mech_data, target_handles_, fvm_info.probe_map);
+    add_probes(gids, cells, rec, D, mechptr_by_name, mech_data, target_handles, fvm_info.probe_map);
 
     // Create lookup structure for target ids.
-    util::make_partition(target_handle_divisions_,
-        util::transform_view(gids,
-                             [&](cell_gid_type i) { return fvm_info.num_targets[i]; }));
-
+    std::vector<cell_size_type> target_handle_divisions;
+    util::make_partition(target_handle_divisions,
+                         util::transform_view(gids,
+                                              [&](cell_gid_type i) { return fvm_info.num_targets[i]; }));
+    targets_ = partitioned_vector{std::move(target_handles),
+                                  std::move(target_handle_divisions)};
     
     reset();
     return fvm_info;

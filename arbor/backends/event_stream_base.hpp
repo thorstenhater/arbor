@@ -6,6 +6,7 @@
 
 #include "backends/event.hpp"
 #include "backends/event_stream_state.hpp"
+#include "communication/partitioned_vector.hpp"
 #include "event_lane.hpp"
 #include "timestep_range.hpp"
 #include "util/span.hpp"
@@ -88,11 +89,13 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
     //   * the list is partitioned by `time_step` via `ev_spans`
     template<typename EventStream>
     friend void initialize(const event_lane_subrange& lanes,
-                           const std::vector<target_handle>& handles,
-                           const std::vector<std::size_t>& divs,
+                           const partitioned_vector<target_handle>& handles,
                            const timestep_range& steps,
                            std::vector<EventStream>& streams) {
-        arb_assert(lanes.size() < divs.size());
+        const auto& divs = handles.partition();
+        const auto& hdls = handles.values();
+        
+        arb_assert(lanes.size() < handles.partition().size());
         // reset streams and allocate sufficient space for temporaries
         for (auto& stream: streams) {
             stream.clear();
@@ -113,7 +116,7 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
                 // traverse lower edge -> upper edge and store events
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_hi; ++evnt_idx) {
                     const auto& evnt = lane[evnt_idx];
-                    const auto& handle = handles[div + evnt.target];
+                    const auto& handle = hdls[div + evnt.target];
                     auto& stream = streams[handle.id];
                     stream.ev_data_.emplace_back(event_data_type{handle.index, evnt.weight});
                     stream.ev_spans_[step + 1]++;

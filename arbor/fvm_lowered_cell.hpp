@@ -242,11 +242,16 @@ struct fvm_lowered_cell {
                                              const event_lane_subrange& event_lanes,
                                              const std::vector<std::vector<sample_event>>& staged_samples) = 0;
 
+    // Describe the target on the cell group
+    // num_targets: number of targets
+    // targets: vector of targets partioned into chunks, one chunk per local cell.
+    virtual cell_size_type num_targets() const = 0;
+    virtual const partitioned_vector<target_handle>& targets() const = 0;
+  
     virtual arb_value_type time() const = 0;
 
     virtual ~fvm_lowered_cell() {}
 
-    virtual cell_size_type num_targets() const = 0;
 
     virtual void t_serialize(serializer& ser, const std::string& k) const = 0;
     virtual void t_deserialize(serializer& ser, const std::string& k) = 0;

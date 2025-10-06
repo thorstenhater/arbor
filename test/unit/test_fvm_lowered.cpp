@@ -246,19 +246,19 @@ TEST(fvm_lowered, target_handles) {
         unsigned expsyn_id = expsyn->mechanism_id();
         unsigned exp2syn_id = exp2syn->mechanism_id();
 
-        EXPECT_EQ(4u, cell.target_handles_.size());
+        EXPECT_EQ(4u, cell.targets_.values().size());
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[0].id);
-        EXPECT_EQ(1u, cell.target_handles_[0].index);
+        EXPECT_EQ(expsyn_id, cell.targets_.values()[0].id);
+        EXPECT_EQ(1u, cell.targets_.values()[0].index);
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[1].id);
-        EXPECT_EQ(0u, cell.target_handles_[1].index);
+        EXPECT_EQ(expsyn_id, cell.targets_.values()[1].id);
+        EXPECT_EQ(0u, cell.targets_.values()[1].index);
 
-        EXPECT_EQ(exp2syn_id, cell.target_handles_[2].id);
-        EXPECT_EQ(0u, cell.target_handles_[2].index);
+        EXPECT_EQ(exp2syn_id, cell.targets_.values()[2].id);
+        EXPECT_EQ(0u, cell.targets_.values()[2].index);
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[3].id);
-        EXPECT_EQ(2u, cell.target_handles_[3].index);
+        EXPECT_EQ(expsyn_id, cell.targets_.values()[3].id);
+        EXPECT_EQ(2u, cell.targets_.values()[3].index);
     };
 
     fvm_cell fvcell0(*context);

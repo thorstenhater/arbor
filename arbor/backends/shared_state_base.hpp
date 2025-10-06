@@ -34,11 +34,10 @@ struct shared_state_base {
     void begin_epoch(const event_lane_subrange& lanes,
                      const std::vector<std::vector<sample_event>>& samples,
                      const timestep_range& dts,
-                     const std::vector<target_handle>& handles,
-                     const std::vector<size_t>& divs) {
+                     const partitioned_vector<target_handle>& handles) {
         auto d = static_cast<D*>(this);
         // events
-        initialize(lanes, handles, divs, dts, d->streams);
+        initialize(lanes, handles, dts, d->streams);
         // samples
         auto n_samples = util::sum_by(samples, [] (const auto& s) {return s.size();});
         if (d->sample_time.size() < n_samples) {

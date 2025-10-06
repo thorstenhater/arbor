@@ -280,7 +280,7 @@ void run_expsyn_g_probe_test(context ctx) {
         fvm_cell lcell(*ctx);
         auto fvm_info = lcell.initialize({0}, rec);
         const auto& probe_map = fvm_info.probe_map;
-        const auto& targets = lcell.target_handles_;
+        const auto& targets = lcell.targets_.values();
 
         EXPECT_EQ(2u, rec.get_probes(0).size());
         EXPECT_EQ(2u, probe_map.size());
@@ -421,7 +421,7 @@ void run_expsyn_g_cell_probe_test(context ctx) {
             ASSERT_EQ(h.raw_handles.size(), m.size());
             ASSERT_EQ(n_expsyn, m.size());
 
-            const auto n_targets = lcell.target_handles_.size();
+            const auto n_targets = lcell.targets_.values().size();
             std::vector<double> expected_coalesced_cv_value(geom.size());
             std::vector<double> expected_uncoalesced_value(n_targets);
 

@@ -14,6 +14,8 @@ public:
     using value_type = T;
     using count_type = unsigned;
 
+    partitioned_vector() = default;
+    
     partitioned_vector(std::vector<value_type>&& v, std::vector<count_type>&& p) :
         values_(std::move(v)),
         partition_(std::move(p)) {
