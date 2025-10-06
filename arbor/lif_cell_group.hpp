@@ -77,6 +77,8 @@ struct ARB_ARBOR_API lif_cell_group: public cell_group {
 
     std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const override;
 
+    cell_size_type num_targets() const override { return cells_.size(); }
+  
     ARB_SERDES_ENABLE(lif_cell_group, gids_, cells_, spikes_, last_time_updated_, next_time_updatable_);
 
     virtual void t_serialize(serializer& ser, const std::string& k) const override;

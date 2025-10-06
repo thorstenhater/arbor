@@ -13,7 +13,7 @@
 #include <arbor/assert.hpp>
 #include <arbor/communication/mpi_error.hpp>
 
-#include "communication/gathered_vector.hpp"
+#include "communication/partitioned_vector.hpp"
 #include "profile/profiler_macro.hpp"
 #include "util/rangeutil.hpp"
 #include "util/partition.hpp"
@@ -220,9 +220,9 @@ std::vector<std::vector<T>> gather_all(const std::vector<std::vector<T>>& values
 /// Gather all of a distributed vector
 /// Retains the meta data (i.e. vector partition)
 template <typename T>
-gathered_vector<T> gather_all_with_partition(const std::vector<T>& values, MPI_Comm comm) {
-    using gathered_type = gathered_vector<T>;
-    using count_type = typename gathered_vector<T>::count_type;
+partitioned_vector<T> gather_all_with_partition(const std::vector<T>& values, MPI_Comm comm) {
+    using gathered_type = partitioned_vector><T>;
+    using count_type = typename gathered_type::count_type;
     using traits = mpi_traits<T>;
 
     // We have to use int for the count and displs vectors instead

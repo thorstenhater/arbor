@@ -246,6 +246,8 @@ struct fvm_lowered_cell {
 
     virtual ~fvm_lowered_cell() {}
 
+    virtual cell_size_type num_targets() const = 0;
+
     virtual void t_serialize(serializer& ser, const std::string& k) const = 0;
     virtual void t_deserialize(serializer& ser, const std::string& k) = 0;
 };

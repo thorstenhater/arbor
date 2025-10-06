@@ -13,15 +13,15 @@ namespace arb {
 // Post-synaptic spike events
 
 struct target_handle {
-    cell_local_size_type mech_id;    // mechanism type identifier (per cell group).
-    cell_local_size_type mech_index; // instance of the mechanism
+    cell_local_size_type id;    // per cell group identifier 
+    cell_local_size_type index; // offset into the instance 
 
     target_handle() = default;
 
-    target_handle(cell_local_size_type mech_id, cell_local_size_type mech_index):
-        mech_id(mech_id), mech_index(mech_index) {}
+    target_handle(cell_local_size_type id_, cell_local_size_type index_):
+        id(id_), index(index_) {}
 
-    ARB_SERDES_ENABLE(target_handle, mech_id, mech_index);
+    ARB_SERDES_ENABLE(target_handle, id, index);
 };
 
 }
@@ -64,7 +64,7 @@ struct deliverable_event_data {
 
 // Delivery data accessor function for multi_event_stream:
 inline arb_deliverable_event_data event_data(const deliverable_event& ev) {
-    return {ev.handle.mech_index, ev.weight};
+    return {ev.handle.index, ev.weight};
 }
 
 inline arb_deliverable_event_stream make_event_stream_state(arb_deliverable_event_data* begin,

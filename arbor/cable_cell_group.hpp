@@ -46,6 +46,9 @@ struct ARB_ARBOR_API cable_cell_group: public cell_group {
 
     std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const override;
 
+    cell_size_type num_targets() const override { return lowered_->num_targets(); }
+
+  
     ARB_SERDES_ENABLE(cable_cell_group, gids_, spikes_, lowered_);
 
     void t_serialize(serializer& ser, const std::string& k) const override;

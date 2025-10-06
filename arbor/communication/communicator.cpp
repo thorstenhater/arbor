@@ -10,7 +10,7 @@
 #include <arbor/spike.hpp>
 #include <include/arbor/arbexcept.hpp>
 
-#include "communication/gathered_vector.hpp"
+#include "communication/partitioned_vector.hpp"
 #include "connection.hpp"
 #include "distributed_context.hpp"
 #include "execution_context.hpp"

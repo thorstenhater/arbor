@@ -3,6 +3,12 @@
 
 namespace {
 
+void check_result(arb_deliverable_event_data const* results, std::vector<arb_deliverable_event_data> const& expected) {
+    for (std::size_t i=0; i<expected.size(); ++i) {
+        EXPECT_EQ(results[i].weight, expected[i].weight);
+    }
+}
+  
 template<typename Result>
 void check(Result result) {
     for (std::size_t step=0; step<result.steps.size(); ++step) {

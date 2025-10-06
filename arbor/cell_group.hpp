@@ -34,15 +34,16 @@ public:
 
     // Sampler association methods below should be thread-safe, as they might be invoked
     // from a sampler call back called from a different cell group running on a different thread.
-
     virtual void add_sampler(sampler_association_handle, cell_member_predicate, schedule, sampler_function) = 0;
     virtual void remove_sampler(sampler_association_handle) = 0;
     virtual void remove_all_samplers() = 0;
 
     // Probe metadata queries might also be called while a simulation is running, and so should
     // also be thread-safe.
-
     virtual std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const { return {}; }
+
+    virtual cell_size_type num_targets() const = 0;
+  
     // trampolines for serialization
     virtual void t_serialize(serializer& s, const std::string&) const = 0;
     virtual void t_deserialize(serializer& s, const std::string&)  = 0;

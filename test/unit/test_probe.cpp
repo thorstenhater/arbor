@@ -307,7 +307,7 @@ void run_expsyn_g_probe_test(context ctx) {
         // Integrate to 3 ms, with one event at 1ms to first expsyn weight 0.5,
         // and another at 2ms to second, weight 1.
 
-        arb_assert(targets[0].mech_id == targets[1].mech_id);
+        arb_assert(targets[0].id == targets[1].id);
         const double tfinal = 3.0;
         const double dt = 0.001;
         const timestep_range dts{tfinal, dt};

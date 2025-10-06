@@ -33,6 +33,8 @@ public:
 
     void remove_sampler(sampler_association_handle h) override {}
 
+    cell_size_type num_targets() const override { return 0; }
+  
     void remove_all_samplers() override {}
 
     ARB_SERDES_ENABLE(spike_source_cell_group, spikes_, gids_, time_sequences_);

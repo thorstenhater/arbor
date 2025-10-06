@@ -44,12 +44,12 @@ struct mpi_context_impl {
         return {};
     }
 
-    gathered_vector<spike>
+    partitioned_vector<spike>
     gather_spikes(const std::vector<spike>& local_spikes) const {
         return mpi::gather_all_with_partition(local_spikes, comm_);
     }
 
-    gathered_vector<cell_gid_type>
+    partitioned_vector<cell_gid_type>
     gather_gids(const std::vector<cell_gid_type>& local_gids) const {
         return mpi::gather_all_with_partition(local_gids, comm_);
     }
@@ -186,10 +186,10 @@ struct remote_context_impl {
         return mpi::gather_all(local_spikes, portal_);
     }
 
-    gathered_vector<spike>
+    partitioned_vector<spike>
     gather_spikes(const std::vector<spike>& local_spikes) const { return mpi_.gather_spikes(local_spikes); }
 
-    gathered_vector<cell_gid_type>
+    partitioned_vector<cell_gid_type>
     gather_gids(const std::vector<cell_gid_type>& local_gids) const { return mpi_.gather_gids(local_gids); }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {

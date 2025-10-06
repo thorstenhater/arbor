@@ -23,7 +23,7 @@ struct connection {
 
 inline
 spike_event make_event(const connection& c, const spike& s) {
-    return {c.target, s.time + c.delay, c.weight};
+  return {c.target, s.time + c.delay, c.weight};
 }
 
 } // namespace arb

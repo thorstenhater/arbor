@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "arbor/common_types.hpp"
-#include "communication/gathered_vector.hpp"
+#include "communication/partitioned_vector.hpp"
 
 
 TEST(gathered_vector, invariants) {
@@ -18,7 +18,7 @@ TEST(gathered_vector, invariants) {
     {3, 6}
     };
     auto pt = std::vector<unsigned>{0, 3, 5, 5, 7};
-    auto gv = arb::gathered_vector<arb::cell_member_type>{std::move(sc), std::move(pt)};
+    auto gv = arb::partitioned_vector{std::move(sc), std::move(pt)};
     auto partition = gv.partition();
     auto values = gv.values();
     ASSERT_TRUE(std::is_sorted(partition.begin(), partition.end()));

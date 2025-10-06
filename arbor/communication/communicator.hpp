@@ -9,7 +9,7 @@
 #include <arbor/recipe.hpp>
 #include <arbor/spike.hpp>
 
-#include "communication/gathered_vector.hpp"
+#include "communication/partitioned_vector.hpp"
 #include "connection.hpp"
 #include "epoch.hpp"
 #include "execution_context.hpp"
@@ -32,7 +32,7 @@ class ARB_ARBOR_API communicator {
 public:
 
     struct spikes {
-        gathered_vector<spike> from_local;
+        partitioned_vector<spike> from_local;
         std::vector<spike> from_remote;
     };
 

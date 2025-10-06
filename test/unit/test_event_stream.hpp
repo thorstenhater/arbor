@@ -4,6 +4,8 @@
 #include <random>
 #include <gtest/gtest.h>
 
+#include <arbor/spike_event.hpp>
+
 #include "timestep_range.hpp"
 #include "backends/event.hpp"
 #include "util/rangeutil.hpp"
@@ -11,12 +13,6 @@
 namespace {
 
 using namespace arb;
-
-void check_result(arb_deliverable_event_data const* results, std::vector<arb_deliverable_event_data> const& expected) {
-    for (std::size_t i=0; i<expected.size(); ++i) {
-        EXPECT_EQ(results[i].weight, expected[i].weight);
-    }
-}
 
 template<typename Stream>
 struct result {
@@ -166,10 +162,10 @@ result<Stream> multi_step() {
         auto r_t0 = res.steps.find(r_event.time)->t_begin();
         auto const& l_handle = handles[divs[l_cell] + l_event.target];
         auto const& r_handle = handles[divs[r_cell] + r_event.target];
-        auto l_mech_id = l_handle.mech_id;
-        auto r_mech_id = r_handle.mech_id;
-        auto l_mech_index = l_handle.mech_index;
-        auto r_mech_index = r_handle.mech_index;
+        auto l_mech_id = l_handle.id;
+        auto r_mech_id = r_handle.id;
+        auto l_mech_index = l_handle.index;
+        auto r_mech_index = r_handle.index;
 
         // sort by mech_id
         if (l_mech_id < r_mech_id) return true;
@@ -196,8 +192,8 @@ result<Stream> multi_step() {
         auto& event = events[cell][idx];
         auto step = res.steps.find(event.time) - res.steps.begin();
         auto const& handle = handles[divs[cell] + event.target];
-        auto mech_id = handle.mech_id;
-        auto mech_index = handle.mech_index;
+        auto mech_id = handle.id;
+        auto mech_index = handle.index;
         event.weight = cc++;
         res.expected[mech_id][step].push_back(arb_deliverable_event_data{mech_index, event.weight});
     }

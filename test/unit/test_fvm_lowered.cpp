@@ -248,17 +248,17 @@ TEST(fvm_lowered, target_handles) {
 
         EXPECT_EQ(4u, cell.target_handles_.size());
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[0].mech_id);
-        EXPECT_EQ(1u, cell.target_handles_[0].mech_index);
+        EXPECT_EQ(expsyn_id, cell.target_handles_[0].id);
+        EXPECT_EQ(1u, cell.target_handles_[0].index);
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[1].mech_id);
-        EXPECT_EQ(0u, cell.target_handles_[1].mech_index);
+        EXPECT_EQ(expsyn_id, cell.target_handles_[1].id);
+        EXPECT_EQ(0u, cell.target_handles_[1].index);
 
-        EXPECT_EQ(exp2syn_id, cell.target_handles_[2].mech_id);
-        EXPECT_EQ(0u, cell.target_handles_[2].mech_index);
+        EXPECT_EQ(exp2syn_id, cell.target_handles_[2].id);
+        EXPECT_EQ(0u, cell.target_handles_[2].index);
 
-        EXPECT_EQ(expsyn_id, cell.target_handles_[3].mech_id);
-        EXPECT_EQ(2u, cell.target_handles_[3].mech_index);
+        EXPECT_EQ(expsyn_id, cell.target_handles_[3].id);
+        EXPECT_EQ(2u, cell.target_handles_[3].index);
     };
 
     fvm_cell fvcell0(*context);

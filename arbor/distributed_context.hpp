@@ -9,7 +9,7 @@
 #include <arbor/spike.hpp>
 #include <arbor/util/pp_util.hpp>
 
-#include "communication/gathered_vector.hpp"
+#include "communication/partitioned_vector.hpp"
 #include "epoch.hpp"
 #include "label_resolution.hpp"
 
@@ -93,11 +93,11 @@ public:
         return impl_->remote_gather_spikes(local_spikes);
     }
 
-    gathered_vector<spike> gather_spikes(const spike_vector& local_spikes) const {
+    partitioned_vector<spike> gather_spikes(const spike_vector& local_spikes) const {
         return impl_->gather_spikes(local_spikes);
     }
 
-    gathered_vector<cell_gid_type> gather_gids(const gid_vector& local_gids) const {
+    partitioned_vector<cell_gid_type> gather_gids(const gid_vector& local_gids) const {
         return impl_->gather_gids(local_gids);
     }
 
@@ -157,11 +157,11 @@ public:
 
 private:
     struct interface {
-        virtual gathered_vector<spike>
+        virtual partitioned_vector<spike>
         gather_spikes(const spike_vector& local_spikes) const = 0;
         virtual spike_vector
         remote_gather_spikes(const spike_vector& local_spikes) const = 0;
-        virtual gathered_vector<cell_gid_type>
+        virtual partitioned_vector<cell_gid_type>
         gather_gids(const gid_vector& local_gids) const = 0;
         virtual cell_label_range
         gather_cell_label_range(const cell_label_range& local_ranges) const = 0;
@@ -170,12 +170,12 @@ private:
         virtual std::vector<std::string>
         gather(std::string value, int root) const = 0;
         virtual distributed_request send_recv_nonblocking(std::size_t recv_count,
-            void* recv_data,
-            int source_id,
-            std::size_t send_count,
-            const void* send_data,
-            int dest_id,
-            int tag) const = 0;
+                                                          void* recv_data,
+                                                          int source_id,
+                                                          std::size_t send_count,
+                                                          const void* send_data,
+                                                          int dest_id,
+                                                          int tag) const = 0;
         virtual int id() const = 0;
         virtual int size() const = 0;
         virtual void barrier() const = 0;
@@ -197,11 +197,11 @@ private:
         remote_gather_spikes(const spike_vector& local_spikes) const override {
             return wrapped.remote_gather_spikes(local_spikes);
         }
-        gathered_vector<spike>
+        partitioned_vector<spike>
         gather_spikes(const spike_vector& local_spikes) const override {
             return wrapped.gather_spikes(local_spikes);
         }
-        gathered_vector<cell_gid_type>
+        partitioned_vector<cell_gid_type>
         gather_gids(const gid_vector& local_gids) const override {
             return wrapped.gather_gids(local_gids);
         }
@@ -252,10 +252,10 @@ private:
 };
 
 struct local_context {
-    gathered_vector<spike>
+    partitioned_vector<spike>
     gather_spikes(const std::vector<spike>& local_spikes) const {
-        using count_type = typename gathered_vector<spike>::count_type;
-        return gathered_vector<spike>(
+        using count_type = typename partitioned_vector<spike>::count_type;
+        return partitioned_vector<spike>(
             std::vector<spike>(local_spikes),
             {0u, static_cast<count_type>(local_spikes.size())}
         );
@@ -264,10 +264,10 @@ struct local_context {
     remote_gather_spikes(const std::vector<spike>& local_spikes) const {
         return {};
     }
-    gathered_vector<cell_gid_type>
+    partitioned_vector<cell_gid_type>
     gather_gids(const std::vector<cell_gid_type>& local_gids) const {
-        using count_type = typename gathered_vector<cell_gid_type>::count_type;
-        return gathered_vector<cell_gid_type>(
+        using count_type = typename partitioned_vector<cell_gid_type>::count_type;
+        return partitioned_vector<cell_gid_type>(
                 std::vector<cell_gid_type>(local_gids),
                 {0u, static_cast<count_type>(local_gids.size())}
         );

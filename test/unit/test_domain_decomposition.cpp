@@ -155,9 +155,9 @@ struct dummy_context {
     int size_ = 1;
     int id_ = 0;
 
-    gathered_vector<spike> gather_spikes(const std::vector<spike>&) const { throw unimplemented{__FUNCTION__}; }
+    partitioned_vector<spike> gather_spikes(const std::vector<spike>&) const { throw unimplemented{__FUNCTION__}; }
     std::vector<spike> remote_gather_spikes(const std::vector<spike>&) const { throw unimplemented{__FUNCTION__}; }
-    gathered_vector<cell_gid_type> gather_gids(const std::vector<cell_gid_type>& local_gids) const { throw unimplemented{__FUNCTION__}; }
+    partitioned_vector<cell_gid_type> gather_gids(const std::vector<cell_gid_type>& local_gids) const { throw unimplemented{__FUNCTION__}; }
     void remote_ctrl_send_continue(const epoch&) const {}
     void remote_ctrl_send_done() const {}
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const { throw unimplemented{__FUNCTION__}; }

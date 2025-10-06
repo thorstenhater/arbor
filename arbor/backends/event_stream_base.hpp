@@ -114,8 +114,8 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_hi; ++evnt_idx) {
                     const auto& evnt = lane[evnt_idx];
                     const auto& handle = handles[div + evnt.target];
-                    auto& stream = streams[handle.mech_id];
-                    stream.ev_data_.emplace_back(event_data_type{handle.mech_index, evnt.weight});
+                    auto& stream = streams[handle.id];
+                    stream.ev_data_.emplace_back(event_data_type{handle.index, evnt.weight});
                     stream.ev_spans_[step + 1]++;
                 }
                 // remember the next event to process for cell `idx`

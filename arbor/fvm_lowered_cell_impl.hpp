@@ -83,6 +83,8 @@ struct fvm_lowered_cell_impl: public fvm_lowered_cell {
     // Optional non-physical voltage check threshold, tripped when |Um| > Ucrit
     std::optional<double> check_voltage_mV_;
 
+    cell_size_type num_targets() const override { return target_handles_.size(); }
+  
     // random number generator seed value
     arb_seed_type seed_;
 
@@ -894,8 +896,8 @@ void resolve_probe(const cable_probe_point_state& p, probe_resolution_data<B>& R
             auto cg = lid + cg_lo;
             if (cg >= cg_hi) continue;
             const auto& handle = R.handles.at(cg);
-            if (handle.mech_id != mech_id) return;
-            auto mech_index = handle.mech_index;
+            if (handle.id != mech_id) return;
+            auto mech_index = handle.index;
             R.result.push_back(fvm_probe_scalar{{data + mech_index},
                                                  point_info_of(target,
                                                                lid,
@@ -931,9 +933,9 @@ void resolve_probe(const cable_probe_point_state_cell& p, probe_resolution_data<
     cell_lid_type lid = 0;
     for (auto target: util::make_span(cell_targets_beg, cell_targets_end)) {
         const auto& handle = R.handles.at(target);
-        if (handle.mech_id != mech_id) continue;
+        if (handle.id != mech_id) continue;
 
-        auto mech_index = handle.mech_index;
+        auto mech_index = handle.index;
         result.raw_handles.push_back(data + mech_index);
 
         // Convert to cell-local target index.
