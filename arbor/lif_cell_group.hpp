@@ -78,12 +78,15 @@ struct ARB_ARBOR_API lif_cell_group: public cell_group {
     std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const override;
 
     cell_size_type num_targets() const override { return cells_.size(); }
+    const partitioned_vector<target_handle>& targets() const override { return targets_; }
   
     ARB_SERDES_ENABLE(lif_cell_group, gids_, cells_, spikes_, last_time_updated_, next_time_updatable_);
 
     virtual void t_serialize(serializer& ser, const std::string& k) const override;
     virtual void t_deserialize(serializer& ser, const std::string& k) override;
 
+
+    
 private:
     enum class lif_probe_kind { voltage };
 
@@ -93,6 +96,8 @@ private:
         lif_probe_metadata metadata;
     };
 
+    partitioned_vector<target_handle> targets_;
+    
     // Advances a single cell (lid) with the exact solution (jumps can be arbitrary).
     // Parameter dt is ignored, since we make jumps between two consecutive spikes.
     void advance_cell(time_type tfinal, time_type dt, cell_gid_type lid, const event_lane_subrange& event_lane);

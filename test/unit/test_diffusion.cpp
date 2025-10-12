@@ -190,7 +190,8 @@ TEST(diffusion, by_event) {
         .set_diffusivity(5e-10)
         .set_concentration(0.0)
         .add_inject()
-        .add_event(0, 0.005);
+        .add_event(0, 0.005)
+    ;
     result_t exp = {{ 0.000000,  0.000000,  0.000000},
                     { 0.000000,  0.100000,  0.000000},
                     { 0.000000,  0.200000,  0.000000},

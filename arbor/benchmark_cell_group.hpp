@@ -33,6 +33,7 @@ public:
     void remove_all_samplers() override {}
 
     cell_size_type num_targets() const override { return cells_.size(); }
+    const partitioned_vector<target_handle>& targets() const override { return targets_; };
   
     ARB_SERDES_ENABLE(benchmark_cell_group, cells_, spikes_, gids_);
 
@@ -43,6 +44,7 @@ private:
     std::vector<benchmark_cell> cells_;
     std::vector<spike> spikes_;
     std::vector<cell_gid_type> gids_;
+    partitioned_vector<target_handle> targets_;
 };
 
 } // namespace arb

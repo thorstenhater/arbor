@@ -11,7 +11,10 @@ struct connection {
     cell_lid_type target = 0;
     float weight = 0.0f;
     float delay = 0.0f;
-    cell_size_type index_on_domain = cell_gid_type(-1);
+    // queue index, eg synapse mechanism kind in cable cells
+    cell_size_type index_on_domain = cell_size_type(-1);
+    // sub-target, eg specific synapse of a given kind
+    cell_size_type domain_offset = cell_size_type(-1);
 
     bool operator==(const connection&) const = default;
 

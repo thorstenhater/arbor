@@ -100,7 +100,9 @@ struct shared_state_base {
 
     void deliver_events(mechanism& m) {
         auto d = static_cast<D*>(this);
-        auto& stream = d->streams.at(m.mechanism_id());
+        // TODO(TH) This ... is very loose.
+        if (m.target_id < 0 || m.target_id >= d->streams.size()) return;
+        auto& stream = d->streams.at(m.target_id);
         if (!stream.empty()) {
             auto state = stream.marked_events();
             m.deliver_events(state);

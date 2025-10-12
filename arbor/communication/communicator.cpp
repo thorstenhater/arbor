@@ -20,6 +20,7 @@
 #include "util/partition.hpp"
 #include "util/rangeutil.hpp"
 #include "util/span.hpp"
+#include "util/partition.hpp"
 
 #include "communication/communicator.hpp"
 
@@ -87,6 +88,7 @@ void make_remote_connections(const std::vector<cell_gid_type>& gids,
     for (auto tgt_gid: gids) {
         const auto iod = dom_dec->index_on_domain(tgt_gid);
         source_resolver.clear();
+        // TODO(TH): use proper queue management here, too
         for (const auto& conn: rec.external_connections_on(tgt_gid)) {
             auto src = global_cell_of(conn.source);
             auto src_gid = conn.source.rid;
@@ -112,7 +114,8 @@ void make_remote_connections(const std::vector<cell_gid_type>& gids,
 void communicator::update_connections(const recipe& rec,
                                       const domain_decomposition_ptr dom_dec,
                                       const label_resolution_map& source_resolution_map,
-                                      const label_resolution_map& target_resolution_map) {
+                                      const label_resolution_map& target_resolution_map,
+                                      const partitioned_vector<target_handle>& targets) {
     // Record all the gids in a flat vector.
     PE(init:communicator:update:collect_gids);
     std::vector<cell_gid_type> gids;
@@ -150,30 +153,31 @@ void communicator::update_connections(const recipe& rec,
     auto push_connection = [&] (const auto& conn, cell_gid_type tgt_gid, cell_size_type tgt_iod) {
         auto src_gid = conn.source.gid;
         if(src_gid >= num_total_cells_) throw arb::bad_connection_source_gid(tgt_gid, src_gid, num_total_cells_);
-            // strip off qualifiers and match on type to find the actual lid of source
-            auto src_lid = cell_lid_type(-1);
-            using C = std::decay_t<decltype(conn)>;
-            if constexpr (std::is_same_v<cell_connection, C>) {
-                src_lid = source_resolver.resolve(conn.source);
-            }
-            else if constexpr (std::is_same_v<raw_cell_connection, C>) {
-                src_lid = conn.source.index;
-            }
-            else {
-                ARB_UNREACHABLE;
-            }
-            // targets always get resolution
-            auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
-            // NOTE old compilers stumble over emplace_back here
-            auto src_dom = dom_dec->gid_domain(src_gid);
-            connections_by_src_domain[src_dom].emplace_back(
-                connection{
-                .source={.gid=src_gid, .index=src_lid},
-                .target=tgt_lid,
-                .weight=conn.weight,
-                .delay=conn.delay,
-                .index_on_domain=tgt_iod
-            });
+        // strip off qualifiers and match on type to find the actual lid of source
+        auto src_lid = cell_lid_type(-1);
+        using C = std::decay_t<decltype(conn)>;
+        if constexpr (std::is_same_v<cell_connection, C>) {
+            src_lid = source_resolver.resolve(conn.source);
+        }
+        else if constexpr (std::is_same_v<raw_cell_connection, C>) {
+            src_lid = conn.source.index;
+        }
+        else {
+            ARB_UNREACHABLE;
+        }
+
+        // targets always get resolution
+        auto tgt_lid = target_resolver.resolve(tgt_gid, conn.target);
+        // local cell index 
+        auto src_dom = dom_dec->gid_domain(src_gid);
+        // get target handle
+        const auto& hdl = targets.value(tgt_iod, tgt_lid); 
+        connections_by_src_domain[src_dom].emplace_back(connection{ .source={.gid=src_gid, .index=src_lid},
+                                                                    .target=tgt_lid,
+                                                                    .weight=conn.weight,
+                                                                    .delay=conn.delay,
+                                                                    .index_on_domain=hdl.id,
+                                                                    .domain_offset=hdl.index });
     };
 
     PE(init:communicator:update:connections:local);
@@ -311,7 +315,9 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                                        [](const auto& spk, const auto& src) { return spk.source < src; });
             }
             for (; cn < ce && cons.srcs[cn] == src; ++cn) {
+                // NOTE(TH): abusing the destination field to store the instance ... let's see how that goes
                 auto dst = cons.dests[cn];
+                auto off = cons.off_on_domain[cn];
                 auto del = cons.delays[cn];
                 auto wgt = cons.weights[cn];
                 auto dom = cons.idx_on_domain[cn];
@@ -319,7 +325,7 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                 // Handle all connections with the same source
                 // scan the range of spikes, once per connection
                 for (sp = fst; sp < se && sp->source == src; ++sp) {
-                    que.emplace_back(dst, sp->time + del, wgt);
+                    que.emplace_back(off, sp->time + del, wgt);
                 }
             }
             // once we leave here, sp will be at the end of the eglible range
@@ -342,7 +348,9 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
             }
             for (sp = spk; sp < se && sp->source == src; ++sp) {
                 for (cn = fst; cn < ce && cons.srcs[cn] == src; ++cn) {
+                    // NOTE(TH): abusing the destination field to store the instance ... let's see how that goes
                     auto dst = cons.dests[cn];
+                    auto off = cons.off_on_domain[cn];
                     auto del = cons.delays[cn];
                     auto wgt = cons.weights[cn];
                     auto dom = cons.idx_on_domain[cn];
@@ -351,7 +359,7 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                     // them all. This is mostly rare.
                     // NB: Reset the spike iterator as we walk the same sub-range
                     // for each connection with the same source.
-                    que.emplace_back(dst, sp->time + del, wgt);
+                    que.emplace_back(off, sp->time + del, wgt);
                 }
             }
         }
@@ -360,7 +368,7 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
 
 void communicator::make_event_queues(communicator::spikes& spikes,
                                      std::vector<pse_vector>& queues) {
-    arb_assert(queues.size()==num_local_cells_);
+    // arb_assert(queues.size()==num_local_cells_);
     const auto& sp = spikes.from_local.partition();
     const auto& cp = connection_part_;
     for (auto dom: util::make_span(num_domains_)) {

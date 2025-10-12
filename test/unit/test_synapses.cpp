@@ -110,6 +110,8 @@ TEST(synapses, syn_basic_state) {
 
     state.instantiate(*expsyn,  {}, {syn_cv, {}, syn_weight, syn_mult}, {});
     state.instantiate(*exp2syn, {}, {syn_cv, {}, syn_weight, syn_mult}, {});
+    expsyn->target_id = 0;
+    exp2syn->target_id = 1;
 
     // Parameters initialized to default values?
 
@@ -149,8 +151,23 @@ TEST(synapses, syn_basic_state) {
 
     // Deliver two events (at time 0), one each to expsyn synapses 1 and 3
     // and exp2syn synapses 0 and 2.
-    std::vector<pse_vector> events{{{0, 0.0, 3.14f}, {1, 0.0, 1.41f}, {2, 0.0, 2.71f}, {3, 0.0, 0.07f}}};
+    std::vector<pse_vector> events{
+        {
+            {
+                {1, 0.0, 3.14f},
+                {3, 0.0, 1.41f},
+            },
+            {
+                {0, 0.0, 2.71f},
+                {2, 0.0, 0.07f},
+            },
+        }
+    };
+    // a single cell group
     auto lanes = event_lane_subrange(events.begin(), events.end());
+    // This is a single cell with 2 target
+    // * target 0 on CVs 0 and 3
+    // * target 1 on CVs 1 and 2
     partitioned_vector<target_handle> handles{{{0, 1}, {0, 3}, {1, 0}, {1, 2}}, {0, 4}};
     
     state.begin_epoch(lanes, {}, dts, handles);
@@ -161,7 +178,7 @@ TEST(synapses, syn_basic_state) {
 
     using fvec = std::vector<arb_value_type>;
 
-    EXPECT_TRUE(testing::seq_almost_eq<arb_value_type>(fvec({0, 3.14f, 0, 1.41f}),
+    EXPECT_TRUE(testing::seq_almost_eq<arb_value_type>(fvec({0, 3.14f, 0, 1.4099999666213989}), // NOTE: very slight decay/inaccuracy
                                                        mechanism_field(expsyn, "g")));
 
     double factor = mechanism_field(exp2syn, "factor")[0];

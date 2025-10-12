@@ -34,6 +34,7 @@ public:
     void remove_sampler(sampler_association_handle h) override {}
 
     cell_size_type num_targets() const override { return 0; }
+    const partitioned_vector<target_handle>& targets() const override { return targets_; }
   
     void remove_all_samplers() override {}
 
@@ -46,6 +47,7 @@ private:
     std::vector<spike> spikes_;
     std::vector<cell_gid_type> gids_;
     std::vector<std::vector<schedule>> time_sequences_;
+    partitioned_vector<target_handle> targets_;
 };
 
 } // namespace arb

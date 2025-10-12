@@ -37,13 +37,13 @@ struct test_recipe: public n_cable_cell_recipe {
         label_dict labels;
         labels.set("soma", arb::reg::tagged(1));
 
-        decor decorations;
-        decorations.place(mlocation{0, 0.5}, synapse("expsyn"), "synapse");
-        decorations.place(mlocation{0, 0.5}, threshold_detector{-64*arb::units::mV}, "detector");
-        decorations.place(mlocation{0, 0.5}, junction("gj"), "gapjunction");
-        cable_cell c(st, decorations, labels);
-
-        return c;
+        auto decorations = decor{}
+             .place(mlocation{0, 0.5}, synapse("expsyn"), "synapse")
+             .place(join(ls::location(0, 0.1), ls::location(0, 0.2)), synapse("exp2syn"), "synapse2")
+             .place(mlocation{0, 0.5}, threshold_detector{-64*arb::units::mV}, "detector")
+             .place(mlocation{0, 0.5}, junction("gj"), "gapjunction");
+        
+        return {st, decorations, labels};
     }
 
     std::vector<arb::event_generator> event_generators(arb::cell_gid_type gid) const override {
@@ -99,12 +99,12 @@ struct test_recipe_gj: public test_recipe {
         test_recipe(n), gj_pairs_(std::move(gj_pairs)) {}
 
     std::vector<gap_junction_connection> gap_junctions_on(cell_gid_type i) const override {
+        auto lbl = "gapjunction";
+        auto pol = lid_selection_policy::assert_univalent;
         std::vector<gap_junction_connection> gjs;
-        for (auto p: gj_pairs_) {
-            if (p.first == i) gjs.push_back({{p.second, "gapjunction", lid_selection_policy::assert_univalent},
-                                             {"gapjunction", lid_selection_policy::assert_univalent}, 0.});
-            if (p.second == i) gjs.push_back({{p.first, "gapjunction", lid_selection_policy::assert_univalent},
-                                             {"gapjunction", lid_selection_policy::assert_univalent}, 0.});
+        for (const auto& [fst, snd]: gj_pairs_) {
+            if (fst == i) gjs.push_back({{snd, lbl, pol}, {lbl, pol}, 0.});
+            if (snd == i) gjs.push_back({{fst, lbl, pol}, {lbl, pol}, 0.});
         }
         return gjs;
     }

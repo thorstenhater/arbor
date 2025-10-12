@@ -67,6 +67,8 @@ struct fvm_lowered_cell_impl: public fvm_lowered_cell {
     using array               = typename backend::array;
     using shared_state        = typename backend::shared_state;
 
+    cell_size_type num_targets_ = -1;
+    
     execution_context context_;
 
     std::unique_ptr<shared_state> state_; // Cell state shared across mechanisms.
@@ -81,7 +83,7 @@ struct fvm_lowered_cell_impl: public fvm_lowered_cell {
     // Optional non-physical voltage check threshold, tripped when |Um| > Ucrit
     std::optional<double> check_voltage_mV_;
 
-    cell_size_type num_targets() const override { return targets_.size(); }
+    cell_size_type num_targets() const override { return num_targets_; }
     const partitioned_vector<target_handle>& targets() const override { return targets_; }
   
     // random number generator seed value
@@ -159,7 +161,7 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(const timestep_
     PL();
 
     // loop over timesteps
-    for (const auto& ts : dts) {
+    for (const auto& ts: dts) {
         state_->update_time_to(ts);
         arb_assert(state_->time == ts.t_begin());
 
@@ -436,9 +438,10 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
                                             mech_data.stimuli,
                                             data_alignment,
                                             seed_);
-
+    
     // Keep track of mechanisms by name for probe lookup.
     std::unordered_map<std::string, mechanism*> mechptr_by_name;
+    cell_size_type target_id = 0;
     std::vector<target_handle> target_handles(mech_data.n_target, target_handle{});
     for (const auto& [name, config]: mech_data.mechanisms) {
         auto n_cv = config.cv.size();
@@ -472,7 +475,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
             if (!config.target.empty()) {
                 if (config.multiplicity.empty()) {
                     for (auto i: util::count_along(config.cv)) {
-                        target_handles[config.target[i]] = target_handle(id, i);
+                        target_handles[config.target[i]] = target_handle(target_id, i);
                     }
                 }
                 else {
@@ -480,11 +483,13 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
                     for (auto i: util::count_along(config.cv)) {
                         auto hi = lo + layout.multiplicity[i];
                         for (auto j: util::make_span(lo, hi)) {
-                            target_handles[config.target[j]] = target_handle(id, i);
+                            target_handles[config.target[j]] = target_handle(target_id, i);
                         }
                         lo = hi;
                     }
                 }
+                mech->target_id = target_id;
+                ++target_id;
             }
             mechptr_by_name[name] = mech.get();
             mechanisms_.emplace_back(mech.release());
@@ -548,16 +553,21 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
         }
     }
 
+    num_targets_ = target_id;
+    
     add_probes(gids, cells, rec, D, mechptr_by_name, mech_data, target_handles, fvm_info.probe_map);
 
-    // Create lookup structure for target ids.
-    std::vector<cell_size_type> target_handle_divisions;
-    util::make_partition(target_handle_divisions,
-                         util::transform_view(gids,
-                                              [&](cell_gid_type i) { return fvm_info.num_targets[i]; }));
-    targets_ = partitioned_vector{std::move(target_handles),
+    if (!target_handles.empty()) {
+        std::vector<cell_size_type> target_handle_divisions;
+        util::make_partition(target_handle_divisions,
+                             util::transform_view(gids,
+                                                  [&](cell_gid_type i) { return fvm_info.num_targets[i]; }));
+        targets_ = partitioned_vector{std::move(target_handles),
                                   std::move(target_handle_divisions)};
-    
+    }
+    else {
+        targets_ = {};
+    }
     reset();
     return fvm_info;
 }

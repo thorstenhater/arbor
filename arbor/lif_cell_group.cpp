@@ -39,6 +39,17 @@ lif_cell_group::lif_cell_group(const std::vector<cell_gid_type>& gids,
             }
         }
     }
+
+{
+      std::vector<target_handle> hdls;
+      std::vector<unsigned> divs{0};
+      for (auto lid : util::count_along(gids_)) {
+        hdls.emplace_back(lid, 0);
+        divs.push_back(lid + 1);
+      }
+      targets_ = {std::move(hdls), std::move(divs)};
+    }
+        
 }
 
 cell_kind lif_cell_group::get_cell_kind() const {
@@ -46,6 +57,7 @@ cell_kind lif_cell_group::get_cell_kind() const {
 }
 
 void lif_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange& event_lanes) {
+    arb_assert(event_lanes.size() == cells_.size());
     PE(advance:lif);
     for (auto lid: util::make_span(gids_.size())) {
         // Advance each cell independently.

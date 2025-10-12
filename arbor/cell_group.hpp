@@ -8,7 +8,7 @@
 #include <arbor/schedule.hpp>
 #include <arbor/spike.hpp>
 #include <arbor/serdes.hpp>
-
+#include <arbor/partitioned_vector.hpp>
 
 #include "epoch.hpp"
 #include "event_lane.hpp"
@@ -21,8 +21,7 @@
 //   ranges are needed to map (gid, label) pairs to their corresponding lid sets.
 namespace arb {
 
-class cell_group {
-public:
+struct cell_group {
     virtual ~cell_group() = default;
 
     virtual cell_kind get_cell_kind() const = 0;
@@ -44,7 +43,7 @@ public:
     virtual std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const { return {}; }
 
     virtual cell_size_type num_targets() const = 0;
-    // virtual const partitioned_vector<target_handle> targets = 0;
+    virtual const partitioned_vector<target_handle>& targets() const = 0;
   
     // trampolines for serialization
     virtual void t_serialize(serializer& s, const std::string&) const = 0;

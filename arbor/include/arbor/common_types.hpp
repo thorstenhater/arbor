@@ -171,6 +171,9 @@ struct target_handle {
     cell_local_size_type id    = -1; // per cell group identifier 
     cell_local_size_type index = -1; // offset into the instance 
 
+    bool operator==(const target_handle&) const noexcept = default;
+    auto operator<=>(const target_handle&) const noexcept = default;
+    
     target_handle() = default;
     target_handle(cell_local_size_type id_, cell_local_size_type index_): id(id_), index(index_) {}
 };

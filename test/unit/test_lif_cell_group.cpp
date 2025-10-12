@@ -82,13 +82,9 @@ public:
         ncells_(n), weight_(weight), delay_(delay)
     {}
 
-    cell_size_type num_cells() const override {
-        return ncells_;
-    }
+    cell_size_type num_cells() const override { return ncells_; }
 
-    cell_kind get_cell_kind(cell_gid_type gid) const override {
-        return cell_kind::lif;
-    }
+    cell_kind get_cell_kind(cell_gid_type gid) const override { return cell_kind::lif; }
 
     std::vector<cell_connection> connections_on(cell_gid_type gid) const override {
         if (gid == 0) return {};
@@ -177,7 +173,7 @@ TEST(lif_cell_group, recipe)
 }
 
 TEST(lif_cell_group, spikes) {
-    // make two lif cells
+    // make two lif cells, weight 1000, delay 0.1
     path_recipe recipe(2, 1000, 0.1);
 
     auto context = make_context();

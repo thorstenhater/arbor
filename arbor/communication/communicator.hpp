@@ -10,6 +10,8 @@
 #include <arbor/spike.hpp>
 #include <arbor/partitioned_vector.hpp>
 
+#include <iostream>
+
 #include "connection.hpp"
 #include "epoch.hpp"
 #include "execution_context.hpp"
@@ -81,13 +83,15 @@ public:
     void update_connections(const recipe& rec,
                             const domain_decomposition_ptr dom_dec,
                             const label_resolution_map& source_resolution_map,
-                            const label_resolution_map& target_resolution_map);
+                            const label_resolution_map& target_resolution_map,
+                            const partitioned_vector<target_handle>& targets);
 
     void set_remote_spike_filter(const spike_predicate&);
 
     // TODO: This is public for now.
     struct connection_list {
         std::vector<cell_size_type> idx_on_domain;
+        std::vector<cell_size_type> off_on_domain;
         std::vector<cell_member_type> srcs;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
@@ -96,6 +100,7 @@ public:
         void make(std::vector<connection>& cons) {
             for (const auto& con: cons) {
                 idx_on_domain.push_back(con.index_on_domain);
+                off_on_domain.push_back(con.domain_offset);
                 srcs.push_back(con.source);
                 dests.push_back(con.target);
                 weights.push_back(con.weight);

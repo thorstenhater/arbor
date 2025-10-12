@@ -168,8 +168,16 @@ private:
     std::vector<std::vector<event_generator>> event_generators_;
 
     // map gid to group index
-    std::unordered_map<cell_gid_type, cell_size_type> gid_to_cell_index_;
+    std::unordered_map<cell_gid_type, cell_size_type> gid_to_group_index_;
+    // map gid to local index
+    std::unordered_map<cell_gid_type, cell_size_type> gid_to_local_index_;
 
+    // local target map
+    unsigned num_local_targets_ = 0;
+    partitioned_vector<target_handle> targets_;
+    // partition of lanes by group, ie the per-group targets 
+    std::vector<unsigned> group_lanes_;
+    
     context ctx_;
     domain_decomposition_ptr ddc_;
     task_system_handle task_system_;
@@ -226,19 +234,18 @@ simulation_state::simulation_state(const recipe& rec,
     cell_groups_.resize(num_groups);
     std::vector<cell_labels_and_gids> cg_sources(num_groups);
     std::vector<cell_labels_and_gids> cg_targets(num_groups);
-    foreach_group_index(
-        [&](cell_group_ptr& group, int i) {
-          PE(init:simulation:group:factory);
-          const auto& group_info = decomp->group(i);
-          cell_label_range sources, targets;
-          auto factory = cell_kind_implementation(group_info.kind, group_info.backend, *ctx_, seed);
-          group = factory(group_info.gids, rec, sources, targets);
-          PL();
-          PE(init:simulation:group:targets_and_sources);
-          cg_sources[i] = cell_labels_and_gids(std::move(sources), group_info.gids);
-          cg_targets[i] = cell_labels_and_gids(std::move(targets), group_info.gids);
-          PL();
-        });
+    foreach_group_index([&](cell_group_ptr& group, int i) {
+        PE(init:simulation:group:factory);
+        const auto& group_info = decomp->group(i);
+        cell_label_range sources, targets;
+        auto factory = cell_kind_implementation(group_info.kind, group_info.backend, *ctx_, seed);
+        group = factory(group_info.gids, rec, sources, targets);
+        PL();
+        PE(init:simulation:group:targets_and_sources);
+        cg_sources[i] = cell_labels_and_gids(std::move(sources), group_info.gids);
+        cg_targets[i] = cell_labels_and_gids(std::move(targets), group_info.gids);
+        PL();
+    });
     PE(init:simulation:sources);
     if (rec.resolve_sources()) {
         cell_labels_and_gids local_sources;
@@ -258,16 +265,40 @@ simulation_state::simulation_state(const recipe& rec,
 }
 
 void simulation_state::update(const recipe& rec) {
-    communicator_.update_connections(rec, ddc_, source_resolution_map_, target_resolution_map_);
     // Use half minimum delay of the network for max integration interval.
+
+    num_local_targets_ = 0;
+    targets_.clear();
+    group_lanes_ = {0};
+    {
+        std::vector<target_handle> hdls;
+        std::vector<unsigned> divs{0};
+        for(const auto& group: cell_groups_) {
+            const auto& group_hdls = group->targets().values();
+            const auto& group_divs = group->targets().partition();
+            for (auto pidx = 0ul; pidx + 1 < group_divs.size(); ++pidx) {
+                for (const auto& hidx: util::make_span(group_divs[pidx], group_divs[pidx + 1])) {
+                    const auto& hdl = group_hdls[hidx];
+                    hdls.emplace_back(hdl.id + num_local_targets_, hdl.index);
+                }
+                divs.push_back(hdls.size());
+            }
+            num_local_targets_ += group->num_targets();
+            group_lanes_.push_back(num_local_targets_);
+        }
+
+        targets_ = {std::move(hdls), std::move(divs)};
+    }
+    for (const auto& hdl: targets_.values()) arb_assert(hdl.id < num_local_targets_);
+
+    communicator_.update_connections(rec, ddc_, source_resolution_map_, target_resolution_map_, targets_);
     t_interval_ = min_delay()/2;
 
-    const auto num_local_cells = communicator_.num_local_cells();
+    
     // Initialize empty buffers for pending events for each local cell
-    pending_events_.resize(num_local_cells);
     // Forget old generators, if present
     event_generators_.clear();
-    event_generators_.resize(num_local_cells);
+    event_generators_.resize(num_local_targets_);
     PE(init:simulation:update:generators);
     auto target_resolver = resolver(&target_resolution_map_);
     cell_size_type lidx = 0;
@@ -275,14 +306,21 @@ void simulation_state::update(const recipe& rec) {
     for (const auto& group_info: ddc_->groups()) {
         for (auto gid: group_info.gids) {
             // Store mapping of gid to local cell index.
-            gid_to_cell_index_[gid] = gidx;
+            gid_to_group_index_[gid] = gidx;
+            gid_to_local_index_[gid] = lidx;
             // Set up the event generators for cell gid.
-            event_generators_[lidx] = rec.event_generators(gid);
-            // Resolve event_generator targets; each event generator gets their own resolver state.
-            for (auto& gen: event_generators_[lidx]) {
+            for (const auto& gen: rec.event_generators(gid)) {
+                // NOTE: each event generator gets their own resolver state. Questionable?
                 target_resolver.clear();
+                // Resolve event_generator target
                 auto lid = target_resolver.resolve(gid, gen.target());
-                gen.set_target_lid(lid);
+                // Get queue and offset
+                const auto& hdl = targets_.value(lidx, lid);
+                // copy, modify, and insert
+                auto tmp = gen;
+                // NOTE: Store queue off set in lid field. For now.
+                tmp.set_target_lid(hdl.index);
+                event_generators_[hdl.id].push_back(tmp);
             }
             ++lidx;
         }
@@ -290,11 +328,12 @@ void simulation_state::update(const recipe& rec) {
     }
     PL();
 
-    // Create event lane buffers.
+    // Create event buffers.
     // One buffer is consumed by cell group updates while the other is filled with events for
     // the following epoch. In each buffer there is one lane for each local cell.
-    event_lanes_[0].resize(num_local_cells);
-    event_lanes_[1].resize(num_local_cells);
+    pending_events_.resize(num_local_targets_);
+    event_lanes_[0].resize(num_local_targets_);
+    event_lanes_[1].resize(num_local_targets_);
 }
 
 void simulation_state::reset() {
@@ -389,9 +428,8 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
         local_spikes(current.id).clear();
         foreach_group_index(
             [&](cell_group_ptr& group, int i) {
-                auto queues = util::subrange_view(event_lanes(current.id), communicator_.group_queue_range(i));
+                auto queues = util::subrange_view(event_lanes(current.id), group_lanes_[i], group_lanes_[i + 1]);
                 group->advance(current, dt, queues);
-
                 PE(advance:spikes);
                 local_spikes(current.id).insert(group->spikes());
                 group->clear_spikes();
@@ -425,7 +463,7 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
     // Enqueue task: build event_lanes for next epoch from pending events, event-generator events for the
     // next epoch, and with any unprocessed events from the current event_lanes.
     auto enqueue = [this](epoch next) {
-        foreach_cell(
+        threading::parallel_for::apply(0, num_local_targets_, task_system_.get(),
             [&](cell_size_type i) {
                 // NOTE Despite the superficial optics, we need to sort by the
                 // full key here and _not_ purely by time. With different
@@ -531,12 +569,10 @@ void simulation_state::remove_all_samplers() {
 }
 
 std::vector<probe_metadata> simulation_state::get_probe_metadata(const cell_address_type& probeset_id) const {
-    if (auto lidx = util::value_by_key(gid_to_cell_index_, probeset_id.gid)) {
+    if (auto lidx = util::value_by_key(gid_to_group_index_, probeset_id.gid)) {
         return cell_groups_.at(*lidx)->get_probe_metadata(probeset_id);
     }
-    else {
-        return {};
-    }
+    return {};
 }
 
 // Simulation class implementations forward to implementation class.
@@ -550,9 +586,7 @@ simulation::simulation(const recipe& rec,
     impl_.reset(new simulation_state(rec, decomp, ctx, seed));
 }
 
-void simulation::reset() {
-    impl_->reset();
-}
+void simulation::reset() { impl_->reset(); }
 
 void simulation::update(const recipe& rec) { impl_->update(rec); }
 

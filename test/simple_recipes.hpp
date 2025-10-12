@@ -33,6 +33,8 @@ public:
         return probes_.at(i);
     }
 
+    
+
     virtual void add_probe(cell_gid_type gid, const cell_tag_type& tag, std::any address) { probes_[gid].emplace_back(std::move(address), tag); }
 
     std::any get_global_properties(cell_kind k) const override {
@@ -56,8 +58,18 @@ public:
         cell_gprop_.default_parameters.reversal_potential_method[ion_name] = "nernst/"+ion_name;
     }
 
+    void add_event_generator(cell_gid_type gid, event_generator gen) {
+        gens_[gid].push_back(std::move(gen));
+    }
+    
+    std::vector<event_generator> event_generators(cell_gid_type gid) const override {
+        if (gens_.contains(gid)) return gens_.at(gid);
+        return {};
+    }
+    
 protected:
     std::unordered_map<cell_gid_type, std::vector<probe_info>> probes_;
+    std::unordered_map<cell_gid_type, std::vector<event_generator>> gens_;
     cable_cell_global_properties cell_gprop_;
 };
 

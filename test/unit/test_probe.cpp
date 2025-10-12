@@ -311,7 +311,15 @@ void run_expsyn_g_probe_test(context ctx) {
         const double tfinal = 3.0;
         const double dt = 0.001;
         const timestep_range dts{tfinal, dt};
-        std::vector<pse_vector> events{{{0, 1.0, 0.5}, {1, 2.0, 1.0}}};
+        std::vector<pse_vector> events;
+        // in coalesced synapses, there's a single target index 0
+        if (coalesce_synapses) {
+            events = {{{0, 1.0, 0.5}, {0, 2.0, 1.0}}};
+        }
+        // in uncoalesced synapses, there's one target index for each synapse
+        else {
+            events = {{{0, 1.0, 0.5}, {1, 2.0, 1.0}}};
+        }
         auto lanes = util::subrange_view(events, 0, events.size());
         lcell.integrate(dts, lanes, {});
 
@@ -379,15 +387,6 @@ void run_expsyn_g_cell_probe_test(context ctx) {
     // Weight for target (gid, lid)
     auto weight = [](cell_gid_type gid, cell_lid_type lid) -> float { return lid + 100*gid; };
 
-    // Manually send an event to each expsyn synapse and integrate for a tiny time step.
-    // Set up one stream per cell.
-    std::vector events(gids.size(), pse_vector{});
-    for (auto gid: gids) {
-        for (auto target_id: util::keys(expsyn_target_loc_map)) {
-            events[gid].emplace_back(target_id, 0., weight(gid, target_id));
-        }
-    }
-
     // Independently get cv geometry to compute CV indices.
     cv_geometry geom;
     for (const auto& cell: cells) {
@@ -395,7 +394,7 @@ void run_expsyn_g_cell_probe_test(context ctx) {
     }
 
     // Actual test;
-    auto run_test = [&](bool coalesce_synapses) {
+    auto run_test = [&](bool coalesce_synapses) {        
         cable1d_recipe rec(cells, coalesce_synapses);
         for (auto gid: gids) {
             rec.add_probe(gid, "expsyn-g", cable_probe_point_state_cell{"expsyn", "g"});
@@ -403,8 +402,24 @@ void run_expsyn_g_cell_probe_test(context ctx) {
 
         fvm_cell lcell(*ctx);
         auto fvm_info = lcell.initialize(gids, rec);
+        
+        std::vector<pse_vector> events;
+        // Manually send an event to each expsyn synapse and integrate for a tiny time step.
+        // iterate over cell partitions
+        for (auto pidx = 0ul; pidx + 1 < lcell.targets_.partition().size(); ++pidx) {
+            auto lid = 0;
+            auto lo = lcell.targets_.partition().at(pidx);
+            auto hi = lcell.targets_.partition().at(pidx + 1);
+            for (auto vidx = lo; vidx < hi; ++vidx) {
+                const auto& tgt = lcell.targets_.values()[vidx]; 
+                if (tgt.id >= events.size()) events.resize(tgt.id+1);
+                // NOTE: pidx is gid here and only here.
+                events[tgt.id].emplace_back(tgt.index, 0., weight(pidx, lid));
+                ++lid;
+            }
+        }
         const auto& probe_map = fvm_info.probe_map;
-
+        
         (void)lcell.integrate({1e-5, 1e-5}, util::subrange_view(events, 0, events.size()), {});
 
         ASSERT_EQ(2u, probe_map.size());

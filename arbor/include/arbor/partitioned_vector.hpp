@@ -23,6 +23,14 @@ public:
         arb_assert(partition_.back() == values_.size());
     }
 
+    /// extract value by partition and offset
+    const T& value(count_type part, count_type off) const {
+        arb_assert(part + 1 < partition_.size());
+        auto lo = partition_[part];
+        arb_assert(off + lo < partition_[part + 1]);
+        return values_[lo + off];
+    }
+    
     /// the partition of distribution
     const std::vector<count_type>& partition() const { return partition_; }
 
@@ -35,6 +43,21 @@ public:
     /// the size of the gathered vector
     std::size_t size() const { return values_.size(); }
 
+    std::size_t partition_size() const { return partition_.empty() ? 0 : partition_.size() - 1; }
+
+    /// append another part-vector
+    void append(const partitioned_vector<T>& rhs) {
+        for(const auto& val: rhs.values_) values_.push_back(val);
+        if (partition_.empty()) partition_.push_back(0);
+        auto off = partition_.back();
+        for (auto idx = 1ul; idx < rhs.partition_.size(); ++idx) {
+            partition_.push_back(rhs.partition_[idx] + off);
+        }
+    }
+
+    void clear() { values_.clear(); partition_.clear(); }
+    
+    
 private:
     std::vector<value_type> values_;
     std::vector<count_type> partition_;

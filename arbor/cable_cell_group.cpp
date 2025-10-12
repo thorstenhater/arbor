@@ -9,7 +9,6 @@
 #include <arbor/spike.hpp>
 
 #include "backends/event.hpp"
-#include "cell_group.hpp"
 #include "fvm_lowered_cell.hpp"
 #include "label_resolution.hpp"
 #include "cable_cell_group.hpp"
@@ -155,14 +154,12 @@ void run_samples(
     sc.sampler({sc.probeset_id, sc.index, p.get_metadata_ptr()}, n_sample, sample_records.data());
 }
 
-void run_samples(
-    const fvm_probe_multi& p,
-    const sampler_call_info& sc,
-    const arb_value_type* raw_times,
-    const arb_value_type* raw_samples,
-    std::vector<sample_record>& sample_records,
-    fvm_probe_scratch& scratch)
-{
+void run_samples(const fvm_probe_multi& p,
+                 const sampler_call_info& sc,
+                 const arb_value_type* raw_times,
+                 const arb_value_type* raw_samples,
+                 std::vector<sample_record>& sample_records,
+                 fvm_probe_scratch& scratch) {
     const sample_size_type n_raw_per_sample = p.raw_handles.size();
     sample_size_type n_sample = (sc.end_offset-sc.begin_offset)/n_raw_per_sample;
     arb_assert((sc.end_offset-sc.begin_offset)==n_sample*n_raw_per_sample);
@@ -185,14 +182,12 @@ void run_samples(
     sc.sampler({sc.probeset_id, sc.index, p.get_metadata_ptr()}, n_sample, sample_records.data());
 }
 
-void run_samples(
-    const fvm_probe_weighted_multi& p,
-    const sampler_call_info& sc,
-    const arb_value_type* raw_times,
-    const arb_value_type* raw_samples,
-    std::vector<sample_record>& sample_records,
-    fvm_probe_scratch& scratch)
-{
+void run_samples(const fvm_probe_weighted_multi& p,
+                 const sampler_call_info& sc,
+                 const arb_value_type* raw_times,
+                 const arb_value_type* raw_samples,
+                 std::vector<sample_record>& sample_records,
+                 fvm_probe_scratch& scratch) {
     const sample_size_type n_raw_per_sample = p.raw_handles.size();
     sample_size_type n_sample = (sc.end_offset - sc.begin_offset)/n_raw_per_sample;
     arb_assert((sc.end_offset - sc.begin_offset)==n_sample*n_raw_per_sample);
@@ -426,7 +421,6 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
 
     // Run integration and collect samples, spikes.
     auto result = lowered_->integrate(timesteps_, event_lanes, sample_events_);
-
     // For each sampler callback registered in `call_info`, construct the
     // vector of sample entries from the lowered cell sample times and values
     // and then call the callback.

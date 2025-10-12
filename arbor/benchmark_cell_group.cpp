@@ -6,7 +6,6 @@
 #include <arbor/schedule.hpp>
 
 #include "benchmark_cell_group.hpp"
-#include "cell_group.hpp"
 #include "label_resolution.hpp"
 #include "profile/profiler_macro.hpp"
 
@@ -43,6 +42,16 @@ benchmark_cell_group::benchmark_cell_group(const std::vector<cell_gid_type>& gid
         cg_targets.add_label(hash_value(c.target), {0, 1});
     }
 
+    {
+      std::vector<target_handle> hdls;
+      std::vector<unsigned> divs{0};
+      for (auto lid : util::count_along(gids_)) {
+        hdls.emplace_back(lid, 0);
+        divs.push_back(lid + 1);
+      }
+      targets_ = {std::move(hdls), std::move(divs)};
+    }
+    
     benchmark_cell_group::reset();
 }
 

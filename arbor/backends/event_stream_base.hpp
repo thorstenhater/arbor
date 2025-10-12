@@ -89,13 +89,11 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
     //   * the list is partitioned by `time_step` via `ev_spans`
     template<typename EventStream>
     friend void initialize(const event_lane_subrange& lanes,
-                           const partitioned_vector<target_handle>& handles,
+                           const partitioned_vector<target_handle>&,
                            const timestep_range& steps,
                            std::vector<EventStream>& streams) {
-        const auto& divs = handles.partition();
-        const auto& hdls = handles.values();
+        arb_assert(streams.size() >= lanes.size());
         
-        arb_assert(lanes.size() < handles.partition().size());
         // reset streams and allocate sufficient space for temporaries
         for (auto& stream: streams) {
             stream.clear();
@@ -108,17 +106,19 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
         for (auto step: util::count_along(steps)) {
             const auto& [t_lo, t_hi] = steps[step];
             for (auto cell_idx: util::count_along(lanes)) {
-                auto div = divs[cell_idx];
+                arb_assert(cell_idx < lanes.size());
+                if (cell_idx >= lanes.size()) throw std::runtime_error("Ohoh");
+                if (cell_idx >= cell_evnt_idx.size()) throw std::runtime_error("Ohoh");
                 auto evnt_idx = cell_evnt_idx[cell_idx];
                 const auto& lane = lanes[cell_idx];
                 // find lower edge and skip events
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_lo; ++evnt_idx) {}
                 // traverse lower edge -> upper edge and store events
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_hi; ++evnt_idx) {
+                    arb_assert(evnt_idx < lane.size());
                     const auto& evnt = lane[evnt_idx];
-                    const auto& handle = hdls[div + evnt.target];
-                    auto& stream = streams[handle.id];
-                    stream.ev_data_.emplace_back(event_data_type{handle.index, evnt.weight});
+                    auto& stream = streams[cell_idx];
+                    stream.ev_data_.emplace_back(event_data_type{evnt.target, evnt.weight});
                     stream.ev_spans_[step + 1]++;
                 }
                 // remember the next event to process for cell `idx`
@@ -135,6 +135,7 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
                               return std::tie(a.mech_index, a.weight) < std::tie(b.mech_index, b.weight);
                           });
             }
+
         }
 
         for (auto& stream: streams) static_cast<spike_event_stream_base&>(stream).init();
