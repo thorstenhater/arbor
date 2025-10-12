@@ -107,8 +107,6 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
             const auto& [t_lo, t_hi] = steps[step];
             for (auto cell_idx: util::count_along(lanes)) {
                 arb_assert(cell_idx < lanes.size());
-                if (cell_idx >= lanes.size()) throw std::runtime_error("Ohoh");
-                if (cell_idx >= cell_evnt_idx.size()) throw std::runtime_error("Ohoh");
                 auto evnt_idx = cell_evnt_idx[cell_idx];
                 const auto& lane = lanes[cell_idx];
                 // find lower edge and skip events
@@ -124,20 +122,9 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
                 // remember the next event to process for cell `idx`
                 cell_evnt_idx[cell_idx] = evnt_idx;
             }
-            // sort step bucket and update right partition
-            for (auto& stream: streams) {
-                // fix the partition property
-                stream.ev_spans_[step + 1] += stream.ev_spans_[step];
-                // sort events in partition
-                std::sort(stream.ev_data_.begin() + stream.ev_spans_[step],
-                          stream.ev_data_.begin() + stream.ev_spans_[step + 1],
-                          [](const auto& a, const auto& b) {
-                              return std::tie(a.mech_index, a.weight) < std::tie(b.mech_index, b.weight);
-                          });
-            }
-
+            // fix the partition property
+            for (auto& stream: streams) stream.ev_spans_[step + 1] += stream.ev_spans_[step];
         }
-
         for (auto& stream: streams) static_cast<spike_event_stream_base&>(stream).init();
     }
 };
