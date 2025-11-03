@@ -316,7 +316,6 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
             }
             for (; cn < ce && cons.srcs[cn] == src; ++cn) {
                 // NOTE(TH): abusing the destination field to store the instance ... let's see how that goes
-                auto dst = cons.dests[cn];
                 auto off = cons.off_on_domain[cn];
                 auto del = cons.delays[cn];
                 auto wgt = cons.weights[cn];
@@ -349,7 +348,6 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
             for (sp = spk; sp < se && sp->source == src; ++sp) {
                 for (cn = fst; cn < ce && cons.srcs[cn] == src; ++cn) {
                     // NOTE(TH): abusing the destination field to store the instance ... let's see how that goes
-                    auto dst = cons.dests[cn];
                     auto off = cons.off_on_domain[cn];
                     auto del = cons.delays[cn];
                     auto wgt = cons.weights[cn];

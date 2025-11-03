@@ -95,37 +95,29 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
         arb_assert(streams.size() >= lanes.size());
         
         // reset streams and allocate sufficient space for temporaries
-        for (auto& stream: streams) {
+        for (auto lane_idx: util::count_along(lanes)) {
+            const auto& lane = lanes[lane_idx];
+            
+            auto& stream = streams[lane_idx];            
             stream.clear();
+            stream.ev_data_.reserve(lane.size());
             stream.ev_spans_.resize(steps.size() + 1, 0);
-        }
-        // Traverse incoming data first by time step then by cell, keeping track
-        // of the next event to process in the time range [t(step), t(step+1)).
-        // That allows for sorting event spans individually.
-        auto cell_evnt_idx = std::vector(lanes.size(), cell_size_type(0));
-        for (auto step: util::count_along(steps)) {
-            const auto& [t_lo, t_hi] = steps[step];
-            for (auto cell_idx: util::count_along(lanes)) {
-                arb_assert(cell_idx < lanes.size());
-                auto evnt_idx = cell_evnt_idx[cell_idx];
-                const auto& lane = lanes[cell_idx];
+
+            auto evnt_idx = 0ul;
+            for (auto step: util::count_along(steps)) {
+                const auto& [t_lo, t_hi] = steps[step];
                 // find lower edge and skip events
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_lo; ++evnt_idx) {}
                 // traverse lower edge -> upper edge and store events
                 for (; evnt_idx < lane.size() && lane[evnt_idx].time < t_hi; ++evnt_idx) {
-                    arb_assert(evnt_idx < lane.size());
                     const auto& evnt = lane[evnt_idx];
-                    auto& stream = streams[cell_idx];
-                    stream.ev_data_.emplace_back(event_data_type{evnt.target, evnt.weight});
+                    stream.ev_data_.emplace_back(evnt.target, evnt.weight);
                     stream.ev_spans_[step + 1]++;
                 }
-                // remember the next event to process for cell `idx`
-                cell_evnt_idx[cell_idx] = evnt_idx;
+                stream.ev_spans_[step + 1] += stream.ev_spans_[step];
             }
-            // fix the partition property
-            for (auto& stream: streams) stream.ev_spans_[step + 1] += stream.ev_spans_[step];
+            static_cast<spike_event_stream_base&>(stream).init();
         }
-        for (auto& stream: streams) static_cast<spike_event_stream_base&>(stream).init();
     }
 };
 

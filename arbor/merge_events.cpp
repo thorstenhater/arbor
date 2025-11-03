@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 #include <numeric>
 #include <queue>
 
@@ -16,9 +17,9 @@ void ARB_ARBOR_API linear_merge_events(std::vector<event_span>& sources, pse_vec
     // Consume all events.
     for (;;) {
         // Now find the minimum
-        auto mevt =  spike_event{0, terminal_time, 0};;
+        auto mevt =  spike_event{0, terminal_time, 0};
         auto midx = -1;
-        for (auto idx = 0ull; idx < sources.size(); ++idx) {
+        for (auto idx = 0ul; idx < sources.size(); ++idx) {
             auto& source = sources[idx];
             if (!source.empty()) {
                 auto& evt = source.front();
@@ -35,6 +36,38 @@ void ARB_ARBOR_API linear_merge_events(std::vector<event_span>& sources, pse_vec
     }
 }
 
+template <typename T>
+std::vector<T> merge_pair(const std::vector<T>& lhs, const std::vector<T>& rhs) {
+    std::vector<T> res;
+    res.reserve(lhs.size() + rhs.size());
+    std::merge(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::back_inserter(res));
+    return res;
+}
+    
+// merge streams in pairs
+void ARB_ARBOR_API pairwise_merge_events(std::vector<event_span>& sources, pse_vector& out) {
+    // spans are lightweight to sort and manipulate
+    std::erase_if(sources, [](auto& src) { return src.empty(); });
+    if (sources.empty()) return;
+    std::sort(sources.begin(), sources.end(),
+              [](auto& a, auto& b) { return a.size() < b.size(); });
+
+    std::vector<std::vector<spike_event>> tmp;
+    for(auto& src: sources) tmp.emplace_back(src.begin(), src.end());
+
+    while (tmp.size() > 1) {
+        std::vector<std::vector<spike_event>> next;
+        for (size_t ix = 0; ix + 1 < tmp.size(); ix += 2) {
+            next.emplace_back(merge_pair(tmp[ix], tmp[ix + 1]));
+        }
+        if (tmp.size() & 1) next.emplace_back(std::move(tmp.back()));
+        tmp = std::move(next);
+    }
+    out.reserve(out.size() + tmp.size());
+    for(const auto& evt: tmp.back()) out.push_back(evt);
+}
+
+
 // priority-queue based merge.
 void ARB_ARBOR_API pqueue_merge_events(std::vector<event_span>& sources, pse_vector& out) {
     // Min heap tracking the minimum element from each span
@@ -44,10 +77,9 @@ void ARB_ARBOR_API pqueue_merge_events(std::vector<event_span>& sources, pse_vec
     // Add the first element from each sorted vector to the min heap
     for (std::size_t ix = 0; ix < sources.size(); ++ix) {
         auto& source = sources[ix];
-        if (!source.empty()) {
-            heap.emplace(source.front(), ix);
-            source.left++;
-        }
+        if (source.empty()) continue;
+        heap.emplace(source.front(), ix);
+        source.left++;
     }
 
     // Merge by continually popping the minimum element from the min heap
@@ -59,22 +91,21 @@ void ARB_ARBOR_API pqueue_merge_events(std::vector<event_span>& sources, pse_vec
         // If the sorted vector from which the minimum element was taken still
         // has elements, add the next smallest element to the heap
         auto& source = sources[ix];
-        if (!source.empty()) {
-            heap.emplace(source.front(), ix);
-            source.left++;
-        }
+        if (source.empty()) continue;
+        heap.emplace(source.front(), ix);
+        source.left++;
     }
 }
 
 void ARB_ARBOR_API merge_events(std::vector<event_span>& sources, pse_vector &out, std::size_t n_evts) {
     out.reserve(out.size() + n_evts);
     auto n_queues = sources.size();
-    if (n_queues < 20) { // NOTE: MAGIC NUMBER, found by ubench/merge
-        linear_merge_events(sources, out);
-    }
-    else {
-        pqueue_merge_events(sources, out);
-    }
+    pqueue_merge_events(sources, out);
+    // if (n_queues < 20) { // NOTE: MAGIC NUMBER, found by ubench/merge
+        // linear_merge_events(sources, out);
+    // }
+    // else {
+    // }
 }
 
 void ARB_ARBOR_API merge_events(std::vector<event_span>& sources, pse_vector &out) {

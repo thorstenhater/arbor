@@ -64,6 +64,23 @@ static void BM_linear(benchmark::State& state) {
     }
 }
 
+static void BM_paired(benchmark::State& state) {
+    const std::size_t ncells = state.range(0);
+    const std::size_t ev_per_cell = state.range(1);
+
+    const payload data{ncells, ev_per_cell};
+
+    while (state.KeepRunning()) {
+        arb::pse_vector out;
+        // Need to do this here, normally the wrapper does this
+        out.reserve(data.size);
+        // Clone the input, merge clobbers it.
+        auto tmp = data.span;
+        arb::pairwise_merge_events(tmp, out);
+        benchmark::ClobberMemory();
+    }
+}
+
 static void BM_queue(benchmark::State& state) {
     const std::size_t ncells = state.range(0);
     const std::size_t ev_per_cell = state.range(1);
@@ -107,7 +124,9 @@ void run_custom_arguments(benchmark::internal::Benchmark* b) {
 
 BENCHMARK(BM_tree)->Apply(run_custom_arguments);
 BENCHMARK(BM_linear)->Apply(run_custom_arguments);
+BENCHMARK(BM_paired)->Apply(run_custom_arguments);
 BENCHMARK(BM_queue)->Apply(run_custom_arguments);
 BENCHMARK(BM_default)->Apply(run_custom_arguments);
+
 
 BENCHMARK_MAIN();

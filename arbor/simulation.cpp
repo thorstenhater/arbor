@@ -48,10 +48,9 @@ ARB_ARBOR_API void merge_cell_events(time_type t_from,
     PE(communication:enqueue:generators);
     for (auto& g: generators) {
         event_span evts = g.events(t_from, t_to);
-        if (!evts.empty()) {
-            spanbuf.push_back(evts);
-            n_evts += evts.size();
-        }
+        if (evts.empty()) continue;
+        spanbuf.push_back(evts);
+        n_evts += evts.size();
     }
     PL();
 
@@ -169,8 +168,6 @@ private:
 
     // map gid to group index
     std::unordered_map<cell_gid_type, cell_size_type> gid_to_group_index_;
-    // map gid to local index
-    std::unordered_map<cell_gid_type, cell_size_type> gid_to_local_index_;
 
     // local target map
     unsigned num_local_targets_ = 0;
@@ -307,7 +304,6 @@ void simulation_state::update(const recipe& rec) {
         for (auto gid: group_info.gids) {
             // Store mapping of gid to local cell index.
             gid_to_group_index_[gid] = gidx;
-            gid_to_local_index_[gid] = lidx;
             // Set up the event generators for cell gid.
             for (const auto& gen: rec.event_generators(gid)) {
                 // NOTE: each event generator gets their own resolver state. Questionable?

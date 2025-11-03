@@ -93,7 +93,6 @@ public:
         std::vector<cell_size_type> idx_on_domain;
         std::vector<cell_size_type> off_on_domain;
         std::vector<cell_member_type> srcs;
-        std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;
 
@@ -102,7 +101,6 @@ public:
                 idx_on_domain.push_back(con.index_on_domain);
                 off_on_domain.push_back(con.domain_offset);
                 srcs.push_back(con.source);
-                dests.push_back(con.target);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);
             }
@@ -119,16 +117,16 @@ public:
 
         void reserve(std::size_t n) {
             idx_on_domain.reserve(n);
+            off_on_domain.reserve(n);
             srcs.reserve(n);
-            dests.reserve(n);
             weights.reserve(n);
             delays.reserve(n);
         }
 
         void clear() {
             idx_on_domain.clear();
+            off_on_domain.clear();
             srcs.clear();
-            dests.clear();
             weights.clear();
             delays.clear();
         }

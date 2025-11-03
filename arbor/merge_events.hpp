@@ -16,6 +16,7 @@ using event_span = util::range<const spike_event*>;
 
 void ARB_ARBOR_API linear_merge_events(std::vector<event_span>& sources, pse_vector& out);
 void ARB_ARBOR_API pqueue_merge_events(std::vector<event_span>& sources, pse_vector& out);
+void ARB_ARBOR_API pairwise_merge_events(std::vector<event_span>& sources, pse_vector& out);    
 
 void ARB_ARBOR_API merge_events(std::vector<event_span>& sources, pse_vector& out);
 void ARB_ARBOR_API merge_events(std::vector<event_span>& sources, pse_vector& out, std::size_t n_evts);
