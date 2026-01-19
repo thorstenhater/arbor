@@ -50,8 +50,18 @@ struct mpi_context_impl {
     }
 
     partitioned_vector<cell_gid_type>
+    all_to_all_spikes(const partitioned_vector<spike>& local_spikes) const {
+        return mpi::all_to_all_with_partition(local_spikes, comm_);
+    }
+
+    partitioned_vector<cell_gid_type>
     gather_gids(const std::vector<cell_gid_type>& local_gids) const {
         return mpi::gather_all_with_partition(local_gids, comm_);
+    }
+
+    partitioned_vector<cell_member_type>
+    all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
+        return mpi::all_to_all_with_partition(gids_domains, comm_);
     }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {
@@ -190,6 +200,11 @@ struct remote_context_impl {
     gather_spikes(const std::vector<spike>& local_spikes) const { return mpi_.gather_spikes(local_spikes); }
 
     partitioned_vector<cell_gid_type>
+    all_to_all_spikes(const partitioned_vector<spike>& local_spikes) const {
+        return mpi_.all_to_all_spikes(local_spikes);
+    }
+
+    partitioned_vector<cell_gid_type>
     gather_gids(const std::vector<cell_gid_type>& local_gids) const { return mpi_.gather_gids(local_gids); }
 
     cell_label_range gather_cell_label_range(const cell_label_range& local_ranges) const {
@@ -198,6 +213,11 @@ struct remote_context_impl {
 
     cell_labels_and_gids gather_cell_labels_and_gids(const cell_labels_and_gids& local_labels_and_gids) const {
         return mpi_.gather_cell_labels_and_gids(local_labels_and_gids);
+    }
+
+    partitioned_vector<cell_member_type>
+    all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
+        return mpi_.all_to_all_gids_domains(gids_domains);
     }
 
     distributed_request send_recv_nonblocking(std::size_t recv_count,

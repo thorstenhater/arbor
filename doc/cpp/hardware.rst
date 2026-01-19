@@ -680,7 +680,7 @@ To support dry-run mode we use the following classes:
         Duplicates the vector of strings from local domain, :cpp:member:`num_ranks_` times.
         Returns the concatenated vector.
 
-    .. cpp:function:: gathered_vector<arb::spike>  gather_spikes(const std::vector<arb::spike>& local_spikes) const
+    .. cpp:function:: partitioned_vector<arb::spike>  gather_spikes(const std::vector<arb::spike>& local_spikes) const
 
         The vector of :cpp:any:`local_spikes` represents the spikes obtained from running a
         simulation of :cpp:member:`num_cells_per_tile_` on the local domain.

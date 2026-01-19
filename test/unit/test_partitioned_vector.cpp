@@ -6,7 +6,7 @@
 #include <arbor/partitioned_vector.hpp>
 
 
-TEST(gathered_vector, invariants) {
+TEST(partitioned_vector, invariants) {
     auto sc = std::vector<arb::cell_member_type> {
     {0, 0}, // 0-3
     {0, 1},

@@ -39,14 +39,14 @@ spikes is facilitated through the ``communicator::exchange`` method. which is
 
    using spike_vec = std::vector<spike>;
 
-   // From gathered_vector
+   // From partitioned_vector
    template <typename T>
-   struct gathered_vector {
+   struct partitioned_vector {
        std::vector<T> values_;
        std::vector<int> partition_;
    };
 
-   using g_spike_vec = gathered_vector<spike>;
+   using g_spike_vec = partitioned_vector<spike>;
 
    g_spike_vec communicator::exchange(spike_vec local_spikes) { // Take by value, since we modify (sort) anyhow.
        // sort the spikes in ascending order of source gid
@@ -134,7 +134,7 @@ which uses this
    // all events that must be delivered to targets in that cell group as a
    // result of the global spike exchange, plus any events that were already
    // in the list.
-   void make_event_queues(const gathered_vector<spike>& global_spikes,
+   void make_event_queues(const partitioned_vector<spike>& global_spikes,
                           std::vector<pse_vector>& queues) {
        // Predicate for partitioning
        struct spike_pred {
