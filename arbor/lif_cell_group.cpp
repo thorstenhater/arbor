@@ -6,6 +6,8 @@
 #include "util/rangeutil.hpp"
 #include "util/span.hpp"
 
+#include <iostream>
+
 using namespace arb;
 
 // Constructor containing gid of first cell in a group and a container of all cells.
@@ -40,11 +42,14 @@ lif_cell_group::lif_cell_group(const std::vector<cell_gid_type>& gids,
         }
     }
 
-{
+    {
+      // We have a single target per cell...
       std::vector<target_handle> hdls;
       std::vector<unsigned> divs{0};
-      for (auto lid : util::count_along(gids_)) {
+      for (auto lid: util::count_along(gids_)) {
+        // ...it's always numbered zero...
         hdls.emplace_back(lid, 0);
+        // ...and we always have a single target per division
         divs.push_back(lid + 1);
       }
       targets_ = {std::move(hdls), std::move(divs)};
@@ -123,6 +128,7 @@ void lif_cell_group::advance_cell(time_type tfinal,
     auto t = last_time_updated_[lid];
     // spikes to process
     const auto n_events = static_cast<int>(event_lanes.size() ? event_lanes[lid].size() : 0);
+    if (n_events > 0)  std::cerr << "lif cell lid=" << lid << " #events=" << n_events << " time=" << tfinal << '\n';
     int event_idx = 0;
     // collected sampling data
     std::unordered_map<sampler_association_handle,

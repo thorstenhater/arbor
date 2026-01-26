@@ -359,7 +359,7 @@ communicator::exchange(std::vector<spike>& local_spikes) {
     PL();
     return {std::move(global_spikes), std::move(remote_spikes)};
 }
-
+  
 void communicator::set_remote_spike_filter(const spike_predicate& p) { remote_spike_filter_ = p; }
 void communicator::remote_ctrl_send_continue(const epoch& e) { ctx_->distributed->remote_ctrl_send_continue(e); }
 void communicator::remote_ctrl_send_done() { ctx_->distributed->remote_ctrl_send_done(); }
@@ -369,8 +369,10 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                                const S& spks,
                                std::vector<pse_vector>& queues) {
     auto sp = spks.begin(), se = spks.end();
-    while (sp < se && cn < ce) {
-        if ((ce - cn) < size_t(se - sp)) {
+    if (sp > se)
+      std::cerr << "appending events " << (se - sp) << '\n'; 
+    while ( sp < se && cn < ce) {
+        if (false && (ce - cn) < size_t(se - sp)) {
             auto src = cons.srcs[cn];
             // identify range of spikes to enqueue.
             auto fst = sp;
@@ -411,6 +413,7 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
                     - cons.srcs.begin();
             }
             for (sp = spk; sp < se && sp->source == src; ++sp) {
+                std::cerr << "sending spike from " << src.gid << '\n'; 
                 for (cn = fst; cn < ce && cons.srcs[cn] == src; ++cn) {
                     // NOTE(TH): abusing the destination field to store the instance ... let's see how that goes
                     auto off = cons.off_on_domain[cn];
@@ -434,6 +437,8 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
 
 void communicator::make_event_queues(communicator::spikes& spikes,
                                      std::vector<pse_vector>& queues) {
+    if (spikes.from_local.size() > 0)
+      std::cerr << "making queues " << spikes.from_local.size() << '\n';
     // arb_assert(queues.size()==num_local_cells_);
     const auto& sp = spikes.from_local.partition();
     const auto& cp = connection_part_;

@@ -100,9 +100,9 @@ void ARB_ARBOR_API pqueue_merge_events(std::vector<event_span>& sources, pse_vec
 void ARB_ARBOR_API merge_events(std::vector<event_span>& sources, pse_vector &out, std::size_t n_evts) {
     out.reserve(out.size() + n_evts);
     auto n_queues = sources.size();
-    pqueue_merge_events(sources, out);
+    // pqueue_merge_events(sources, out);
     // if (n_queues < 20) { // NOTE: MAGIC NUMBER, found by ubench/merge
-        // linear_merge_events(sources, out);
+        linear_merge_events(sources, out);
     // }
     // else {
     // }

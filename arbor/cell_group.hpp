@@ -32,16 +32,20 @@ struct cell_group {
     virtual const std::vector<spike>& spikes() const = 0;
     virtual void clear_spikes() = 0;
 
-    // Sampler association methods below should be thread-safe, as they might be invoked
-    // from a sampler call back called from a different cell group running on a different thread.
+    // Sampler association methods below should be thread-safe, as they might be
+    // invoked from a sampler call back called from a different cell group
+    // running on a different thread.
     virtual void add_sampler(sampler_association_handle, cell_member_predicate, schedule, sampler_function) = 0;
     virtual void remove_sampler(sampler_association_handle) = 0;
     virtual void remove_all_samplers() = 0;
 
-    // Probe metadata queries might also be called while a simulation is running, and so should
-    // also be thread-safe.
+    // Probe metadata queries might also be called while a simulation is
+    // running, and so should also be thread-safe.
     virtual std::vector<probe_metadata> get_probe_metadata(const cell_address_type&) const { return {}; }
 
+    // Targets define the inputs for spikes on a cell; for many cell groups,
+    // there's exactly one input per cell. We return this as a partitioned
+    // list, where divisions are marking cells.
     virtual cell_size_type num_targets() const = 0;
     virtual const partitioned_vector<target_handle>& targets() const = 0;
   

@@ -432,6 +432,10 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
                 PL();
             });
     };
+  
+    std::cerr << "group lanes = { ";
+    for (auto ix: group_lanes_) std::cerr << ix << " ";
+    std::cerr << "}\n";
 
     // Exchange task: gather previous locally generated spikes, distribute across all ranks, and deliver
     // post-synaptic spike events to per-cell pending event vectors.
@@ -439,10 +443,18 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
         // Collate locally generated spikes.
         PE(communication:exchange:local_gather);
         auto all_local_spikes = local_spikes(prev.id).gather();
+        if (!all_local_spikes.empty())
+          std::cerr << "#local spikes a =" << all_local_spikes.size() << '\n'; 
         PL();
         communicator_.remote_ctrl_send_continue(prev);
         // Gather generated spikes across all ranks.
         auto spikes = communicator_.exchange(all_local_spikes);
+
+        if (!all_local_spikes.empty())
+          std::cerr << "#local spikes b =" << all_local_spikes.size() << '\n'; 
+
+        if (spikes.from_local.size())
+          std::cerr << "#local spikes c =" << spikes.from_local.size() << '\n'; 
 
         // Present spikes to user-supplied callbacks.
         PE(communication:spikeio);

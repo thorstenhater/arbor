@@ -181,7 +181,6 @@ TEST(lif_cell_group, spikes) {
     path_recipe recipe(2, 1000, 0.1);
 
     auto context = make_context();
-
     auto decomp = partition_load_balance(recipe, context);
     simulation sim(recipe, context, decomp);
 

@@ -105,6 +105,7 @@ public:
                 srcs.push_back(con.source);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);
+                std::cerr << "dom=" << con.index_on_domain << " off=" << con.domain_offset << " src=" << con.source.gid << '\n';
             }
         }
 
