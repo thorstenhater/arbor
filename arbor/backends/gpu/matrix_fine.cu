@@ -206,22 +206,28 @@ void solve_matrix_fine(
 
 } // namespace kernels
 
-ARB_ARBOR_API void assemble_matrix_fine(
-    arb_value_type* d,
-    arb_value_type* rhs,
-    const arb_value_type* invariant_d,
-    const arb_value_type* voltage,
-    const arb_value_type* current,
-    const arb_value_type* conductivity,
-    const arb_value_type* cv_capacitance,
-    const arb_value_type* area,
-    const arb_value_type  dt,
-    const arb_index_type* perm,
-    unsigned n)
-{
-    launch_1d(n, 128, kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
-        d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance, area,
-        dt, perm, n);
+ARB_ARBOR_API void assemble_matrix_fine(arb_value_type* d,
+                                        arb_value_type* rhs,
+                                        const arb_value_type* invariant_d,
+                                        const arb_value_type* voltage,
+                                        const arb_value_type* current,
+                                        const arb_value_type* conductivity,
+                                        const arb_value_type* cv_capacitance,
+                                        const arb_value_type* area,
+                                        const arb_value_type  dt,
+                                        const arb_index_type* perm,
+                                        unsigned n,
+                                        gpu_stream* stream) {
+    if (nullptr == stream) {
+        launch_1d(n, 128, kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
+                  d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance, area,
+                  dt, perm, n);
+    }
+    else {
+        stream_launch_1d(stream, n, 128, kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
+                         d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance, area,
+                         dt, perm, n);
+    }
 }
 
 // Example:
@@ -241,22 +247,29 @@ ARB_ARBOR_API void assemble_matrix_fine(
 // num_levels   = [3, 2, 3, ...]
 // num_cells    = [2, 3, ...]
 // num_blocks   = level_start.size() - 1 = num_levels.size() = num_cells.size()
-ARB_ARBOR_API void solve_matrix_fine(
-    arb_value_type* rhs,
-    arb_value_type* d,                     // diagonal values
-    const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)
-    const level_metadata* level_meta,      // information pertaining to each level
-    const arb_index_type* level_lengths,   // lengths of branches of every level concatenated
-    const arb_index_type* level_parents,   // parents of branches of every level concatenated
-    const arb_index_type* block_index,     // start index into levels for each gpu block
-    arb_index_type* num_cells,             // the number of cells packed into this single matrix
-    arb_index_type* padded_size,           // length of rhs, d, u, including padding
-    unsigned num_blocks,                   // number of blocks
-    unsigned blocksize)                    // size of each block
-{
-    launch(num_blocks, blocksize, kernels::solve_matrix_fine<arb_value_type>,
-        rhs, d, u, level_meta, level_lengths, level_parents, block_index,
-        num_cells);
+ARB_ARBOR_API void solve_matrix_fine(arb_value_type* rhs,
+                                     arb_value_type* d,                     // diagonal values
+                                     const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)
+                                     const level_metadata* level_meta,      // information pertaining to each level
+                                     const arb_index_type* level_lengths,   // lengths of branches of every level concatenated
+                                     const arb_index_type* level_parents,   // parents of branches of every level concatenated
+                                     const arb_index_type* block_index,     // start index into levels for each gpu block
+                                     arb_index_type* num_cells,             // the number of cells packed into this single matrix
+                                     arb_index_type* padded_size,           // length of rhs, d, u, including padding
+                                     unsigned num_blocks,                   // number of blocks
+                                     unsigned blocksize,                    // size of each block
+                                     gpu_stream* stream) {
+    if (nullptr == stream) {
+        launch(num_blocks, blocksize, kernels::solve_matrix_fine<arb_value_type>,
+               rhs, d, u, level_meta, level_lengths, level_parents, block_index,
+               num_cells);
+    }
+    else {
+        stream_launch(stream, num_blocks, blocksize, kernels::solve_matrix_fine<arb_value_type>,
+                      rhs, d, u, level_meta, level_lengths, level_parents, block_index,
+                      num_cells);
+
+    }
 }
 
 } // namespace gpu

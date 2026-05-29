@@ -47,5 +47,21 @@ void launch_1d(unsigned elements, unsigned block_size, Kernel kernel, Args&&... 
     launch(impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
 }
 
+template<typename Kernel, typename... Args>
+void stream_launch(gpu_stream* stream, const dim3& blocks, const dim3& threads, Kernel kernel, Args&&... args) {
+    kernel<<<blocks, threads, 0, *stream>>>(std::forward<Args>(args)...);
+    ARB_GPU_CHECK(get_last_error());
+#ifndef NDEBUG
+    ARB_GPU_CHECK(device_synchronize());
+#endif
+}
+
+template<typename Kernel, typename... Args>
+void stream_launch_1d(gpu_stream* stream, unsigned elements, unsigned block_size, Kernel kernel, Args&&... args) {
+    if (!elements) return;
+    launch(stream, impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
+}
+
+    
 } // namespace gpu
 } // namespace arb

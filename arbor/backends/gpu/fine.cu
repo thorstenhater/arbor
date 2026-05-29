@@ -37,13 +37,18 @@ void scatter(const T* __restrict__ const from,
 
 } // namespace kernels
 
-ARB_ARBOR_API void gather(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n)
+ARB_ARBOR_API void gather(const arb_value_type* from,
+                          arb_value_type* to,
+                          const arb_index_type* p,
+                          unsigned n,
+                          cudaStream_t* stream=nullptr)
 {
-    launch_1d(n, 128, kernels::gather<arb_value_type, arb_index_type>, from, to, p, n);
+    if (nullptr == stream) {
+        launch_1d(n, 128, kernels::gather<arb_value_type, arb_index_type>, from, to, p, n);
+    }
+    else {
+        stream_launch_1d(stream, n, 128, kernels::gather<arb_value_type, arb_index_type>, from, to, p, n);
+    }
 }
 
 ARB_ARBOR_API void scatter(
