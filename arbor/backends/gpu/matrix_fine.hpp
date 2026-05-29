@@ -1,5 +1,6 @@
 #include <arbor/fvm_types.hpp>
 #include <arbor/export.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 #include "fine.hpp"
 
@@ -16,7 +17,7 @@ ARB_ARBOR_API void assemble_matrix_fine(arb_value_type* d,
                                         const arb_value_type dt,
                                         const arb_index_type* perm,
                                         unsigned n,
-                                        gpu_stream*=nullptr);
+                                        gpu_stream* stream=nullptr);
 
 ARB_ARBOR_API void solve_matrix_fine(arb_value_type* rhs,
                                      arb_value_type* d,                     // diagonal values
@@ -29,7 +30,7 @@ ARB_ARBOR_API void solve_matrix_fine(arb_value_type* rhs,
                                      arb_index_type* padded_size,           // length of rhs, d, u, including padding
                                      unsigned num_blocks,                   // number of blocks
                                      unsigned blocksize,                    // size of each block
-                                     gpu_stream*=nullptr);
+                                     gpu_stream* stream=nullptr);
 
 } // namespace gpu
 } // namespace arb
