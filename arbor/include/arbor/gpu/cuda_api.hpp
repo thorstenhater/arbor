@@ -14,6 +14,8 @@ namespace gpu {
 
 using DeviceProp = cudaDeviceProp;
 
+using gpu_stream = cudaStream_t;
+
 struct ARB_SYMBOL_VISIBLE api_error_type {
     cudaError_t value;
     api_error_type(cudaError_t e): value(e) {}
