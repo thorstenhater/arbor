@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <arbor/common_types.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 #include "memory/memory.hpp"
 #include "util/partition.hpp"
@@ -77,6 +78,9 @@ public:
     //      `solver_format[perm[i]] = external_format[i]`
     iarray perm;
 
+    // TODO(TH)
+    gpu_stream stream;
+    
     matrix_state_fine() = default;
 
     // constructor for fine-grained matrix.
@@ -87,6 +91,8 @@ public:
         using util::make_span;
         constexpr unsigned npos = unsigned(-1);
 
+        cudaStreamCreate(&stream);
+        
         max_branches_per_level = 128;
 
         num_cells = cell_cv_divs.size()-1;
@@ -407,7 +413,8 @@ public:
                              area_um2.data(),
                              dt,
                              perm.data(),
-                             size());
+                             size(),
+                             &stream);
     }
 
     void solve(array& to) {
@@ -421,7 +428,8 @@ public:
                           num_cells_in_block.data(),
                           data_partition.data(),
                           num_cells_in_block.size(),
-                          max_branches_per_level);
+                          max_branches_per_level,
+                          &stream);
         // unpermute the solution
         packed_to_flat(rhs, to);
     }
@@ -431,6 +439,7 @@ public:
                const T dt, const_view current, const_view conductivity, const_view area_um2) {
         assemble(dt, voltage, current, conductivity, area_um2);
         solve(voltage);
+        cudaStreamSynchronize(stream);
     }
 
     std::size_t size() const { return matrix_size; }
@@ -447,7 +456,7 @@ private:
         arb_assert(from.size()==data_size);
         arb_assert(to.size()==matrix_size);
 
-        gather(from.data(), to.data(), perm.data(), perm.size());
+        gather(from.data(), to.data(), perm.data(), perm.size(), &stream);
     }
 };
 

@@ -4,6 +4,7 @@
 
 #include <arbor/export.hpp>
 #include <arbor/fvm_types.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 namespace arb {
 namespace gpu {
@@ -71,17 +72,17 @@ struct level_metadata {
 };
 
 // C wrappers around kernels
-ARB_ARBOR_API void gather(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n);
+ARB_ARBOR_API void gather(const arb_value_type* from,
+                          arb_value_type* to,
+                          const arb_index_type* p,
+                          unsigned n,
+                          gpu_stream* stream=nullptr);
 
-ARB_ARBOR_API void scatter(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n);
+ARB_ARBOR_API void scatter(const arb_value_type* from,
+                           arb_value_type* to,
+                           const arb_index_type* p,
+                           unsigned n,
+                           gpu_stream* stream=nullptr);
 
 } // gpu
 } // arb

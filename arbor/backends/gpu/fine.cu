@@ -41,7 +41,7 @@ ARB_ARBOR_API void gather(const arb_value_type* from,
                           arb_value_type* to,
                           const arb_index_type* p,
                           unsigned n,
-                          cudaStream_t* stream=nullptr)
+                          gpu_stream* stream)
 {
     if (nullptr == stream) {
         launch_1d(n, 128, kernels::gather<arb_value_type, arb_index_type>, from, to, p, n);
@@ -51,13 +51,17 @@ ARB_ARBOR_API void gather(const arb_value_type* from,
     }
 }
 
-ARB_ARBOR_API void scatter(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n)
-{
-    launch_1d(n, 128, kernels::scatter<arb_value_type, arb_index_type>, from, to, p, n);
+ARB_ARBOR_API void scatter(const arb_value_type* from,
+                           arb_value_type* to,
+                           const arb_index_type* p,
+                           unsigned n,
+                           gpu_stream* stream) {
+    if (nullptr == stream) {
+        launch_1d(n, 128, kernels::scatter<arb_value_type, arb_index_type>, from, to, p, n);
+    }
+    else {
+        stream_launch_1d(stream, n, 128, kernels::scatter<arb_value_type, arb_index_type>, from, to, p, n);    
+    }
 }
 
 } // namespace gpu
