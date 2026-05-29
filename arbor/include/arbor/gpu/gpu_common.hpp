@@ -59,7 +59,7 @@ void stream_launch(gpu_stream* stream, const dim3& blocks, const dim3& threads, 
 template<typename Kernel, typename... Args>
 void stream_launch_1d(gpu_stream* stream, unsigned elements, unsigned block_size, Kernel kernel, Args&&... args) {
     if (!elements) return;
-    launch(stream, impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
+    stream_launch(stream, impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
 }
 
     
