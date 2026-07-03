@@ -32,7 +32,7 @@ static inline bool cable_lt(const arb::mcable& a, const arb::mcable& b) {
     return std::tuple(a.branch, a.prox_pos, a.dist_pos)<std::tuple(b.branch, b.prox_pos, b.dist_pos);
 }
 
-void check_trailing(std::istream& in, std::string fname) {
+void check_trailing(std::istream& in, const std::string& fname) {
     if (!(in >> std::ws).eof()) {
         throw pyarb_error(util::pprintf("Trailing data found at end of file '{}'", fname));
     }
