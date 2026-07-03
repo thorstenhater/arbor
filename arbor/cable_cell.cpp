@@ -185,8 +185,7 @@ struct cable_cell_impl {
             // Skip zero-length cables in extent:
             if (cable.prox_pos == cable.dist_pos) continue;
             if (!mm.insert(cable, {prop.t_mech, im})) {
-                throw cable_cell_error(util::pprintf("Setting mechanism '{}' on region '{}' overpaints at cable {}",
-                                                     prop.t_mech.mech.name(), str, cable));
+                throw cable_cell_error(std::format("Setting mechanism '{}' on region '{}' overpaints at cable {}", prop.t_mech.mech.name(), str, cable));
             }
         }
     }
@@ -198,8 +197,7 @@ struct cable_cell_impl {
             // Skip zero-length cables in extent:
             if (cable.prox_pos == cable.dist_pos) continue;
             if (!mm.insert(cable, prop)) {
-                throw cable_cell_error(util::pprintf("Setting property '{}' on region '{}' overpaints at cable {}",
-                                                     show(prop), str, cable));
+                throw cable_cell_error(std::format("Setting property '{}' on region '{}' overpaints at cable {}", show(prop), str, cable));
             }
         }
     }

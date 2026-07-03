@@ -1,4 +1,5 @@
 #include <iostream>
+#include <format>
 
 #include <arbor/common_types.hpp>
 

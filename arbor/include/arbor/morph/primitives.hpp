@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <format>
 
 #include <arbor/export.hpp>
 #include <arbor/util/hash_def.hpp>
+#include <arbor/format.hpp>
 
 //  Types used to identify concrete locations.
 namespace arb {
@@ -18,7 +20,6 @@ constexpr msize_t mnpos = msize_t(-1);
 struct ARB_SYMBOL_VISIBLE mpoint {
     double x, y, z;  // [µm]
     double radius;   // [μm]
-    friend std::ostream& operator<<(std::ostream&, const mpoint&);
     auto operator<=>(const mpoint&) const = default;
 };
 
@@ -27,12 +28,7 @@ ARB_ARBOR_API bool is_collocated(const mpoint& a, const mpoint& b);
 ARB_ARBOR_API double distance(const mpoint& a, const mpoint& b);
 
 // Indicate allowed comparison operations for classifying regions
-enum class comp_op {
-    lt,
-    le,
-    gt,
-    ge
-};
+enum class comp_op { lt, le, gt, ge };
 
 // Describe a cable segment between two adjacent samples.
 struct ARB_SYMBOL_VISIBLE msegment {
@@ -41,7 +37,6 @@ struct ARB_SYMBOL_VISIBLE msegment {
     mpoint dist;
     int tag;
     auto operator<=>(const msegment&) const = default;
-    friend std::ostream& operator<<(std::ostream&, const msegment&);
 };
 
 // Describe a specific location on a morpholology.
@@ -51,14 +46,11 @@ struct ARB_SYMBOL_VISIBLE mlocation {
     // The relative position on the branch ∈ [0,1].
     double pos = 0.0;
     auto operator<=>(const mlocation&) const = default;
-    friend std::ostream& operator<<(std::ostream&, const mlocation&);
 };
 
 // branch ≠ npos and 0 ≤ pos ≤ 1
 ARB_ARBOR_API bool test_invariants(const mlocation&);
-
 using mlocation_list = std::vector<mlocation>;
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const mlocation_list& l);
 
 //// Tests whether each location in the list satisfies the invariants for a location,
 //// and that the locations in the vector are ordered.
@@ -92,11 +84,10 @@ struct ARB_SYMBOL_VISIBLE mcable {
 
     // branch ≠ npos, and 0 ≤ prox_pos ≤ dist_pos ≤ 1
     friend bool test_invariants(const mcable&);
-    friend std::ostream& operator<<(std::ostream&, const mcable&);
 };
 
 using mcable_list = std::vector<mcable>;
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const mcable_list& c);
+
 // Tests whether each cable in the list satisfies the invariants for a cable,
 // and that the cables in the vector are ordered.
 ARB_ARBOR_API bool test_invariants(const mcable_list&);
@@ -106,3 +97,12 @@ ARB_ARBOR_API bool test_invariants(const mcable_list&);
 ARB_DEFINE_HASH(arb::mcable, a.branch, a.prox_pos, a.dist_pos);
 ARB_DEFINE_HASH(arb::mlocation, a.branch, a.pos);
 ARB_DEFINE_HASH(arb::mpoint, a.x, a.y, a.z, a.radius);
+ARB_DEFINE_HASH(arb::msegment, a.id, a.prox, a.dist, a.tag);
+
+ARB_FORMAT_ENABLE_EXT(mpoint, x, y, z, radius);
+ARB_FORMAT_ENABLE_EXT(msegment, id, prox, dist, tag);
+ARB_FORMAT_ENABLE_EXT(mcable, branch, prox_pos, dist_pos);
+ARB_FORMAT_ENABLE_EXT(mlocation, branch, pos);
+
+ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const arb::mlocation_list& c);
+ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const arb::mcable_list& c);

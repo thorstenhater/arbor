@@ -1,5 +1,7 @@
 #include <limits>
 #include <string>
+#include <format>
+
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -17,19 +19,17 @@
 namespace pyarb {
 
 std::string gd_string(const arb::group_description& g) {
-    return util::pprintf(
-        "<arbor.group_description: num_cells {}, gids [{}], {}, {}>",
-        g.gids.size(), util::csv(g.gids, 5), g.kind, g.backend);
+    return util::pprintf("<arbor.group_description: num_cells {}, gids [{}], {}, {}>",
+                         g.gids.size(), util::csv(g.gids, 5), g.kind, g.backend);
 }
 
 std::string dd_string(const arb::domain_decomposition_ptr d) {
-    return util::pprintf(
-        "<arbor.domain_decomposition: domain_id {}, num_domains {}, num_local_cells {}, num_global_cells {}, groups {}>",
-        d->domain_id(), d->num_domains(), d->num_local_cells(), d->num_global_cells(), d->num_groups());
+    return std::format("<arbor.domain_decomposition: domain_id {}, num_domains {}, num_local_cells {}, num_global_cells {}, groups {}>",
+                       d->domain_id(), d->num_domains(), d->num_local_cells(), d->num_global_cells(), d->num_groups());
 }
 
 std::string ph_string(const arb::partition_hint& h) {
-    return util::pprintf(
+    return std::format(
         "<arbor.partition_hint: cpu_group_size {}, gpu_group_size {}, prefer_gpu {}>",
         h.cpu_group_size, h.gpu_group_size, (h.prefer_gpu == 1) ? "True" : "False");
 }

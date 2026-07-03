@@ -84,8 +84,6 @@ struct morphology_impl {
     morphology_impl(const segment_tree& m);
 
     void init();
-
-    friend std::ostream& operator<<(std::ostream&, const morphology_impl&);
 };
 
 morphology_impl::morphology_impl(const segment_tree& tree) {
@@ -120,24 +118,6 @@ morphology_impl::morphology_impl(const segment_tree& tree) {
     }
     terminal_branches_.shrink_to_fit();
 }
-
-std::ostream& operator<<(std::ostream& o, const morphology_impl& m) {
-    if (m.branches_.empty()) {
-        return o << "(morphology ())";
-    }
-    bool first = true;
-    o << "(morphology\n  (";
-    for (auto i: util::make_span(m.branches_.size())) {
-        if (!first) o << "\n  ";
-        o << "(" << m.branch_parents_[i] << " (" << io::sepval(m.branches_[i], " ") << "))";
-        first = false;
-    }
-    return o << "))";
-}
-
-//
-// morphology implementation
-//
 
 morphology::morphology(segment_tree m):
     impl_(std::make_shared<const morphology_impl>(std::move(m)))
@@ -193,11 +173,6 @@ ARB_ARBOR_API segment_tree morphology::to_segment_tree() const {
     }
 
     return st;
-}
-
-
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const morphology& m) {
-    return o << *m.impl_;
 }
 
 // Utilities.
@@ -443,4 +418,3 @@ ARB_ARBOR_API std::vector<mextent> components(const morphology& m, const mextent
 }
 
 } // namespace arb
-

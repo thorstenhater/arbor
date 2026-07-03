@@ -44,8 +44,6 @@ public:
     // Note: tree == arb::morphology(tree).to_segment_tree() is not guaranteed
     // to be true.
     segment_tree to_segment_tree() const;
-
-    friend std::ostream& operator<<(std::ostream&, const morphology&);
 };
 
 // Represent a (possibly empty or disconnected) region on a morphology.
@@ -153,3 +151,21 @@ ARB_ARBOR_API std::vector<mextent> components(const morphology& m, const mextent
 
 
 } // namespace arb
+
+template <>
+struct ARB_SYMBOL_VISIBLE std::formatter<::arb::morphology> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    auto format(const ::arb::morphology& obj, std::format_context& ctx) const {
+        std::format_to(ctx.out(), "(morphology");
+        for (auto ix = 0; obj.num_branches(); ++ix) {
+            std::format_to(ctx.out(), " (branch {} (segments", obj.branch_parent(ix));
+            for (const auto& seg: obj.branch_segments(ix)) {
+                std::format_to(ctx.out(), "{}", seg);
+            }
+            std::format_to(ctx.out(), "))");
+        }
+        return std::format_to(ctx.out(), ")");
+    }
+};
+
+inline ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const ::arb::morphology& it) { os << std::format("{}", it); return os; }

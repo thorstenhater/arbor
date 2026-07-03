@@ -7,6 +7,7 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <format>
 
 #include <arbor/arbexcept.hpp>
 #include <arbor/cable_cell.hpp>
@@ -22,7 +23,6 @@
 #include "util/piecewise.hpp"
 #include "util/pw_over_cable.hpp"
 #include "util/rangeutil.hpp"
-#include "util/strprintf.hpp"
 
 namespace arb {
 
@@ -37,15 +37,8 @@ using util::sort_by;
 
 namespace {
 
-template <typename... Args>
-cable_cell_error make_cc_error(const char* fmt, Args... args) {
-    return {util::pprintf(fmt, args...)};
-}
-
 template <typename V>
-std::optional<V> operator|(const std::optional<V>& a, const std::optional<V>& b) {
-    return a? a: b;
-}
+std::optional<V> operator|(const std::optional<V>& a, const std::optional<V>& b) { return a? a: b; }
 
 // Given sorted vectors a, b, return sorted vector with unique elements v
 // such that v is present in a or b.
@@ -311,8 +304,8 @@ fvm_cv_discretize(const cable_cell& cell,
         auto& id_map = ion_diffusivity[ion];
         arb_value_type def = data.default_value;
         if (def <= 0.0 || std::isnan(def)) {
-            throw make_cc_error("Illegal global diffusivity '{}' for ion '{}'; possibly unset."
-                                " Please define a positive global or cell default.", def, ion);
+            throw cable_cell_error{std::format("Illegal global diffusivity '{}' for ion '{}'; possibly unset."
+                                               " Please define a positive global or cell default.", def, ion)};
         }
         // Write inverse diffusivity / diffuse resistivity map
         auto& id = data.axial_resistivity;
@@ -326,8 +319,8 @@ fvm_cv_discretize(const cable_cell& cell,
                 auto ie = thingify(ii, provider);
                 auto sc = ie->eval(provider, cable);
                 if (def <= 0.0 || std::isnan(def)) {
-                    throw make_cc_error("Illegal diffusivity '{}' for ion '{}' at cable {}."
-                                        " Please check your expressions.", sc, ion, cable);
+                    throw cable_cell_error{std::format("Illegal diffusivity '{}' for ion '{}' at cable {}."
+                                                       " Please check your expressions.", sc, ion, cable)};
                 }
                 return sc;
             };
@@ -982,17 +975,17 @@ void verify_mechanism(const ion_species_map& global_ions,
 
     for (const auto& [ion, dep]: info.ions) {
         if (!global_ions.count(ion)) {
-            throw make_cc_error("Mechanism {} uses ion {} which is missing in global properties", name, ion);
+            throw cable_cell_error{std::format("Mechanism {} uses ion {} which is missing in global properties", name, ion)};
         }
 
         if (dep.verify_ion_charge) {
             if (dep.expected_ion_charge!=global_ions.at(ion)) {
-                throw make_cc_error("Mechanism {} uses ion {}, but expects a different valence.", name, ion);
+                throw cable_cell_error{std::format("Mechanism {} uses ion {}, but expects a different valence.", name, ion)};
             }
         }
 
         if (dep.write_reversal_potential && (dep.write_concentration_int || dep.write_concentration_ext)) {
-            throw make_cc_error("Mechanism {} writes both reversal potential and concentration.", name);
+            throw cable_cell_error{std::format("Mechanism {} writes both reversal potential and concentration.", name)};
         }
 
         auto is_diffusive = diffusive_ions.count(ion);
@@ -1137,9 +1130,8 @@ apply_parameters_on_cv(fvm_mechanism_config& config,
 auto make_mechanism_config(const mechanism_info& info,
                            arb_mechanism_kind expected) {
     if (info.kind != expected) {
-        throw make_cc_error("Expected {} mechanism, got {}.",
-                            arb_mechanism_kind_str(expected),
-                            arb_mechanism_kind_str(info.kind));
+        throw cable_cell_error{std::format("Expected {} mechanism, got {}.",
+                                           arb_mechanism_kind_str(expected), arb_mechanism_kind_str(info.kind))};
     }
     fvm_mechanism_config result;
     result.kind = expected;
@@ -1193,9 +1185,7 @@ make_voltage_mechanism_config(const region_assignment<voltage_process>& assignme
         apply_parameters_on_cv(config, data, param_maps, support);
 
         for (const auto& [cable, _]: support) {
-            if (voltage_support.count(cable)) {
-                throw make_cc_error("Multiple voltage processes on a single cable");
-            }
+            if (voltage_support.count(cable)) throw cable_cell_error{std::format("Multiple voltage processes on a single cable")};
             voltage_support.insert(cable);
         }
         if (!config.cv.empty()) result.emplace(name, std::move(config));
@@ -1255,9 +1245,7 @@ make_density_mechanism_config(const region_assignment<density>& assignments,
                     ok &= build_data.init_econc_mask.insert(c, 0.);
                 }
             }
-            if (!ok) {
-                throw make_cc_error("Overlapping ion concentration writing mechanism {}.", name);
-            }
+            if (!ok) throw cable_cell_error{std::format("Overlapping ion concentration writing mechanism {}.", name)};
         }
         if (!config.cv.empty()) result[name] = std::move(config);
     }
@@ -1665,7 +1653,7 @@ make_revpot_mechanism_config(const std::unordered_map<std::string, mechanism_des
                     auto& existing_revpot_desc = revpot_tbl.at(other_ion);
                     if (existing_revpot_desc.name() != name
                      || existing_revpot_desc.values() != values) {
-                        throw make_cc_error("Inconsistent revpot ion assignment for mechanism {}", name);
+                        throw cable_cell_error{std::format("Inconsistent revpot ion assignment for mechanism {}", name)};
                     }
                 }
                 else {
@@ -1675,9 +1663,7 @@ make_revpot_mechanism_config(const std::unordered_map<std::string, mechanism_des
             }
         }
 
-        if (!writes_this_revpot) {
-            throw make_cc_error("Revpot mechanism for ion {} does not write this reversal potential", ion);
-        }
+        if (!writes_this_revpot) throw cable_cell_error{std::format("Revpot mechanism for ion {} does not write this reversal potential", ion)};
 
         ex_config[ion].write_eX = true;
 
@@ -1719,7 +1705,7 @@ make_revpot_mechanism_config(const std::unordered_map<std::string, mechanism_des
     // Confirm that all ions written to by a revpot have a corresponding entry in a reversal_potential_method table.
     for (auto& [k, v]: revpot_tbl) {
         if (!ex_config.count(k) || !ex_config.at(k).write_eX) {
-            throw make_cc_error("Revpot mechanism {} also writes to ion {}.", v.name(), k);
+            throw cable_cell_error{std::format("Revpot mechanism {} also writes to ion {}.", v.name(), k)};
         }
     }
 

@@ -1430,7 +1430,6 @@ ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const network_value& v)
 }
 
 ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const network_site_info& s) {
-
     os << "<arbor.network_site_info: gid " << s.gid;
     os << ", kind " << s.kind;
     os << ", label \"" << s.label << "\"";
