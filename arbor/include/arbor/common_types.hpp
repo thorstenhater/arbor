@@ -15,6 +15,7 @@
 
 #include <arbor/util/hash_def.hpp>
 #include <arbor/export.hpp>
+#include <arbor/format.hpp>
 
 namespace arb {
 
@@ -31,14 +32,12 @@ using cell_size_type = std::make_unsigned_t<cell_gid_type>;
 //
 // Local indices for items within a particular cell-local collection should be
 // zero-based and numbered contiguously.
-
 using cell_lid_type = std::uint32_t;
 
 // Local labels for items within a particular cell-local collection
 using cell_tag_type = std::string;
 
 // For counts of cell-local data.
-
 using cell_local_size_type = std::make_unsigned_t<cell_lid_type>;
 
 // For global identification of an item of cell local data.
@@ -50,7 +49,6 @@ using cell_local_size_type = std::make_unsigned_t<cell_lid_type>;
 //
 //  * identify an item within a cell-local collection by the member `index`
 //    (see: cell_lid_type).
-
 struct cell_member_type {
     cell_gid_type gid;
     cell_lid_type index;
@@ -58,7 +56,6 @@ struct cell_member_type {
 };
 
 // Pair of indexes that describe range of local indices.
-
 struct lid_range {
     cell_lid_type begin = 0;
     cell_lid_type end = 0;
@@ -68,7 +65,6 @@ struct lid_range {
 };
 
 // Global range of indices with given step size.
-
 struct gid_range {
     cell_gid_type begin = 0;
     cell_gid_type end = 0;
@@ -79,7 +75,6 @@ struct gid_range {
 };
 
 // Policy for selecting a cell_lid_type from a range of possible values.
-
 enum class lid_selection_policy {
     round_robin,
 	round_robin_halt,
@@ -89,7 +84,6 @@ enum class lid_selection_policy {
 // For referring to a labeled placement on an unspecified cell.
 // The placement may be associated with multiple locations, the policy
 // is used to select a specific location.
-
 struct cell_local_label_type {
     cell_tag_type tag;
     lid_selection_policy policy;
@@ -167,12 +161,18 @@ enum class ARB_SYMBOL_VISIBLE cell_kind {
     adex,         // ADaptive EXponential.
 };
 
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, lid_selection_policy m);
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_member_type m);
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, cell_kind k);
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, backend_kind k);
-
 } // namespace arb
 
 ARB_DEFINE_HASH(arb::cell_address_type, a.gid, a.tag)
 ARB_DEFINE_HASH(arb::cell_member_type, a.gid, a.index)
+
+ARB_FORMAT_ENABLE_ENUM(cell_kind, cable, lif, spike_source, benchmark, adex);
+ARB_FORMAT_ENABLE_ENUM(backend_kind, gpu, multicore);
+ARB_FORMAT_ENABLE_ENUM(lid_selection_policy, round_robin, round_robin_halt, assert_univalent);
+
+ARB_FORMAT_ENABLE_EXT(cell_member_type, gid, index)
+ARB_FORMAT_ENABLE_EXT(cell_address_type, gid, tag)
+ARB_FORMAT_ENABLE_EXT(cell_local_label_type, tag, policy)
+ARB_FORMAT_ENABLE_EXT(cell_global_label_type, gid, label)
+ARB_FORMAT_ENABLE_EXT(cell_remote_label_type, rid, index)
+

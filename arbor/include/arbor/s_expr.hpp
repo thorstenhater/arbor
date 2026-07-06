@@ -10,6 +10,7 @@
 #include <variant>
 
 #include <arbor/export.hpp>
+#include <arbor/format.hpp>
 
 namespace arb {
 
@@ -45,8 +46,6 @@ struct token {
     tok kind;
     std::string spelling;
 };
-
-ARB_ARBOR_API std::ostream& operator<<(std::ostream&, const token&);
 
 struct symbol {
     std::string str;
@@ -255,4 +254,73 @@ ARB_ARBOR_API std::size_t length(const s_expr& l);
 // Location of the head of the s-expr
 ARB_ARBOR_API src_location location(const s_expr& l);
 } // namespace arb
+
+template <>
+struct ARB_SYMBOL_VISIBLE std::formatter<::arb::token> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    auto format(const ::arb::token& obj, std::format_context& ctx) const {
+        if (obj.kind==::arb::tok::string) return std::format_to(ctx.out(), "\"{}\"", obj.spelling);
+        return std::format_to(ctx.out(), "{}", obj.spelling);
+    }
+};
+
+ARB_FORMAT_ENABLE_ENUM(tok, nil, real, integer, symbol, lparen, rparen, string, eof, error)
+
+template <>
+struct ARB_SYMBOL_VISIBLE std::formatter<::arb::src_location> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    auto format(const ::arb::src_location& obj, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}:{}", obj.line, obj.column);
+    }
+};
+
+template <>
+struct ARB_SYMBOL_VISIBLE std::formatter<::arb::s_expr> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        auto pos = ctx.begin();
+        if (pos == ctx.end() || *pos == '}') return pos;
+        if (*pos == 'p' || *pos == 'P') pretty = true;
+        ++pos; // 'p|P'
+        return pos;
+    }
+
+    auto const pprint_to(std::format_context::iterator out, const ::arb::s_expr& x, unsigned indent) const {
+        if (x.is_atom()) return std::format_to(out, "{}", x.atom());
+        auto it = std::begin(x);
+        auto end = std::end(x);
+        std::string ind = " ";
+        if (pretty) {
+            ind = std::string(std::string::size_type(2*indent + 1), ' ');
+            ind[0] = '\n';
+        }
+        out = std::format_to(out, "(");
+        bool first = true;
+        while (it != end) {
+            if (!first && !it->is_atom()) {
+                out = std::format_to(out, "{}", ind);
+                out = pprint_to(out, *it, indent+1);
+                ++it;
+                if (it != end && it->is_atom()) out = std::format_to(out, "{}", ind);
+            }
+            else {
+                out = pprint_to(out, *it, indent+1);
+                if (++it != end) out = std::format_to(out, " ");
+            }
+            first = false;
+        }
+        out = std::format_to(out, ")");
+        return out;        
+    }
+        
+    auto format(const ::arb::s_expr& x, std::format_context& ctx) const { return pprint_to(ctx.out(), x, 0); }
+
+    bool pretty = false;
+};
+
+
+namespace arb {
+inline ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const ::arb::token& it)        { os << std::format("{}", it); return os; }
+inline ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const ::arb::src_location& it) { os << std::format("{}", it); return os; }
+inline ARB_ARBOR_API std::ostream& operator<<(std::ostream& os, const ::arb::s_expr& it)       { os << std::format("{}", it); return os; }
+} // arb
 

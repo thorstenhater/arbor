@@ -60,6 +60,4 @@ struct ion_data_flags {
     bool ex() const { return read_eX_ || write_eX_; }
     bool reset_ex() const { return write_eX_; }
 };
-
-
-}
+} 

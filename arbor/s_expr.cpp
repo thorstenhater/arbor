@@ -1,7 +1,7 @@
 #include <cctype>
 #include <cstring>
 #include <string>
-#include <memory>
+#include <format>
 #include <unordered_map>
 #include <ostream>
 #include <variant>
@@ -9,8 +9,6 @@
 
 #include <arbor/arbexcept.hpp>
 #include <arbor/s_expr.hpp>
-
-#include "util/strprintf.hpp"
 
 namespace arb {
 
@@ -43,39 +41,11 @@ inline bool is_valid_symbol_char(char c) {
     }
 }
 
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const src_location& l) {
-    return o << l.line << ":" << l.column;
-}
-
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const tok& t) {
-    switch (t) {
-        case tok::nil:    return o << "nil";
-        case tok::lparen: return o << "lparen";
-        case tok::rparen: return o << "rparen";
-        case tok::real:   return o << "real";
-        case tok::integer:return o << "integer";
-        case tok::symbol: return o << "symbol";
-        case tok::string: return o << "string";
-        case tok::eof:    return o << "eof";
-        case tok::error:  return o << "error";
-    }
-    return o << "<unknown>";
-}
-
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const token& t) {
-    if (t.kind==tok::string) {
-        return o << util::pprintf("\"{}\"", t.spelling);
-    }
-    return o << util::pprintf("{}", t.spelling);
-}
-
-//
 // lexer
-//
 
 struct s_expr_lexer_error: public arb::arbor_internal_error {
     s_expr_lexer_error(const std::string& msg, src_location l):
-        arbor_internal_error(util::pprintf("s-expression internal error at {}: {}", l, msg))
+        arbor_internal_error(std::format("s-expression internal error at {}: {}", l, msg))
     {}
 };
 
@@ -200,12 +170,12 @@ private:
                         }
                     }
                     token_ = {loc(), tok::error,
-                        util::pprintf("Unexpected character '{}'.", character())};
+                        std::format("Unexpected character '{}'.", character())};
                     return;
 
                 default:
                     token_ = {loc(), tok::error,
-                        util::pprintf("Unexpected character '{}'.", character())};
+                        std::format("Unexpected character '{}'.", character())};
                     return;
             }
         }
@@ -398,43 +368,7 @@ s_expr& s_expr::tail() {
     return std::get<1>(state).tail.get();
 }
 
-s_expr::operator bool() const {
-    return !(is_atom() && atom().kind==tok::nil);
-}
-
-// Assume that stream indented and ready to go at location to start printing.
-std::ostream& print(std::ostream& o, const s_expr& x, int indent) {
-    std::string in(std::string::size_type(2*indent), ' ');
-    if (x.is_atom()) {
-       return o << x.atom();
-    }
-    auto it = std::begin(x);
-    auto end = std::end(x);
-    bool first=true;
-    o << "(";
-    while (it!=end) {
-        if (!first && !it->is_atom()) {
-            o << "\n" << in;
-            print(o, *it, indent+1);
-            ++it;
-            if (it!=end && it->is_atom()) {
-                o << "\n" << in;
-            }
-        }
-        else {
-            print(o, *it, indent+1);
-            if (++it!=end) {
-                o << " ";
-            }
-        }
-        first = false;
-    }
-    return o << ")";
-}
-
-ARB_ARBOR_API std::ostream& operator<<(std::ostream& o, const s_expr& x) {
-    return print(o, x, 1);
-}
+s_expr::operator bool() const { return !(is_atom() && atom().kind==tok::nil); }
 
 ARB_ARBOR_API std::size_t length(const s_expr& l) {
     // The length of an atom is 1.
@@ -512,7 +446,7 @@ s_expr parse(lexer& L) {
     return node;
 }
 
-}
+} // impl
 
 ARB_ARBOR_API s_expr parse_s_expr(const std::string& line) {
     lexer l(line.c_str());
@@ -522,7 +456,7 @@ ARB_ARBOR_API s_expr parse_s_expr(const std::string& line) {
         auto t = l.current();
         if (t.kind!=tok::eof) {
             return token{t.loc, tok::error,
-                         util::pprintf("Unexpected '{}' at the end of input.", t)};
+                         std::format("Unexpected '{}' at the end of input.", t)};
         }
     }
     return result;

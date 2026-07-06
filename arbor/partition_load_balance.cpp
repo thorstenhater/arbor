@@ -2,6 +2,7 @@
 #include <unordered_set>
 #include <vector>
 #include <algorithm>
+#include <format>
 
 #include <arbor/domdecexcept.hpp>
 #include <arbor/domain_decomposition.hpp>
@@ -13,7 +14,6 @@
 #include "execution_context.hpp"
 #include "util/maputil.hpp"
 #include "util/span.hpp"
-#include "util/strprintf.hpp"
 
 namespace arb {
 
@@ -137,12 +137,12 @@ auto get_backend(context ctx, cell_kind kind, const partition_hint_map& hint_map
     auto has_gpu = ctx->gpu->has_gpu() && cell_kind_supported(kind, backend_kind::gpu, *ctx);
     const auto& hint = util::value_by_key_or(hint_map, kind, {});
     if (!hint.cpu_group_size) {
-        throw arbor_exception(arb::util::pprintf("unable to perform load balancing because {} has invalid suggested cpu_cell_group size of {}",
-                                                 kind, hint.cpu_group_size));
+        throw arbor_exception(std::format("unable to perform load balancing because {} has invalid suggested cpu_cell_group size of {}",
+                                          kind, hint.cpu_group_size));
     }
     if (hint.prefer_gpu && !hint.gpu_group_size) {
-        throw arbor_exception(arb::util::pprintf("unable to perform load balancing because {} has invalid suggested gpu_cell_group size of {}",
-                                                 kind, hint.gpu_group_size));
+        throw arbor_exception(std::format("unable to perform load balancing because {} has invalid suggested gpu_cell_group size of {}",
+                                          kind, hint.gpu_group_size));
     }
     if (hint.prefer_gpu && has_gpu) return std::make_pair(backend_kind::gpu, hint.gpu_group_size);
     return std::make_pair(backend_kind::multicore, hint.cpu_group_size);

@@ -11,7 +11,6 @@ set(arbor_sources
     cable_cell.cpp
     cable_cell_param.cpp
     cell_group_factory.cpp
-    common_types_io.cpp
     cv_policy.cpp
     domdecexcept.cpp
     domain_decomposition.cpp
