@@ -308,12 +308,12 @@ endif()
 
 
 add_library(ext-random123 INTERFACE)
-CPMFindPackage(NAME random123
+CPMFindPackage(NAME Random123
                DOWNLOAD_ONLY YES
                GITHUB_REPOSITORY DEShawResearch/random123
                VERSION 1.14.0)
-if(random123_ADDED)
-    target_include_directories(ext-random123 INTERFACE $<BUILD_INTERFACE:${random123_SOURCE_DIR}/include>)
+if(Random123_ADDED)
+    target_include_directories(ext-random123 INTERFACE $<BUILD_INTERFACE:${Random123_SOURCE_DIR}/include>)
 else()
     target_include_directories(ext-random123 INTERFACE ${RANDOM123_INCLUDE_DIR})
 endif()
