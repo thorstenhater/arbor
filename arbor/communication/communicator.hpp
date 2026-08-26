@@ -91,6 +91,7 @@ public:
     struct connection_list {
         std::vector<cell_size_type> idx_on_domain;
         std::vector<cell_member_type> srcs;
+        std::vector<size_t> lens;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;

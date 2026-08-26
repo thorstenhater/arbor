@@ -370,30 +370,46 @@ void communicator::remote_ctrl_send_done() { ctx_->distributed->remote_ctrl_send
 
 template<typename S>
 void append_events_from_domain(const communicator::connection_list& cons, size_t cn, const size_t ce,
-                               const S& spks,
+                               const S& spikes,
                                std::vector<pse_vector>& queues) {
-    auto sp = spks.begin(), se = spks.end();
-    while (sp < se && cn < ce) {
-        auto src = cons.srcs[cn];
-        while (sp < se && sp->source < src) ++sp;
-        if (sp >= se) continue;
-        auto fst = sp;
-        for (; cn < ce && cons.srcs[cn] == src; ++cn) {
-            auto dom = cons.idx_on_domain[cn];
-            auto& que = queues[dom];
-            auto dst = cons.dests[cn];
-            auto del = cons.delays[cn];
-            auto wgt = cons.weights[cn];
-            // Handle all connections with the same source
-            // scan the range of spikes, once per connection
-            for (sp = fst; sp < se && sp->source == src; ++sp) {
-                que.emplace_back(dst, sp->time + del, wgt);
+
+        auto cbeg = cons.srcs.begin();
+        auto ccur = cbeg;
+        auto cend = cons.srcs.end();
+        auto clen = cons.size();
+        
+        auto send = spikes.end();
+        auto scur  = spikes.begin();
+        while (scur < send) {
+            auto source = scur->source;
+            // auto source = src_to_key(src);
+            auto ctmp = std::lower_bound(ccur, cend, source);
+            // TODO can this ever happen? Given the current A2A MPI it should not?
+            arb_assert ((ctmp < cend) || (*ctmp == source));
+            // We now longer need to search below the current source; they are sorted
+            ccur = ctmp;
+            // Start creation of events. This can (likely: will) create more
+            // than one event per incoming spike as multiple connections
+            // exist for one source.
+            // Remember the starting point of the run of spikes with the same source
+            auto stmp = scur;
+            // Iterate connections from the same source
+            for (auto idx = std::distance(cbeg, ctmp); (idx < clen) && (cons.srcs[idx] == source); ++idx) {
+                auto iod    = cons.idx_on_domain[idx];
+                auto dest   = cons.dests[idx];
+                auto delay  = cons.delays[idx];
+                auto weight = cons.weights[idx];
+                auto& queue = queues[iod];
+                // Make events for all spikes with the same source
+                for(scur = stmp; (scur < send) && (scur->source == source); ++scur) {
+                    queue.emplace_back(dest, scur->time + delay, weight);
+                }
+                // NOTE: Without the reset `scur = stmp` the cursor `scur` will
+                //       be (correctly) at the end of the range.
+                // NOTE: For the same reason will step the connection cursor `ccor`
+                ++ccur;
             }
-        }
-        // once we leave here, sp will be at the end of the eglible range
-        // and all connections with the same source will have been treated.
-        // so, we can just leave sp at this end.
-    }
+        }    
 }
 
 void communicator::make_event_queues(communicator::spikes& spikes,
