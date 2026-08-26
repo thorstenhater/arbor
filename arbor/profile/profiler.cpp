@@ -80,7 +80,7 @@ class profiler {
     std::mutex mutex_;
     // Flag to indicate whether the profiler has been initialized with the task_system
     bool init_ = false;
-    //
+    // sentinel
     timer_stack empty_stack{};
 
 public:
@@ -141,7 +141,7 @@ std::string timer_stack_to_string(const timer_stack& ts, const std::vector<std::
 void recorder::enter(region_id_type index, const std::vector<std::string>& names) {
     current_timer_stack.push_back(index);
     auto& cur_acc = accumulators_[current_timer_stack];
-    if (cur_acc.running) throw std::runtime_error(std::format("recorder::enter you entered the timer twice {}. TimerStack:",
+    if (cur_acc.running) throw std::runtime_error(std::format("recorder::enter you entered the timer twice {}. TimerStack: {}",
                                                               names[index], timer_stack_to_string(current_timer_stack, names)));
     cur_acc.start_time = timer::tic();
     cur_acc.running = true;
@@ -158,7 +158,7 @@ void recorder::leave(region_id_type index, const std::vector<std::string>& names
     cur_acc.count++;
     cur_acc.time += delta;
     cur_acc.running = false;
-    current_timer_stack.erase(std::next(current_timer_stack.begin(), current_timer_stack.size()-1));
+    current_timer_stack.erase(std::next(current_timer_stack.begin(), last));
 }
 
 void recorder::clear() {
@@ -178,8 +178,9 @@ void recorder::task_started(timer_stack _timer_stack) {
 }
 
 void recorder::task_stopped(const timer_stack _timer_stack) {
+    auto size = current_timer_stack.size();
     current_timer_stack = std::move(_timer_stack);
-    for(auto stack_depth = 0U; stack_depth < current_timer_stack.size(); ++stack_depth) {
+    for(auto stack_depth = 0U; stack_depth < size; ++stack_depth) {
         const timer_stack sub_timer_stack(current_timer_stack.begin(), current_timer_stack.begin() + stack_depth + 1);
         auto& acc = accumulators_[sub_timer_stack];
         acc.running = false;
@@ -224,7 +225,7 @@ region_id_type profiler::region_index(const std::string& name) {
     // has to be protected by a mutex.
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = name_index_.find(name);
-    if (it==name_index_.end()) {
+    if (it == name_index_.end()) {
         const auto index = region_names_.size();
         name_index_[name] = index;
         region_names_.emplace_back(name);
