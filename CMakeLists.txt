@@ -158,7 +158,7 @@ if(ARB_GPU STREQUAL "cuda")
     include(FindCUDAToolkit)
     set(ARB_WITH_NVCC TRUE)
     # CMake 3.18 and later set the default CUDA architecture for
-    # each target according to CMAKE_CUDA_ARCHITECTURES. 
+    # each target according to CMAKE_CUDA_ARCHITECTURES.
 
     # This fixes nvcc picking up a wrong host compiler for linking, causing
     # issues with outdated libraries, eg libstdc++ and std::filesystem. Must
@@ -320,9 +320,10 @@ endif()
 install(TARGETS ext-random123 EXPORT arbor-targets)
 
 if (ARB_WITH_PYTHON)
+    set(PYBIND11_FINDPYTHON ON)
     CPMFindPackage(NAME pybind11
                    GITHUB_REPOSITORY pybind/pybind11
-                   VERSION 3.0.0
+                   VERSION 3.1.0
                    OPTIONS "PYBIND11_CPP_STANDARD -std=c++20")
     # required for find_python_module
     include(FindPythonModule)
@@ -352,11 +353,11 @@ add_library(ext-bench INTERFACE)
 if (BUILD_TESTING)
     CPMFindPackage(NAME benchmark
                   GITHUB_REPOSITORY google/benchmark
-                  VERSION 1.8.3
+                  VERSION 1.9.5
                   OPTIONS "BENCHMARK_ENABLE_TESTING OFF" "CMAKE_BUILD_TYPE release" "BUILD_SHARED_LIBS OFF")
     CPMFindPackage(NAME googletest
                   GITHUB_REPOSITORY google/googletest
-                  VERSION 1.17.0
+                  VERSION 1.18.0
                   OPTIONS "INSTALL_GTEST OFF" "BUILD_GMOCK OFF")
     if(benchmark_ADDED)
         target_link_libraries(ext-bench INTERFACE benchmark)
