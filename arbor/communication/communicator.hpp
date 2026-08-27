@@ -90,16 +90,18 @@ public:
     // TODO: This is public for now.
     struct connection_list {
         std::vector<cell_size_type> idx_on_domain;
-        std::vector<cell_member_type> srcs;
+        std::vector<std::uint64_t> srcs;
         std::vector<size_t> lens;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;
 
         void make(std::vector<connection>& cons) {
+            static_assert(sizeof(cell_member_type) == sizeof(std::uint64_t), "cell_member_type:: Must fit into 64b.");
+            static_assert(std::is_trivially_copyable_v<cell_member_type>, "cell_member_type:: Must be POD.");
             for (const auto& con: cons) {
                 idx_on_domain.push_back(con.index_on_domain);
-                srcs.push_back(con.source);
+                srcs.push_back(std::bit_cast<std::uint64_t>(con.source));
                 dests.push_back(con.target);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);

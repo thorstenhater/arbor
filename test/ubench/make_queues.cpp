@@ -178,20 +178,6 @@ aos generate_aos(const std::vector<arb::connection>& conns) {
     return res;
 }
 
-template<typename It, typename T>
-It qsearch(It beg, It end, T val) {
-    It base = beg;
-    int len = std::distance(beg, end);
-    while (len > 1) {
-        int half = len / 2;
-        len -= half;
-        __builtin_prefetch(&base[len / 2 - 1]);
-        __builtin_prefetch(&base[half + len / 2 - 1]);
-        base += (base[half - 1] < val) * half;
-    }
-    return base;
-}
-
 void binary_search_aos(benchmark::State& state) {
     size_t n_cell        = state.range(0);
     size_t conn_per_cell = state.range(1);
@@ -199,31 +185,46 @@ void binary_search_aos(benchmark::State& state) {
 
     auto conns  = generate_connections(n_cell, conn_per_cell);
     auto spikes = generate_events(n_cell, evt_per_cell);
-    auto aos    = generate_aos(conns);
-    auto out    = std::vector<arb::pse_vector>(n_cell);
+    auto cons   = generate_aos(conns);
+    auto queues = std::vector<arb::pse_vector>(n_cell);
 
     while (state.KeepRunning()) {
-        auto cbeg = aos.srcs.begin();
+        auto cbeg = cons.srcs.begin();
         auto ccur = cbeg;
-        auto cend = aos.srcs.end();
-        auto send = spikes.end();
+        auto cend = cons.srcs.end();
+        auto clen = std::distance(cbeg, cend);
 
-        auto sit = spikes.begin();
-        for (; sit != send; ++sit) {
-            auto src = sit->source;
+        auto send = spikes.end();
+        auto scur  = spikes.begin();
+        while (scur < send) {
+            auto src = scur->source;
             auto source = src_to_key(src);
-            auto cit = std::lower_bound(ccur, cend, source);
-            if ((cit == cend) || (*cit != source)) continue;
-            auto idx = std::distance(cbeg, cit);
-            ccur = cit;
-            for (; (sit != send) && (sit->source == src); ++sit) {
-                for (; (cit != cend) && (*cit == source); ++cit) {
-                    auto& queue = out[aos.idx_on_domain[idx]];
-                    queue.emplace_back(aos.dests[idx], sit->time + aos.delays[idx], aos.weights[idx]);
+            auto ctmp = std::lower_bound(ccur, cend, source);
+            // We now longer need to search below the current source; they are sorted
+            ccur = ctmp;
+            // Start creation of events. This can (likely: will) create more
+            // than one event per incoming spike as multiple connections
+            // exist for one source.
+            // Remember the starting point of the run of spikes with the same source
+            auto stmp = scur;
+            // Iterate connections from the same source
+            for (auto idx = std::distance(cbeg, ctmp); (idx < clen) && (cons.srcs[idx] == source); ++idx) {
+                auto iod    = cons.idx_on_domain[idx];
+                auto dest   = cons.dests[idx];
+                auto delay  = cons.delays[idx];
+                auto weight = cons.weights[idx];
+                auto& queue = queues[iod];
+                // Make events for all spikes with the same source
+                for(scur = stmp; (scur < send) && (scur->source == src); ++scur) {
+                    queue.emplace_back(dest, scur->time + delay, weight);
                 }
+                // NOTE: Without the reset `scur = stmp` the cursor `scur` will
+                //       be (correctly) at the end of the range.
+                // NOTE: For the same reason will step the connection cursor `ccur`
+                ++ccur;
             }
         }
-        for (auto& q: out) q.clear();
+        for (auto& q: queues) q.clear();
     }
 }
 
@@ -236,7 +237,7 @@ void hashtable_aos(benchmark::State& state) {
     auto conns  = generate_connections(n_cell, conn_per_cell);
     auto spikes = generate_events(n_cell, evt_per_cell);
     auto aos    = generate_aos(conns);
-    
+
     ankerl::unordered_dense::map<uint64_t, std::pair<size_t, size_t>> first_occurence;
 
     for (size_t idx = 0; idx < aos.srcs.size(); ++idx) {
@@ -248,7 +249,7 @@ void hashtable_aos(benchmark::State& state) {
     auto out = std::vector<arb::pse_vector>(n_cell);
 
     while (state.KeepRunning()) {
-        auto send = spikes.end();        
+        auto send = spikes.end();
         auto sit = spikes.begin();
         for (; sit < send; ++sit) {
             auto src = sit->source;
@@ -266,7 +267,7 @@ void hashtable_aos(benchmark::State& state) {
     }
 }
 
-void run_custom_arguments(benchmark::internal::Benchmark* b) {
+void run_custom_arguments(::benchmark::Benchmark* b) {
     for (auto n_cell: {10, 1000, 10000}) {
         for (auto conn_per_cell: {64, 128, 256}) {
             for (auto evt_per_cell: {64, 128, 256}) {
@@ -280,6 +281,6 @@ void run_custom_arguments(benchmark::internal::Benchmark* b) {
 // BENCHMARK(sorted_conn_spike)->Apply(run_custom_arguments);
 // BENCHMARK(binary_search)->Apply(run_custom_arguments);
 BENCHMARK(binary_search_aos)->Apply(run_custom_arguments);
-// BENCHMARK(hashtable_aos)->Apply(run_custom_arguments);
+BENCHMARK(hashtable_aos)->Apply(run_custom_arguments);
 
 BENCHMARK_MAIN();
