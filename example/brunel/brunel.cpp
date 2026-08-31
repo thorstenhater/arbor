@@ -348,9 +348,10 @@ int main(int argc, char** argv) {
         }
 
         // output profile and diagnostic feedback
-        std::cout << profile::profiler_summary() << "\n"
-                  << "\nThere were " << sim.num_spikes() << " spikes\n";
-
+        std::cout << "There were " << sim.num_spikes() << " spikes\n";
+#ifdef ARB_PROFILE_ENABLED
+        profile::print_profiler_summary(std::cout, -1.0);
+#endif
         auto report = profile::make_meter_report(meters, context);
         std::cout << report;
         if (root) {
