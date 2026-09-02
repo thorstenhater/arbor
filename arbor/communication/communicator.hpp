@@ -94,6 +94,7 @@ public:
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;
+        // for each domain, map sources to ranges of connctions.
         std::vector<ankerl::unordered_dense::map<std::uint64_t, std::pair<std::size_t, std::size_t>>> first_occurence;
 
         void make(std::vector<connection>& cons) {
