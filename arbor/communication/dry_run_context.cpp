@@ -31,7 +31,7 @@ struct dry_run_context_impl {
     //
     // If, on rank=0, we had (gid, lid) -> [r0, r1, ...], and want to obtain the map on rank `r`
     // - we need to shift the gid -> (gid + r*cells-per-tile) % total-cells
-    // - each rank `k` needs to be shifted by the current source rank 
+    // - each rank `k` needs to be shifted by the current source rank
     gathered_vector<spike>
     all_to_all_spikes(const std::vector<spike>& spikes, const sources_to_target_ranks& lut) const {
         auto num_total_cells = num_cells_per_tile_*num_ranks_;
@@ -44,7 +44,7 @@ struct dry_run_context_impl {
             auto offset = num_ranks_ - rank;
             for (const auto& spk: spikes) {
                 // create a spike from a virtual rank by shifting the `gid` into
-                // the `rank`th tile.                
+                // the `rank`th tile.
                 auto shifted = spk.source;
                 shifted.gid += num_cells_per_tile_*rank;
                 shifted.gid %= num_total_cells;
@@ -58,6 +58,8 @@ struct dry_run_context_impl {
                     if (it != ranks.end()) gathered_spikes.emplace_back(shifted, spk.time);
                 }
             }
+            // NOTE there's no need to re-sort after shift/mod of the gid since
+            //      shifting by a full tile will preserve the tile-internal ordering
             partition.push_back(gathered_spikes.size());
         }
         return gathered_vector<spike>(std::move(gathered_spikes), std::move(partition));
@@ -77,11 +79,13 @@ struct dry_run_context_impl {
                 shifted.gid %= num_cells;
                 gathered_spikes.emplace_back(shifted, spk.time);
             }
+            // NOTE there's no need to re-sort after shift/mod of the gid since
+            //      shifting by a full tile will preserve the tile-internal ordering
             partition.push_back(gathered_spikes.size());
         }
         return gathered_vector<spike>(std::move(gathered_spikes), std::move(partition));
     }
-    
+
     void remote_ctrl_send_continue(const epoch&) const {}
     void remote_ctrl_send_done() const {}
     gathered_vector<cell_gid_type>

@@ -67,14 +67,6 @@ void reset_index(const domain_decomposition_ptr dom_dec,
                                                      }));
 }
 
-inline
-void reset_partition(const std::vector<std::vector<connection>>& connss,
-                     std::vector<cell_size_type>& part) {
-    part.clear();
-    part.push_back(0);
-    for (const auto& conns: connss) part.push_back(part.back() + conns.size());
-}
-
 void make_remote_connections(const std::vector<cell_gid_type>& gids,
                              const recipe& rec,
                              const domain_decomposition_ptr dom_dec,
@@ -254,10 +246,6 @@ void communicator::update_connections(const recipe& rec,
                                    [&](auto i) { util::sort(connections_by_src_domain[i]); });
     PL(sort_local);
 
-    PE(partition);
-    reset_partition(connections_by_src_domain, connection_part_);
-    PL(partition);
-
     PE(destructure);
     connections_.clear();
     connections_.reserve(n_con);
@@ -335,66 +323,45 @@ void communicator::remote_ctrl_send_done() { ctx_->distributed->remote_ctrl_send
 // 2. queues[i] <- (o, t + d, w) .forall. found connections
 // Note: both connections _and_ spikes contain duplicates in the source field.
 template<typename S>
-void append_events_from_domain(const communicator::connection_list& cons, const size_t clo, const size_t chi,
+void append_events_from_domain(const communicator::connection_list& cons, size_t dom,
                                const S& spikes,
                                std::vector<pse_vector>& queues) {
-    auto scur = spikes.begin();
+    const auto& lut = cons.first_occurence[dom];
     auto send = spikes.end();
-    auto ccur = cons.srcs.begin() + clo;
-    auto cend = cons.srcs.begin() + chi;
+    auto scur = spikes.begin();
     while (scur < send) {
-        // first spike with the given source; mark for rewinding
-        auto fst = scur;
+        auto sfst = scur;
         auto src = scur->source;
-        auto key = std::bit_cast<std::uint64_t>(src);
-        // obtain the source we are looking for:
-        // NOTE This linear search is currently very slightly slower, indicating
-        //      there's not much distance to search.
-        ccur = std::find(ccur, cend, key);
-        // ccur = std::lower_bound(ccur, cend, key);
-        // NOTE we know all spikes must find a connection by construction of the
-        //      communication infrastructure
-        arb_assert((ccur != cend) && (*ccur == key));
-        auto cidx = std::distance(cons.srcs.begin(), ccur);
-        // process the run of connections with the given source.
-        while ((ccur < cend) && (*ccur == key)) {
-            auto dom = cons.idx_on_domain[cidx];
-            auto& que = queues[dom];
+        const auto& [cfst, clst] = lut.at(std::bit_cast<std::uint64_t>(src));
+        for (auto cidx = cfst; cidx < clst; ++cidx) {
+            auto iod = cons.idx_on_domain[cidx];
+            auto& que = queues[iod];
             auto dst = cons.dests[cidx];
             auto del = cons.delays[cidx];
             auto wgt = cons.weights[cidx];
-            // Handle all spikes with the same source
-            // NOTE we need to rewind to the first spike `fst` everytime since
-            //      there might be more than one connection with the given source.
-            for (scur = fst; scur < send && scur->source == src; ++scur) {
+            for (scur = sfst; (scur < send) && (scur->source == src); ++scur) {
                 que.emplace_back(dst, scur->time + del, wgt);
             }
-            ++ccur;
-            ++cidx;
         }
-        // once we leave here, `scur` will be at the end of the eglible range
-        // and all connections with the same source will have been treated.
-        // Thus, `ccur` will also have traversed all connections
-        // so, we can just leave scur at this end.
     }
 }
+
 
 void communicator::make_event_queues(communicator::spikes& spikes,
                                      std::vector<pse_vector>& queues) {
     arb_assert(queues.size()==num_local_cells_);
     const auto& sp = spikes.from_local.partition();
-    const auto& cp = connection_part_;
     for (auto dom: util::make_span(num_domains_)) {
-        append_events_from_domain(connections_, cp[dom], cp[dom+1],
-                                  util::subrange_view(spikes.from_local.values(), sp[dom], sp[dom+1]),
-                                  queues);
+        append_events_from_domain(connections_, dom,
+                                     util::subrange_view(spikes.from_local.values(), sp[dom], sp[dom+1]),
+                                     queues);
     }
     // Now that all local spikes have been processed; consume the remote events coming in.
     // - turn all gids into externals
     if (!spikes.from_remote.empty()) {
         std::for_each(spikes.from_remote.begin(), spikes.from_remote.end(),
                       [](auto& s) { s.source = global_cell_of(s.source); });
-        append_events_from_domain(ext_connections_, 0, ext_connections_.size(), spikes.from_remote, queues);
+        append_events_from_domain(ext_connections_, 0, spikes.from_remote, queues);
     }
 }
 

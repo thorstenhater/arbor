@@ -89,22 +89,26 @@ public:
 
     // TODO: This is public for now.
     struct connection_list {
+
         std::vector<cell_size_type> idx_on_domain;
-        std::vector<std::uint64_t> srcs;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;
+        std::vector<ankerl::unordered_dense::map<std::uint64_t, std::pair<std::size_t, std::size_t>>> first_occurence;
 
         void make(std::vector<connection>& cons) {
-            static_assert(sizeof(cell_member_type) == sizeof(std::uint64_t), "cell_member_type:: Must fit into 64b.");
-            static_assert(std::is_trivially_copyable_v<cell_member_type>, "cell_member_type:: Must be POD.");
+            first_occurence.emplace_back();
+            auto& lut = first_occurence.back();
+            std::size_t n = delays.size();
             for (const auto& con: cons) {
+                auto key = std::bit_cast<std::uint64_t>(con.source);
+                if (!lut.contains(key)) lut.emplace(key, std::make_pair(n, n));
+                lut[key].second += 1;
                 idx_on_domain.push_back(con.index_on_domain);
-                srcs.push_back(std::bit_cast<std::uint64_t>(con.source));
-                // srcs.push_back(con.source);
                 dests.push_back(con.target);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);
+                ++n;
             }
         }
 
@@ -119,7 +123,6 @@ public:
 
         void reserve(std::size_t n) {
             idx_on_domain.reserve(n);
-            srcs.reserve(n);
             dests.reserve(n);
             weights.reserve(n);
             delays.reserve(n);
@@ -127,13 +130,12 @@ public:
 
         void clear() {
             idx_on_domain.clear();
-            srcs.clear();
             dests.clear();
             weights.clear();
             delays.clear();
         }
 
-        size_t size() const { return srcs.size(); }
+        size_t size() const { return delays.size(); }
     };
 
     const connection_list& connections() const;
@@ -145,8 +147,6 @@ private:
     cell_size_type num_domains_ = 0;
     spike_predicate remote_spike_filter_;
 
-    // partition of connections over the domains of the sources' ids.
-    std::vector<cell_size_type> connection_part_;
     std::vector<cell_size_type> index_divisions_;
     util::partition_view_type<std::vector<cell_size_type>> index_part_;
 
