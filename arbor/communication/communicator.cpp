@@ -2,7 +2,6 @@
 #include <utility>
 #include <vector>
 #include <limits>
-#include <unordered_set>
 
 #include <arbor/assert.hpp>
 #include <arbor/common_types.hpp>
@@ -21,6 +20,7 @@
 #include "util/partition.hpp"
 #include "util/rangeutil.hpp"
 #include "util/span.hpp"
+#include "util/unique.hpp"
 
 #include "communication/communicator.hpp"
 
@@ -222,29 +222,28 @@ void communicator::update_connections(const recipe& rec,
     }
     PL(generated);
 
+    // ensure there's no duplication in the src -> [ranks] table
     PE(sort_unique);
     arb::threading::parallel_for::apply(0, gids_domains.size(), ctx_->thread_pool.get(),
                                         [&](int i) {
-                                          auto& domain_gids = gids_domains[i];
-                                          std::sort(domain_gids.begin(), domain_gids.end());
-                                          domain_gids.erase(
-                                              std::unique(domain_gids.begin(), domain_gids.end()),
-                                              domain_gids.end()
-                                          );
+                                            auto& domain_gids = gids_domains[i];
+                                            util::sort(domain_gids);
+                                            util::unique_in_place(domain_gids);
                                         });
     PL(sort_unique);
 
     PE(gids);
+    src_ranks_.num_domains = num_domains_;
     auto srcs_by_rank = ctx_->distributed->all_to_all_gids_domains(gids_domains);
     const auto& part = srcs_by_rank.partition();
     const auto& srcs = srcs_by_rank.values();
     for (auto domain: util::make_span(0, num_domains_)) {
-      auto beg = part[domain];
-      auto end = part[domain + 1];
-      for (auto idx: util::make_span(beg, end)) {
-        const auto& src = srcs[idx];
-        src_ranks_[src].push_back(domain);
-      }
+        auto beg = part[domain];
+        auto end = part[domain + 1];
+        for (auto idx: util::make_span(beg, end)) {
+            const auto& src = srcs[idx];
+            src_ranks_.insert(src, domain);
+        }
     }
     PL(gids);
 
@@ -284,63 +283,22 @@ time_type communicator::min_delay() {
     return res;
 }
 
-gathered_vector<spike>
-generate_all_to_all_vector(const std::vector<spike>& spikes,
-                           const std::unordered_map<cell_member_type, std::vector<cell_size_type>>& src_ranks,
-                           std::size_t num_domains) {
-
-    using count_type = gathered_vector<spike>::count_type;
-    // count outgoing spikes per rank
-    std::vector<count_type> offsets(num_domains + 1, 0);
-    for (const auto& spk: spikes) {
-        auto ranks = src_ranks.find(spk.source);
-        if (ranks != src_ranks.end()) {
-            for (auto rank: ranks->second) {
-                ++offsets[rank + 1];
-            }
-        }
-    }
-
-    // make partition so we can sort the spikes into bins
-    std::partial_sum(offsets.begin(), offsets.end(),
-                     offsets.begin());
-    auto size = offsets.back();
-
-    // we have the sizes per rank to send to, so deal spikes into bins.
-    std::vector<spike> spikes_per_rank(size);
-    auto rank_indices = offsets;
-    for (const auto& spk: spikes) {
-        auto ranks = src_ranks.find(spk.source);
-        if (ranks != src_ranks.end()) {
-            for (auto rank: ranks->second) {
-                auto& index = rank_indices[rank];
-                spikes_per_rank[index] = spk;
-                ++index;
-            }
-        }
-    }
-    return {std::move(spikes_per_rank), std::move(offsets)};
-}
-
 communicator::spikes
 communicator::exchange(std::vector<spike>& local_spikes) {
     PE(exchange);
     PE(sort);
     // sort the spikes in ascending order of source gid
-    util::sort_by(local_spikes, [](spike s){return s.source;});
+    util::sort_by(local_spikes, [](spike s){ return s.source; });
     PL(sort);
 
     PE(sum_spikes);
-    num_local_spikes_ = ctx_->distributed->sum(local_spikes.size());
-    num_spikes_ += num_local_spikes_;
+    num_local_spikes_ += local_spikes.size();
+    num_spikes_ += ctx_->distributed->sum(local_spikes.size());
     PL(sum_spikes);
 
-    PE(generate);
-    auto spikes_per_rank = generate_all_to_all_vector(local_spikes, src_ranks_, num_domains_);
-    PL(generate);
     PE(all2all);
     // global all-to-all to gather a local copy of the global spike list on each node.
-    auto global_spikes = ctx_->distributed->all_to_all_spikes(spikes_per_rank);
+    auto global_spikes = ctx_->distributed->all_to_all_spikes(local_spikes, src_ranks_);
     PL(all2all);
 
     // Get remote spikes
@@ -377,45 +335,47 @@ void communicator::remote_ctrl_send_done() { ctx_->distributed->remote_ctrl_send
 // 2. queues[i] <- (o, t + d, w) .forall. found connections
 // Note: both connections _and_ spikes contain duplicates in the source field.
 template<typename S>
-void append_events_from_domain(const communicator::connection_list& cons, size_t cn, const size_t ce,
+void append_events_from_domain(const communicator::connection_list& cons, const size_t clo, const size_t chi,
                                const S& spikes,
                                std::vector<pse_vector>& queues) {
-    auto cbeg = cons.srcs.begin() + cn;
-    auto ccur = cbeg;
-    auto cend = cons.srcs.begin() + ce;
-    auto clen = std::distance(cbeg, cend);
-
+    auto scur = spikes.begin();
     auto send = spikes.end();
-    auto scur  = spikes.begin();
+    auto ccur = cons.srcs.begin() + clo;
+    auto cend = cons.srcs.begin() + chi;
     while (scur < send) {
-        auto source = scur->source;
-        auto key = std::bit_cast<std::uint64_t>(source);
-        auto ctmp = std::lower_bound(ccur, cend, key);
-        // TODO can this ever happen? Given the current A2A MPI it should not?
-        arb_assert ((ctmp < cend) || (*ctmp == key));
-        // We now longer need to search below the current source; they are sorted
-        ccur = ctmp;
-        // Start creation of events. This can (likely: will) create more
-        // than one event per incoming spike as multiple connections
-        // exist for one source.
-        // Remember the starting point of the run of spikes with the same source
-        auto stmp = scur;
-        // Iterate connections from the same source
-        for (auto idx = std::distance(cbeg, ctmp); (idx < clen) && (cons.srcs[idx] == key); ++idx) {
-            auto iod    = cons.idx_on_domain[idx];
-            auto dest   = cons.dests[idx];
-            auto delay  = cons.delays[idx];
-            auto weight = cons.weights[idx];
-            auto& queue = queues[iod];
-            // Make events for all spikes with the same source
-            for(scur = stmp; (scur < send) && (scur->source == source); ++scur) {
-                queue.emplace_back(dest, scur->time + delay, weight);
+        // first spike with the given source; mark for rewinding
+        auto fst = scur;
+        auto src = scur->source;
+        auto key = std::bit_cast<std::uint64_t>(src);
+        // obtain the source we are looking for:
+        // NOTE This linear search is currently very slightly slower, indicating
+        //      there's not much distance to search.
+        ccur = std::find(ccur, cend, key);
+        // ccur = std::lower_bound(ccur, cend, key);
+        // NOTE we know all spikes must find a connection by construction of the
+        //      communication infrastructure
+        arb_assert((ccur != cend) && (*ccur == key));
+        auto cidx = std::distance(cons.srcs.begin(), ccur);
+        // process the run of connections with the given source.
+        while ((ccur < cend) && (*ccur == key)) {
+            auto dom = cons.idx_on_domain[cidx];
+            auto& que = queues[dom];
+            auto dst = cons.dests[cidx];
+            auto del = cons.delays[cidx];
+            auto wgt = cons.weights[cidx];
+            // Handle all spikes with the same source
+            // NOTE we need to rewind to the first spike `fst` everytime since
+            //      there might be more than one connection with the given source.
+            for (scur = fst; scur < send && scur->source == src; ++scur) {
+                que.emplace_back(dst, scur->time + del, wgt);
             }
-            // NOTE: Without the reset `scur = stmp` the cursor `scur` will
-            //       be (correctly) at the end of the range.
-            // NOTE: For the same reason will step the connection cursor `ccur`
             ++ccur;
+            ++cidx;
         }
+        // once we leave here, `scur` will be at the end of the eglible range
+        // and all connections with the same source will have been treated.
+        // Thus, `ccur` will also have traversed all connections
+        // so, we can just leave scur at this end.
     }
 }
 
@@ -429,12 +389,13 @@ void communicator::make_event_queues(communicator::spikes& spikes,
                                   util::subrange_view(spikes.from_local.values(), sp[dom], sp[dom+1]),
                                   queues);
     }
-    num_local_events_ = util::sum_by(queues, [](const auto& q) {return q.size();}, num_local_events_);
     // Now that all local spikes have been processed; consume the remote events coming in.
     // - turn all gids into externals
-    std::for_each(spikes.from_remote.begin(), spikes.from_remote.end(),
-                  [](auto& s) { s.source = global_cell_of(s.source); });
-    append_events_from_domain(ext_connections_, 0, ext_connections_.size(), spikes.from_remote, queues);
+    if (!spikes.from_remote.empty()) {
+        std::for_each(spikes.from_remote.begin(), spikes.from_remote.end(),
+                      [](auto& s) { s.source = global_cell_of(s.source); });
+        append_events_from_domain(ext_connections_, 0, ext_connections_.size(), spikes.from_remote, queues);
+    }
 }
 
 std::uint64_t communicator::num_spikes() const { return num_spikes_; }
@@ -445,7 +406,7 @@ const communicator::connection_list& communicator::connections() const { return 
 
 void communicator::reset() {
     num_spikes_ = 0;
-    num_local_events_ = 0;
+    num_local_spikes_ = 0;
 }
 
 } // namespace arb

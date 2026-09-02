@@ -9,6 +9,7 @@
 #include <arbor/recipe.hpp>
 #include <arbor/spike.hpp>
 
+#include "source_rank_map.hpp"
 #include "communication/gathered_vector.hpp"
 #include "connection.hpp"
 #include "epoch.hpp"
@@ -27,7 +28,6 @@ namespace arb {
 // Once all connections have been specified, the construct() method can be used
 // to build the data structures required for efficient spike communication and
 // event generation.
-
 class ARB_ARBOR_API communicator {
 public:
 
@@ -78,8 +78,8 @@ public:
     // used for commmunicate to coupled simulations
     void remote_ctrl_send_continue(const epoch&);
     void remote_ctrl_send_done();
-    
-    
+
+
     void update_connections(const recipe& rec,
                             const domain_decomposition_ptr dom_dec,
                             const label_resolution_map& source_resolution_map,
@@ -91,7 +91,6 @@ public:
     struct connection_list {
         std::vector<cell_size_type> idx_on_domain;
         std::vector<std::uint64_t> srcs;
-        std::vector<size_t> lens;
         std::vector<cell_lid_type> dests;
         std::vector<float> weights;
         std::vector<float> delays;
@@ -102,6 +101,7 @@ public:
             for (const auto& con: cons) {
                 idx_on_domain.push_back(con.index_on_domain);
                 srcs.push_back(std::bit_cast<std::uint64_t>(con.source));
+                // srcs.push_back(con.source);
                 dests.push_back(con.target);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);
@@ -154,14 +154,13 @@ private:
     connection_list connections_;
 
     // sources with connections to other ranks
-    std::unordered_map<cell_member_type, std::vector<cell_size_type>> src_ranks_;
+    sources_to_target_ranks src_ranks_;
 
     // Connections from external simulators into Arbor.
     // Currently we have no partitions/indices/acceleration structures
     connection_list ext_connections_;
     std::uint64_t num_spikes_ = 0u;
     std::uint64_t num_local_spikes_ = 0u;
-    std::uint64_t num_local_events_ = 0u;
     context ctx_;
 };
 
