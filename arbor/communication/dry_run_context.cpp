@@ -127,28 +127,35 @@ struct dry_run_context_impl {
     // // [ (gid on rank 0, lid), ... | (gid on rank 0, lid), ... | ... ]
     //
     // which has the same layout, but different interpretation. The `i`th
-    // segment in this vector is now supposed to be the list of sources to be
-    // sent to rank `j`. Since we do not know which connections are actually
-    // instantiated, we just copy the first slot `n_ranks` times
+    // segment in this vector is now supposed to be the list of sources
+    // terminating on rank `j`.
+    // 
+    // We synthesise this by walking through the tiles in order
+    // 
+    // [ (gid on rank 0, lid), ... | (gid on rank 1, lid), ... | ... ]
+    //
+    // and working out the offset `off` to tile zero, ie 0, -1, -2, ... all mod
+    // num_tiles. We shift all the gids in the tile by `off * num_cells_per_tile`
+    //
+    // [ (gid on rank 0, lid), ... | (gid on rank 1 - num_cells_per_tile, lid), ... | ... ]
+    //
+    // where gid on rank 1 - num_cells_per_tile ~ gid on rank 0 due to the
+    // tiling property
     gathered_vector<cell_member_type>
     all_to_all_gids_domains(const std::vector<std::vector<cell_member_type>>& gids_domains) const {
         using count_type = gathered_vector<cell_member_type>::count_type;
-        // NOTE this is fixed, as we just make copies of the first slot!
-        const auto first = gids_domains.at(0);
         std::vector<count_type> partition(num_ranks_ + 1);
         partition[0] = 0;
-        count_type size = 0;
+        std::vector<cell_member_type> gathered_gids;
         for (count_type rank = 0; rank < num_ranks_; ++rank) {
-            size += first.size();
-            partition[rank + 1] = size;
-        }
-        std::vector<cell_member_type> gathered_gids(size);
-        for (count_type rank = 0; rank < num_ranks_; ++rank) {
-            auto lo = partition[rank];
-            auto hi = partition[rank + 1];
-            for (auto idx = lo; idx < hi; ++idx) {
-                gathered_gids[idx] = first[idx - lo];
+            const auto from = (num_ranks_ - rank) % num_ranks_;
+            const auto& chunk = gids_domains.at(from);
+            for (const auto& src: chunk) {
+                cell_member_type tmp = src;
+                tmp.gid -= num_cells_per_tile_*from; // or % num_cells_per_tile
+                gathered_gids.push_back(tmp); 
             }
+            partition[rank + 1] = gathered_gids.size();            
         }
         return gathered_vector<cell_member_type>(std::move(gathered_gids), std::move(partition));
     }
