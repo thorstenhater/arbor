@@ -92,6 +92,7 @@ public:
 
         std::vector<cell_size_type> idx_on_domain;
         std::vector<cell_lid_type> dests;
+        std::vector<cell_member_type> srcs;
         std::vector<float> weights;
         std::vector<float> delays;
         // for each domain, map sources to ranges of connctions.
@@ -107,6 +108,7 @@ public:
                 lut[key].second += 1;
                 idx_on_domain.push_back(con.index_on_domain);
                 dests.push_back(con.target);
+                srcs.push_back(con.source);
                 weights.push_back(con.weight);
                 delays.push_back(con.delay);
                 ++n;
