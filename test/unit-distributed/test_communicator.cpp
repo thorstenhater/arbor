@@ -651,9 +651,6 @@ TEST(communicator, all2all)
     for (auto i: util::make_span(0, n_global)) {
         for (auto j: util::make_span(0, n_local)) {
             auto idx = i*n_local + j;
-            // TODO
-            // EXPECT_EQ(i, connections.srcs[idx].gid);
-            // EXPECT_EQ(0u, connections.srcs[idx].index);
             EXPECT_EQ(i, connections.dests[idx]);
             EXPECT_LT(connections.idx_on_domain[idx], n_local);
         }
@@ -734,36 +731,9 @@ TEST(communicator, mini_network)
     // - the delay  as <connection offset> * 100 + 10  + sgid
     // to ensure proper dispatch.
 
-    // Expect one set of 22 connections from every rank: these have been sorted.
     auto M = C.connections();
-
-    for (cell_size_type rank = 0; rank < arb::num_ranks(g_context); ++rank) {
-        if (rank == arb::rank(g_context)) {
-            std::cerr << "==============================================\nRank " << rank << '\n';
-            std::cerr << "sources = {  ";
-            for (const auto& w: M.srcs) std::cerr << w << ",  ";
-            std::cerr << "}\n";
-            std::cerr << "weight  = { ";
-            for (const auto& w: M.weights) std::cerr << std::format("{:4.0f}, ", w);
-            std::cerr << "}\n";
-            std::cerr << "delay   = { ";
-            for (const auto& d: M.delays) std::cerr << std::format("{:4.0f}, ", d);
-            std::cerr << "}\n";
-
-            std::cerr << "connections  = {\n";
-            for (const auto& kvs: M.first_occurence) {
-                std::cerr << "  { ";
-                for (const auto& [k, v]: kvs) {
-                    const auto& [gid, lid] = std::bit_cast<cell_member_type>(k);
-                    std::cerr << std::format("{}:{} => {}:{}, ", gid, lid, v.first, v.second);
-                }
-                std::cerr << "}\n";
-            }
-            std::cerr << "}\n";
-        }
-        g_context->distributed->barrier();
-    }
     
+    // Expect one set of 22 connections from every rank
     EXPECT_EQ(22*arb::num_ranks(g_context), M.size());
     EXPECT_EQ(arb::num_ranks(g_context), M.first_occurence.size());
 
