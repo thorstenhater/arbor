@@ -346,6 +346,38 @@ void append_events_from_domain(const communicator::connection_list& cons, size_t
     }
 }
 
+// Remote connections might not terminate here, so provide a specialisd method
+// catching this.
+template<typename S>
+void append_events_from_external(const communicator::connection_list& cons,
+                               const S& spikes,
+                               std::vector<pse_vector>& queues) {
+    // there's only one remote domain
+    const auto& lut = cons.first_occurence[0];
+    auto send = spikes.end();
+    auto scur = spikes.begin();
+    while (scur < send) {
+        auto sfst = scur;
+        auto src = scur->source;
+        auto it = lut.find(std::bit_cast<std::uint64_t>(src));
+        // not for us? skip the spike.
+        if (it == lut.end()) {
+            ++scur;
+            continue;
+        }
+        const auto& [cfst, clst] = it->second;
+        for (auto cidx = cfst; cidx < clst; ++cidx) {
+            auto iod = cons.idx_on_domain[cidx];
+            auto& que = queues[iod];
+            auto dst = cons.dests[cidx];
+            auto del = cons.delays[cidx];
+            auto wgt = cons.weights[cidx];
+            for (scur = sfst; (scur < send) && (scur->source == src); ++scur) {
+                que.emplace_back(dst, scur->time + del, wgt);
+            }
+        }
+    }
+}
 
 void communicator::make_event_queues(communicator::spikes& spikes,
                                      std::vector<pse_vector>& queues) {
@@ -361,7 +393,7 @@ void communicator::make_event_queues(communicator::spikes& spikes,
     if (!spikes.from_remote.empty()) {
         std::for_each(spikes.from_remote.begin(), spikes.from_remote.end(),
                       [](auto& s) { s.source = global_cell_of(s.source); });
-        append_events_from_domain(ext_connections_, 0, spikes.from_remote, queues);
+        append_events_from_external(ext_connections_, spikes.from_remote, queues);
     }
 }
 
