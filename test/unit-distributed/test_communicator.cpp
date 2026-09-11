@@ -2,7 +2,6 @@
 #include "test.hpp"
 
 #include <vector>
-#include <format>
 
 #include <arbor/domain_decomposition.hpp>
 #include <arbor/lif_cell.hpp>

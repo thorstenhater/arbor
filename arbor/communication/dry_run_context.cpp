@@ -39,9 +39,6 @@ struct dry_run_context_impl {
         partition.push_back(0);
         std::vector<spike> gathered_spikes;
         for (cell_gid_type rank = 0; rank < num_ranks_; ++rank) {
-            // offset from the current rank to the target rank (zero) modulo
-            // number of ranks. Must be >=0 due to uint type.
-            auto offset = num_ranks_ - rank;
             for (const auto& spk: spikes) {
                 // create a spike from a virtual rank by shifting the `gid` into
                 // the `rank`th tile.
@@ -53,8 +50,10 @@ struct dry_run_context_impl {
                     // Search for the shifted rank.
                     // SAFETY: - ranks will never be empty by construction
                     //         - ranks is sorted by construction (via sort | uniq)
-                    auto it = std::find_if(ranks.begin(), ranks.end(),
-                                           [nr=num_ranks_, offset](auto old) { return (old + offset) % nr == 0; });
+                    // auto it = std::find_if(ranks.begin(), ranks.end(),
+                                           // [nr=num_ranks_, offset=num_ranks_ - rank](auto old) { return (old + offset) % nr == 0; }
+                                          // );
+                    auto it = std::find(ranks.begin(), ranks.end(), rank);
                     if (it != ranks.end()) gathered_spikes.emplace_back(shifted, spk.time);
                 }
             }
