@@ -30,8 +30,6 @@ void assemble_matrix_fine(T* __restrict__ const d,
                           const T* __restrict__ const area,
                           const T dt,
                           const I* __restrict__ const perm,
-                          T* __restrict__ const cd,
-                          T* __restrict__ const crhs,
                           unsigned n) {
     const unsigned tid = threadIdx.x + blockDim.x*blockIdx.x;
     if (tid < n) {
