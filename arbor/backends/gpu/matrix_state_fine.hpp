@@ -449,7 +449,7 @@ private:
         arb_assert(from.size()==data_size);
         arb_assert(to.size()==matrix_size);
 
-        gather(from.data(), to.data(), perm.data(), perm.size());
+        gather(from.data(), to.data(), perm.data(), perm.size(), true);
     }
 };
 

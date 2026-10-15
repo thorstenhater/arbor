@@ -56,32 +56,29 @@ bool operator<(const branch& lhs, const branch& rhs) {
 
 inline
 std::ostream& operator<<(std::ostream& o, branch b) {
-    return o << "[" << b.id
-        << ", len " << b.length
-        << ", pid " << b.parent_idx
-        << ", sta " << b.start_idx
-        << "]";
+    return o << "["
+             << b.id << ", len " << b.length << ", pid " << b.parent_idx << ", sta " << b.start_idx
+             << "]";
 }
 
 struct level_metadata {
-    unsigned num_branches = 0; // Number of branches in a level
-    unsigned max_length = 0;   // Length of the longest branch
-    unsigned matrix_data_index = 0;   // Index into data values (d, u, rhs) of the first branch
-    unsigned level_data_index  = 0;   // Index into data values (lengths, parents) of each level
+    unsigned num_branches      = 0; // Number of branches in a level
+    unsigned max_length        = 0; // Length of the longest branch
+    unsigned matrix_data_index = 0; // Index into data values (d, u, rhs) of the first branch
+    unsigned level_data_index  = 0; // Index into data values (lengths, parents) of each level
 };
 
 // C wrappers around kernels
-ARB_ARBOR_API void gather(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n);
+ARB_ARBOR_API void gather(const arb_value_type* from,
+                          arb_value_type* to,
+                          const arb_index_type* p,
+                          unsigned n,
+                          bool compact=false);
 
-ARB_ARBOR_API void scatter(
-    const arb_value_type* from,
-    arb_value_type* to,
-    const arb_index_type* p,
-    unsigned n);
+ARB_ARBOR_API void scatter(const arb_value_type* from,
+                           arb_value_type* to,
+                           const arb_index_type* p,
+                           unsigned n);
 
 } // gpu
 } // arb

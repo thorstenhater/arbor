@@ -94,7 +94,7 @@ void solve_matrix_fine(T* __restrict__ const rhs,
         // One thread per branch.
         if (tid < width) {
             const unsigned len = lvl_lengths[tid];
-            unsigned pos = lvl_meta.matrix_data_index + tid;
+            unsigned pos       = lvl_meta.matrix_data_index + tid;
 
             // Zero diagonal term implies dt==0; just leave rhs (for whole matrix)
             // alone in that case.
@@ -122,10 +122,10 @@ void solve_matrix_fine(T* __restrict__ const rhs,
                 const unsigned p = parent_index + lvl_parents[tid];
 
                 const T factor = -u[pos] / d[pos];
-                auto drhs = factor*rhs[2*pos];
-                const T dd = factor*u[pos];
-                gpu_atomic_add(d + 2*p, dd);
-                gpu_atomic_add(rhs + p, drhs);
+                const T drhs   = factor*rhs[2*pos];
+                const T dd     = factor*u[pos];
+                gpu_atomic_add(d   + 2*p, dd);
+                gpu_atomic_add(rhs + 2*p, drhs);
             }
         }
         __syncthreads();
@@ -161,10 +161,10 @@ void solve_matrix_fine(T* __restrict__ const rhs,
 
                 // forward
                 for (unsigned i=0; i<len-1; ++i) {
-                    rhsp = rhs[2*pos] - u[pos]*rhsp;
-                    rhsp /= d[2*pos];
-                    rhs[2*pos] = rhsp;
-                    pos -= width;
+                    rhsp        = rhs[2*pos] - u[pos]*rhsp;
+                    rhsp       /= d[2*pos];
+                    rhs[2*pos]  = rhsp;
+                    pos        -= width;
                 }
             }
         }
