@@ -1,9 +1,12 @@
+// clang-format Language: Cpp
 #include <arbor/fvm_types.hpp>
 #include <arbor/gpu/gpu_api.hpp>
 #include <arbor/gpu/gpu_common.hpp>
 
 #include "matrix_common.hpp"
 #include "matrix_fine.hpp"
+
+#define ARB_USE_COMPENSATED_GPU_ATOMIC_SUM
 
 namespace arb {
 namespace gpu {
@@ -15,55 +18,55 @@ namespace kernels {
 ///     - use the precomputed alpha and alpha_d values to construct the diagonal
 ///       and off diagonal of the symmetric Hines matrix.
 ///     - compute the RHS of the linear system to solve.
-template <typename T, typename I>
-__global__
-void assemble_matrix_fine(
-        T* __restrict__ const d,
-        T* __restrict__ const rhs,
-        const T* __restrict__ const invariant_d,
-        const T* __restrict__ const voltage,
-        const T* __restrict__ const current,
-        const T* __restrict__ const conductivity,
-        const T* __restrict__ const cv_capacitance,
-        const T* __restrict__ const area,
-        const T dt,
-        const I* __restrict__ const perm,
-        unsigned n)
-{
+// TODO(atomic-kahan) wrap this in ifdef
+template <typename T, typename I> __global__
+void assemble_matrix_fine(T* __restrict__ const d,
+                          T* __restrict__ const rhs,
+                          const T* __restrict__ const invariant_d,
+                          const T* __restrict__ const voltage,
+                          const T* __restrict__ const current,
+                          const T* __restrict__ const conductivity,
+                          const T* __restrict__ const cv_capacitance,
+                          const T* __restrict__ const area,
+                          const T dt,
+                          const I* __restrict__ const perm,
+                          T* __restrict__ const cd,
+                          T* __restrict__ const crhs,
+                          unsigned n) {
     const unsigned tid = threadIdx.x + blockDim.x*blockIdx.x;
     if (tid < n) {
         // The 1e-3 is a constant of proportionality required to ensure that the
         // conductance (gi) values have units μS (micro-Siemens).
         // See the model documentation in docs/model for more information.
-        const auto pid = perm[tid];
+        const auto pid         = perm[tid];
         const auto area_factor = T(1e-3)*area[tid];
-        const auto gi = T(1e-3)*cv_capacitance[tid]/dt + area_factor*conductivity[tid];
-        d[pid] = gi + invariant_d[tid];
-        rhs[pid] = gi*voltage[tid] - area_factor*current[tid];
+        const auto gi          = T(1e-3)*cv_capacitance[tid]/dt + area_factor*conductivity[tid];
+        d[2*pid]       = gi + invariant_d[tid];
+        d[2*pid + 1]   = 0.0;
+        rhs[2*pid]     = gi*voltage[tid] - area_factor*current[tid];
+        rhs[2*pid + 1] = 0.0;
     }
 }
 
-/// GPU implementation of Hines Matrix solver.
+// GPU implementation of Hines Matrix solver.
 /// Fine-grained tree based solver.
-/// Each block solves a set of matricesb iterating over the levels of matrix
+/// Each block solves a set of matrices by iterating over the levels of matrix
 /// and perfoming a backward and forward substitution. On each level one thread
 /// gets assigned to one branch on this level of a matrix and solves and
 /// performs the substitution. Afterwards all threads continue on the next
 /// level.
 /// To avoid idle threads, one should try that on each level, there is a similar
 /// number of branches.
-template <typename T>
-__global__
-void solve_matrix_fine(
-    T* __restrict__ const rhs,
-    T* __restrict__ const d,
-    const T* __restrict__ const u,
-    const level_metadata* __restrict__ const level_meta,
-    const arb_index_type* __restrict__ const level_lengths,
-    const arb_index_type* __restrict__ const level_parents,
-    const arb_index_type* __restrict__ const block_index,
-    const arb_index_type* __restrict__ const num_matrix) // number of packed matrices = number of cells
-{
+template <typename T> __global__
+void solve_matrix_fine(T* __restrict__ const rhs,
+                       T* __restrict__ const d,
+                       const T* __restrict__ const u,
+                       const level_metadata* __restrict__ const level_meta,
+                       const arb_index_type* __restrict__ const level_lengths,
+                       const arb_index_type* __restrict__ const level_parents,
+                       const arb_index_type* __restrict__ const block_index,
+                       // number of packed matrices = number of cells
+                       const arb_index_type* __restrict__ const num_matrix) {
     const auto tid = threadIdx.x;
     const auto bid = blockIdx.x;
 
@@ -101,16 +104,16 @@ void solve_matrix_fine(
             // cells require more time steps than others, but we have to solve
             // all the matrices at the same time. When a cell finishes, we put a
             // `0` on the diagonal to mark that it should not be solved for.
-            if (d[pos]!=0) {
+            if (d[2*pos]!=0) {
                 // each branch perform substitution
-                for (unsigned i=0; i<len-1; ++i) {
+                for (unsigned i = 0; i < len-1; ++i) {
                     const unsigned next_pos = pos + width;
-                    const auto d_next = d[next_pos];
-                    const auto rhs_next = rhs[next_pos];
-                    const T factor = -u[pos]/d[pos];
-                    d[next_pos] = fma(factor, u[pos], d_next);
-                    rhs[next_pos] = fma(factor, rhs[pos], rhs_next);
-                    pos = next_pos;
+                    const auto d_next       = d[2*next_pos];
+                    const auto rhs_next     = rhs[2*next_pos];
+                    const T factor          = -u[pos]/d[2*pos];
+                    d[2*next_pos]           = fma(factor, u[pos], d_next);
+                    rhs[2*next_pos]         = fma(factor, rhs[2*pos], rhs_next);
+                    pos                     = next_pos;
                 }
                 // Update d and rhs at the parent node of this branch.
                 // A parent may have more than one contributing to it, so we use
@@ -119,8 +122,10 @@ void solve_matrix_fine(
                 const unsigned p = parent_index + lvl_parents[tid];
 
                 const T factor = -u[pos] / d[pos];
-                gpu_atomic_add(d + p, factor*u[pos]);
-                gpu_atomic_add(rhs + p, factor*rhs[pos]);
+                auto drhs = factor*rhs[2*pos];
+                const T dd = factor*u[pos];
+                gpu_atomic_add(d + 2*p, dd);
+                gpu_atomic_add(rhs + p, drhs);
             }
         }
         __syncthreads();
@@ -138,27 +143,27 @@ void solve_matrix_fine(
             const unsigned len = lvl_lengths[tid];
             unsigned pos = last_lvl_meta.matrix_data_index + tid;
 
-            if (d[pos]!=0) {
+            if (d[2*pos]!=0) {
                 // backward
-                for (unsigned i=0; i<len-1; ++i) {
+                for (unsigned i = 0; i < len-1; ++i) {
                     const unsigned next_pos = pos + width;
-                    const T factor = -u[pos] / d[pos];
-                    const auto rhs_next = rhs[next_pos];
-                    const auto d_next = d[next_pos];
-                    d[next_pos]   = fma(factor, u[pos], d_next);
-                    rhs[next_pos] = fma(factor, rhs[pos], rhs_next);
-                    pos = next_pos;
+                    const T factor          = -u[pos] / d[2*pos];
+                    const auto rhs_next     = rhs[2*next_pos];
+                    const auto d_next       = d[2*next_pos];
+                    d[2*next_pos]           = fma(factor, u[pos], d_next);
+                    rhs[2*next_pos]         = fma(factor, rhs[2*pos], rhs_next);
+                    pos                     = next_pos;
                 }
 
-                auto rhsp = rhs[pos] / d[pos];
-                rhs[pos] = rhsp;
+                auto rhsp = rhs[2*pos] / d[2*pos];
+                rhs[2*pos] = rhsp;
                 pos -= width;
 
                 // forward
                 for (unsigned i=0; i<len-1; ++i) {
-                    rhsp = rhs[pos] - u[pos]*rhsp;
-                    rhsp /= d[pos];
-                    rhs[pos] = rhsp;
+                    rhsp = rhs[2*pos] - u[pos]*rhsp;
+                    rhsp /= d[2*pos];
+                    rhs[2*pos] = rhsp;
                     pos -= width;
                 }
             }
@@ -188,15 +193,15 @@ void solve_matrix_fine(
             const unsigned len = lvl_lengths[tid];
             unsigned pos = lvl_meta.matrix_data_index + (len-1)*width + tid;
 
-            if (d[pos]!=0) {
+            if (d[2*pos]!=0) {
                 // Load the rhs value for the parent node of this branch.
                 const unsigned p = parent_index + lvl_parents[tid];
-                T rhsp = rhs[p];
+                T rhsp = rhs[2*p];
                 // each branch perform substitution
                 for (unsigned i=0; i<len; ++i) {
-                    rhsp = rhs[pos] - u[pos]*rhsp;
-                    rhsp /= d[pos];
-                    rhs[pos] = rhsp;
+                    rhsp = rhs[2*pos] - u[pos]*rhsp;
+                    rhsp /= d[2*pos];
+                    rhs[2*pos] = rhsp;
                     pos -= width;
                 }
             }
@@ -217,11 +222,10 @@ ARB_ARBOR_API void assemble_matrix_fine(
     const arb_value_type* area,
     const arb_value_type  dt,
     const arb_index_type* perm,
-    unsigned n)
-{
-    launch_1d(n, 128, kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
-        d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance, area,
-        dt, perm, n);
+    unsigned n) {
+    launch_1d(n, 128,
+              kernels::assemble_matrix_fine<arb_value_type, arb_index_type>,
+              d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance, area, dt, perm, n);
 }
 
 // Example:
@@ -252,11 +256,10 @@ ARB_ARBOR_API void solve_matrix_fine(
     arb_index_type* num_cells,             // the number of cells packed into this single matrix
     arb_index_type* padded_size,           // length of rhs, d, u, including padding
     unsigned num_blocks,                   // number of blocks
-    unsigned blocksize)                    // size of each block
-{
-    launch(num_blocks, blocksize, kernels::solve_matrix_fine<arb_value_type>,
-        rhs, d, u, level_meta, level_lengths, level_parents, block_index,
-        num_cells);
+    unsigned blocksize) {                  // size of each block
+    launch(num_blocks, blocksize,
+           kernels::solve_matrix_fine<arb_value_type>,
+           rhs, d, u, level_meta, level_lengths, level_parents, block_index, num_cells);
 }
 
 } // namespace gpu

@@ -15,15 +15,15 @@
 #include "matrix_fine.hpp"
 #include "forest.hpp"
 
+#define ARB_USE_COMPENSATED_GPU_ATOMIC_SUM
+
 namespace arb {
 namespace gpu {
 
 template <typename T, typename I>
 struct matrix_state_fine {
-public:
     using value_type = T;
-    using size_type = I;
-
+    using size_type  = I;
     using array      = memory::device_vector<value_type>;
     using view       = typename array::view_type;
     using const_view = typename array::const_view_type;
@@ -370,9 +370,10 @@ public:
 
         // the matrix components u, d and rhs are stored in packed form
         auto nan = std::numeric_limits<double>::quiet_NaN();
-        d   = array(data_size, nan);
         u   = array(data_size, nan);
-        rhs = array(data_size, nan);
+        // TODO(atomic-kahan) wrap this in ifdef
+        d   = array(2*data_size, nan);
+        rhs = array(2*data_size, nan);
 
         // transform u_shuffled values into packed u vector.
         flat_to_packed(u_shuffled, u);
@@ -426,9 +427,11 @@ public:
         packed_to_flat(rhs, to);
     }
 
-
     void solve(array& voltage,
-               const T dt, const_view current, const_view conductivity, const_view area_um2) {
+               const T dt,
+               const_view current,
+               const_view conductivity,
+               const_view area_um2) {
         assemble(dt, voltage, current, conductivity, area_um2);
         solve(voltage);
     }
@@ -439,7 +442,6 @@ private:
     void flat_to_packed(const array& from, array& to ) {
         arb_assert(from.size()==matrix_size);
         arb_assert(to.size()==data_size);
-
         scatter(from.data(), to.data(), perm.data(), perm.size());
     }
 
