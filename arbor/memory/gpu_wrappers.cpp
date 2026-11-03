@@ -18,7 +18,7 @@ namespace memory {
 
 using std::to_string;
 using namespace gpu;
- 
+
 void gpu_memcpy_d2d(void* dest, const void* src, std::size_t n) {
     auto status = device_memcpy(dest, src, n, gpuMemcpyDeviceToDevice);
     if (!status) {
@@ -104,6 +104,11 @@ void gpu_free(void* ptr) {
     }
 }
 
+void gpu_device_synchronize() {
+    auto status = gpu::device_synchronize();
+    if (!status) HANDLE_GPU_ERROR(status, "");
+}
+
 } // namespace memory
 } // namespace arb
 
@@ -158,6 +163,10 @@ void* gpu_malloc(std::size_t n) {
 }
 
 void gpu_free(void* ptr) {
+    NOGPU;
+}
+
+void gpu_device_synchronize() {
     NOGPU;
 }
 

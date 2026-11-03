@@ -33,5 +33,13 @@ void gpu_memcpy_h2d_async(void* stream, void* dest, const void* src, std::size_t
 void gpu_memcpy_d2d_async(void* stream, void* dest, const void* src, std::size_t n);
 void gpu_memcpy_d2h_sync(void* stream, void* dest, const void* src, std::size_t n);
 
+// Block the calling host thread until the device has completed all
+// outstanding work on every stream. Host-side code that observes device data
+// produced outside the legacy stream (e.g. a test intercepting data that a
+// cell group's kernels produced on the group's own stream) must synchronize
+// against that stream first; this is the blunt instrument that needs no
+// handle to it.
+void gpu_device_synchronize();
+
 } // namespace memory
 } // namespace arb
