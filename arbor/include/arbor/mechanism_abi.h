@@ -20,7 +20,7 @@ extern "C" {
 
 // Version
 #define ARB_MECH_ABI_VERSION_MAJOR 0
-#define ARB_MECH_ABI_VERSION_MINOR 7
+#define ARB_MECH_ABI_VERSION_MINOR 8
 #define ARB_MECH_ABI_VERSION_PATCH 0
 #define ARB_MECH_ABI_VERSION ((ARB_MECH_ABI_VERSION_MAJOR * 10000L * 10000L) + (ARB_MECH_ABI_VERSION_MAJOR * 10000L) + ARB_MECH_ABI_VERSION_PATCH)
 
@@ -115,6 +115,11 @@ typedef struct arb_mechanism_ppack {
     arb_ion_state*   ion_states;                    // Array of views into shared state.
 
     arb_value_type const * const * random_numbers;  // Array of random numbers
+
+    void* stream;                                   // Backend stream handle (GPU stream for the
+                                                    // owning cell group); NULL for CPU backends
+                                                    // and for mechanisms not instantiated by a
+                                                    // GPU cell group.
 } arb_mechanism_ppack;
 
 

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <arbor/assert.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 #include "gpu_context.hpp"
 #include "memory/allocator.hpp"
@@ -95,19 +96,22 @@ public:
 
     // After this call both host and device storage are synchronized to the GPU
     // state before the call.
-    void update_host() {
-        memory::gpu_memcpy_d2h(&host_storage_, device_storage_, sizeof(storage_type));
+    // The stream parameter orders these copies on the stream of the cell
+    // group owning the stack (default: legacy stream, matching the
+    // pre-stream-per-group behaviour).
+    void update_host(stream_type s = null_stream) {
+        memory::gpu_memcpy_d2h_sync(s, &host_storage_, device_storage_, sizeof(storage_type));
 
         auto num = size();
         data_.resize(num);
         auto bytes = num*sizeof(T);
-        memory::gpu_memcpy_d2h(data_.data(), host_storage_.data, bytes);
+        memory::gpu_memcpy_d2h_sync(s, data_.data(), host_storage_.data, bytes);
     }
 
     // After this call both host and device storage are synchronized to empty state.
-    void clear() {
+    void clear(stream_type s = null_stream) {
         host_storage_.stores = 0u;
-        memory::gpu_memcpy_h2d(device_storage_, &host_storage_, sizeof(storage_type));
+        memory::gpu_memcpy_h2d_async(s, device_storage_, &host_storage_, sizeof(storage_type));
         data_.clear();
     }
 

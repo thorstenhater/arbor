@@ -52,8 +52,8 @@ void istim_add_current_impl(int n, istim_pp pp) {
 
 } // namespace kernel
 
-ARB_ARBOR_API void istim_add_current_impl(int n, const istim_pp& pp) {
-    launch_1d(n, 128, kernel::istim_add_current_impl, n, pp);
+ARB_ARBOR_API void istim_add_current_impl(stream_type stream, int n, const istim_pp& pp) {
+    launch_1d(stream, n, 128, kernel::istim_add_current_impl, n, pp);
 }
 
 } // namespace gpu

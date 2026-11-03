@@ -14,7 +14,8 @@ struct event_stream final: BaseEventStream {
                     ev_spans_,
                     index_);
 protected:
-  void init() override final { this->base_ptr_ = this->ev_data_.data(); }
+  // Stream parameter is only relevant for the GPU backend; ignored here.
+  void init(void*) override final { this->base_ptr_ = this->ev_data_.data(); }
 };
 
 using spike_event_stream = event_stream<spike_event_stream_base>;

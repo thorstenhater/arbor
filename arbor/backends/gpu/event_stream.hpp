@@ -4,6 +4,7 @@
 
 #include "backends/event_stream_base.hpp"
 #include "memory/memory.hpp"
+#include "memory/gpu_copy.hpp"
 
 namespace arb {
 namespace gpu {
@@ -17,9 +18,12 @@ struct event_stream final: BaseEventStream {
                       index_);
 
 protected:
-    void init() override final {
+    void init(void* stream) override final {
         resize(this->device_ev_data_, this->ev_data_.size());
-        memory::copy_async(this->ev_data_, this->device_ev_data_);
+        // Stream-ordered upload of the event data (all device work of the
+        // owning cell group runs on its own stream); 'stream' is a raw
+        // arb::gpu::stream_type handle, nullptr = legacy stream.
+        memory::copy_async(stream, this->ev_data_, this->device_ev_data_);
         this->base_ptr_ = this->device_ev_data_.data();
     }
 

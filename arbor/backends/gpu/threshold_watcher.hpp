@@ -8,6 +8,7 @@
 #include "backends/common_types.hpp"
 #include "execution_context.hpp"
 #include "memory/memory.hpp"
+#include "memory/gpu_copy.hpp"
 #include "util/span.hpp"
 
 #include "backends/threshold_crossing.hpp"
@@ -19,9 +20,11 @@
 namespace arb {
 namespace gpu {
 
-// CUDA implementation entry point:
+// CUDA implementation entry points; all take the owning cell group's stream
+// (see backends/gpu/stream.hpp), on which their launches must be enqueued.
 
 void test_thresholds_impl(
+    stream_type stream,
     int size,
     arb_value_type t_after,
     arb_value_type t_before,
@@ -36,6 +39,7 @@ void test_thresholds_impl(
     bool record);
 
 void reset_crossed_impl(
+    stream_type stream,
     int size,
     arb_index_type* is_crossed,
     const arb_index_type* cv_index,
@@ -79,20 +83,23 @@ public:
     }
 
     /// Remove all stored crossings that were detected in previous calls to test()
-    void clear_crossings() {
-        stack_.update_host();
-        stack_.clear();
+    /// Stream parameters order the stack copies/kernels on the owning cell
+    //  group's GPU stream; the default (legacy stream) preserves the
+    /// behaviour for direct users outside a cell group (unit tests etc.).
+    void clear_crossings(stream_type s = null_stream) {
+        stack_.update_host(s);
+        stack_.clear(s);
     }
 
     /// Reset state machine for each detector.
     /// Assume that the values in values_ have been set correctly before
     /// calling, because the values are used to determine the initial state
-    void reset(const array& values) {
+    void reset(const array& values, stream_type s = null_stream) {
         values_ = values.data();
-        memory::copy(values, v_prev_);
-        clear_crossings();
+        memory::copy_async(s, values, v_prev_);
+        clear_crossings(s);
         if (size()>0) {
-            reset_crossed_impl((int)size(), is_crossed_.data(), cv_index_.data(), values_, thresholds_.data());
+            reset_crossed_impl(s, (int)size(), is_crossed_.data(), cv_index_.data(), values_, thresholds_.data());
         }
     }
 
@@ -101,8 +108,8 @@ public:
         return is_crossed_[i];
     }
 
-    const std::vector<threshold_crossing>& crossings() const {
-        stack_.update_host();
+    const std::vector<threshold_crossing>& crossings(stream_type s = null_stream) const {
+        stack_.update_host(s);
 
         if (stack_.overflow()) {
             throw arbor_internal_error("gpu/threshold_watcher: gpu spike buffer overflow");
@@ -117,11 +124,12 @@ public:
     /// Crossing events are recorded for each threshold that has been
     /// crossed since current time t, and the last time the test was
     /// performed.
-    void test(array& time_since_spike, const arb_value_type& t_before, const arb_value_type& t_after) {
+    void test(array& time_since_spike, const arb_value_type& t_before, const arb_value_type& t_after, stream_type s = null_stream) {
         arb_assert(values_);
 
         if (size()>0) {
             test_thresholds_impl(
+                s,
                 (int)size(),
                 t_after, t_before,
                 src_to_spike_, time_since_spike.data(),

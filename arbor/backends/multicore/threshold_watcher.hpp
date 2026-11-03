@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <arbor/assert.hpp>
 #include <arbor/fvm_types.hpp>
 #include <arbor/math.hpp>
@@ -41,14 +43,17 @@ public:
 
     /// Remove all stored crossings that were detected in previous calls
     /// to the test() member function.
-    void clear_crossings() {
+    /// (Trailing stream parameters exist for signature parity with the GPU
+    /// backend, which runs all cell-group work on a per-group stream; the
+    /// value — std::nullptr_t here — is ignored.)
+    void clear_crossings(std::nullptr_t = {}) {
         crossings_.clear();
     }
 
     /// Reset state machine for each detector.
     /// Assume that the values in values_ have been set correctly before
     /// calling, because the values are used to determine the initial state
-    void reset(const array& values) {
+    void reset(const array& values, std::nullptr_t = {}) {
         values_ = values.data();
         std::copy(values.begin(), values.end(), v_prev_.begin());
         clear_crossings();
@@ -57,12 +62,12 @@ public:
         }
     }
 
-    const std::vector<threshold_crossing>& crossings() const { return crossings_; }
+    const std::vector<threshold_crossing>& crossings(std::nullptr_t = {}) const { return crossings_; }
 
     /// Tests each target for changed threshold state
     /// Crossing events are recorded for each threshold that
     /// is crossed since the last call to test
-    void test(array& time_since_spike, const arb_value_type& t_before, const arb_value_type& t_after) {
+    void test(array& time_since_spike, const arb_value_type& t_before, const arb_value_type& t_after, std::nullptr_t = {}) {
         if (cv_index_.empty() || n_detectors_ == 0) return;
         arb_assert(values_!=nullptr);
 

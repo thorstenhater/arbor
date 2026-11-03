@@ -12,7 +12,9 @@
 #include "backends/gpu/shared_state.hpp"
 #include "backends/event_stream_state.hpp"
 #include "backends/gpu/chunk_writer.hpp"
+#include "memory/gpu_copy.hpp"
 #include "memory/copy.hpp"
+#include "memory/fill.hpp"
 #include "memory/wrappers.hpp"
 #include "util/index_into.hpp"
 #include "util/rangeutil.hpp"
@@ -27,17 +29,21 @@ using arb::memory::make_const_view;
 namespace arb {
 namespace gpu {
 
-// CUDA implementation entry points:
+// CUDA implementation entry points; all take the owning cell group's stream
+// as their first argument (see backends/gpu/stream.hpp), on which all device
+// work against group-owned memory must be enqueued.
 
 void take_samples_impl(
+    stream_type stream,
     const event_stream_state<raw_probe_info>& s,
     const arb_value_type& time, arb_value_type* sample_time, arb_value_type* sample_value);
 
-void add_scalar(std::size_t n, arb_value_type* data, arb_value_type v);
+void add_scalar(stream_type stream, std::size_t n, arb_value_type* data, arb_value_type v);
 
 // GPU-side minmax: consider CUDA kernel replacement.
-std::pair<arb_value_type, arb_value_type> minmax_value_impl(arb_size_type n, const arb_value_type* v) {
-    auto v_copy = memory::on_host(memory::const_device_view<arb_value_type>(v, n));
+std::pair<arb_value_type, arb_value_type> minmax_value_impl(stream_type stream, arb_size_type n, const arb_value_type* v) {
+    auto v_copy = memory::host_vector<arb_value_type>(n);
+    memory::copy_sync(stream, memory::const_device_view<arb_value_type>(v, n), v_copy);
     return util::minmax_value(v_copy);
 }
 
@@ -67,22 +73,22 @@ ion_state::ion_state(const fvm_ion_config& ion_data,
     if (flags_.xd())       Xd_       = make_const_view(ion_data.reset_iconc);
 }
 
-void ion_state::init_concentration() {
+void ion_state::init_concentration(stream_type s) {
     // NB. not resetting Xd here, it's controlled via the solver.
-    if (flags_.reset_xi()) memory::copy(init_Xi_, Xi_);
-    if (flags_.reset_xo()) memory::copy(init_Xo_, Xo_);
+    if (flags_.reset_xi()) memory::copy_async(s, init_Xi_, Xi_);
+    if (flags_.reset_xo()) memory::copy_async(s, init_Xo_, Xo_);
 }
 
-void ion_state::zero_current() {
-    memory::fill(iX_, 0);
+void ion_state::zero_current(stream_type s) {
+    memory::fill(s, iX_, 0);
 }
 
-void ion_state::reset() {
-    zero_current();
-    if (flags_.reset_xi()) memory::copy(reset_Xi_, Xi_);
-    if (flags_.reset_xo()) memory::copy(reset_Xo_, Xo_);
-    if (flags_.reset_ex()) memory::copy(init_eX_, eX_);
-    if (flags_.reset_xd()) memory::copy(reset_Xi_, Xd_);
+void ion_state::reset(stream_type s) {
+    zero_current(s);
+    if (flags_.reset_xi()) memory::copy_async(s, reset_Xi_, Xi_);
+    if (flags_.reset_xo()) memory::copy_async(s, reset_Xo_, Xo_);
+    if (flags_.reset_ex()) memory::copy_async(s, init_eX_, eX_);
+    if (flags_.reset_xd()) memory::copy_async(s, reset_Xi_, Xd_);
 }
 
 // istim_state methods:
@@ -147,19 +153,19 @@ std::size_t istim_state::size() const {
     return frequency_.size();
 }
 
-void istim_state::zero_current() {
-    memory::fill(accu_stim_, 0.);
+void istim_state::zero_current(stream_type s) {
+    memory::fill(s, accu_stim_, 0.);
 }
 
-void istim_state::reset() {
-    zero_current();
-    memory::copy(envl_divs_, envl_index_);
+void istim_state::reset(stream_type s) {
+    zero_current(s);
+    memory::copy_async(s, envl_divs_, envl_index_);
 }
 
-void istim_state::add_current(const arb_value_type time, array& current_density) {
+void istim_state::add_current(const arb_value_type time, array& current_density, stream_type s) {
     ppack_.time = time;
     ppack_.current_density = current_density.data();
-    istim_add_current_impl((int)size(), ppack_);
+    istim_add_current_impl(s, (int)size(), ppack_);
 }
 
 // Shared state methods:
@@ -193,15 +199,23 @@ shared_state::shared_state(task_system_handle tp,
     sample_events(),
     watcher{n_cv_, src_to_spike.data(), detector_info}
 {
-    memory::fill(time_since_spike, -1.0);
-    add_scalar(temperature_degC.size(), temperature_degC.data(), -273.15);
+    // Construction-time kernels on group memory run on the group stream
+    // (design rule R2); later kernels on that stream inherit the order.
+    auto s = stream();
+    memory::fill(s, time_since_spike, -1.0);
+    add_scalar(s, temperature_degC.size(), temperature_degC.data(), -273.15);
+
+    // Value-initialized device arrays (array(n, value) constructor) fill on
+    // the legacy stream through the API-free memory layer; wait for those
+    // here so they cannot race the first epoch on the group stream.
+    drain_legacy_stream();
 }
 
 void shared_state::update_prng_state(mechanism& m) {
     if (!m.mech_.n_random_variables) return;
     auto const mech_id = m.mechanism_id();
     auto& store = storage.at(mech_id);
-    store.random_numbers_.update(m);
+    store.random_numbers_.update(stream(), m);
 }
 
 unsigned shared_state::instantiate(mechanism& m,
@@ -228,6 +242,10 @@ unsigned shared_state::instantiate(mechanism& m,
 
     // Assign non-owning views onto shared state:
     m.ppack_ = {0};
+    // All kernels launched through this mechanism's interface run on this
+    // group's stream (generated wrappers read ppack_.stream; the ppack is
+    // per-group, so its stream never outlives the state that owns it).
+    m.ppack_.stream           = stream();
     m.ppack_.width            = width;
     m.ppack_.mechanism_id     = id;
     m.ppack_.vec_ci           = cv_to_cell.data();
@@ -351,41 +369,49 @@ unsigned shared_state::instantiate(mechanism& m,
     m.ppack_.ion_states = store.ion_states_d_.data();
 
     if (m.mech_.n_random_variables) store.random_numbers_.instantiate(m, width_padded, pos_data, cbprng_seed);
+
+    // The chunk_writer and value-initialized arrays above launched fill
+    // kernels on the legacy stream (the API-free memory layer is
+    // stream-unaware); wait for them, so that mechanism kernels on the group
+    // stream that read this store are ordered after the initialization.
+    drain_legacy_stream();
     return id;
 }
 
 void shared_state::reset() {
-    memory::copy(init_voltage, voltage);
-    memory::fill(current_density, 0);
-    memory::fill(conductivity, 0);
+    auto s = stream();
+    memory::copy_async(s, init_voltage, voltage);
+    memory::fill(s, current_density, 0);
+    memory::fill(s, conductivity, 0);
     time = 0;
     time_to = 0;
-    memory::fill(time_since_spike, -1.0);
+    memory::fill(s, time_since_spike, -1.0);
 
     for (auto& i: ion_data) {
-        i.second.reset();
+        i.second.reset(s);
     }
-    stim_data.reset();
+    stim_data.reset(s);
 }
 
 void shared_state::zero_currents() {
-    memory::fill(current_density, 0);
-    memory::fill(conductivity, 0);
+    auto s = stream();
+    memory::fill(s, current_density, 0);
+    memory::fill(s, conductivity, 0);
     for (auto& i: ion_data) {
-        i.second.zero_current();
+        i.second.zero_current(s);
     }
-    stim_data.zero_current();
+    stim_data.zero_current(s);
 }
 
 std::pair<arb_value_type, arb_value_type> shared_state::voltage_bounds() const {
-    return minmax_value_impl(n_cv, voltage.data());
+    return minmax_value_impl(stream(), n_cv, voltage.data());
 }
 
 void shared_state::take_samples() {
     sample_events.mark();
     if (!sample_events.empty()) {
         const auto state = sample_events.marked_events();
-        take_samples_impl(state, time, sample_time.data(), sample_value.data());
+        take_samples_impl(stream(), state, time, sample_time.data(), sample_value.data());
     }
 }
 

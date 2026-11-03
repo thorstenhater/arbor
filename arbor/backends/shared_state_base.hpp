@@ -38,16 +38,16 @@ struct shared_state_base {
                      const std::vector<size_t>& divs) {
         auto d = static_cast<D*>(this);
         // events
-        initialize(lanes, handles, divs, dts, d->streams);
+        initialize(lanes, handles, divs, dts, d->streams, d->stream());
         // samples
         auto n_samples = util::sum_by(samples, [] (const auto& s) {return s.size();});
         if (d->sample_time.size() < n_samples) {
             d->sample_time = array(n_samples);
             d->sample_value = array(n_samples);
         }
-        initialize(samples, d->sample_events);
+        initialize(samples, d->sample_events, d->stream());
         // thresholds
-        d->watcher.clear_crossings();
+        d->watcher.clear_crossings(d->stream());
     }
 
     void configure_solver(const fvm_cv_discretization& disc) {
@@ -110,12 +110,12 @@ struct shared_state_base {
 
     void reset_thresholds() {
         auto d = static_cast<D*>(this);
-        d->watcher.reset(d->voltage);
+        d->watcher.reset(d->voltage, d->stream());
     }
 
     void test_thresholds() {
         auto d = static_cast<D*>(this);
-        d->watcher.test(d->time_since_spike, d->time, d->time_to);
+        d->watcher.test(d->time_since_spike, d->time, d->time_to, d->stream());
     }
 
     void configure_stimulus(const fvm_stimulus_config& stims) {
@@ -127,30 +127,31 @@ struct shared_state_base {
 
     void add_stimulus_current() {
         auto d = static_cast<D*>(this);
-        d->stim_data.add_current(d->time, d->current_density);
+        d->stim_data.add_current(d->time, d->current_density, d->stream());
     }
 
     void ions_init_concentration() {
         auto d = static_cast<D*>(this);
         for (auto& i: d->ion_data) {
-            i.second.init_concentration();
+            i.second.init_concentration(d->stream());
         }
     }
 
     void integrate_cable_state() {
         auto d = static_cast<D*>(this);
-        d->solver.solve(d->voltage, d->dt, d->current_density, d->conductivity, d->area_um2);
+        d->solver.solve(d->voltage, d->dt, d->current_density, d->conductivity, d->area_um2, d->stream());
         for (auto& [ion, data]: d->ion_data) {
             if (data.solver) {
                 data.solver->solve(data.Xd_,
-                                   d->dt);
+                                   d->dt,
+                                   d->stream());
             }
         }
     }
 
     fvm_integration_result get_integration_result() {
         auto d = static_cast<D*>(this);
-        const auto& crossings = d->watcher.crossings();
+        const auto& crossings = d->watcher.crossings(d->stream());
         d->update_sample_views();
 
         return { util::range_pointer_view(crossings),

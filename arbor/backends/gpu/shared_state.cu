@@ -38,13 +38,14 @@ __global__ void take_samples_impl(const raw_probe_info* __restrict__ const begin
 
 } // namespace kernel
 
-void add_scalar(std::size_t n, arb_value_type* data, arb_value_type v) {
-    launch_1d(n, 128, kernel::add_scalar<arb_value_type>, n, data, v);
+void add_scalar(stream_type stream, std::size_t n, arb_value_type* data, arb_value_type v) {
+    launch_1d(stream, n, 128, kernel::add_scalar<arb_value_type>, n, data, v);
 }
 
-void take_samples_impl(const event_stream_state<raw_probe_info>& s,
+void take_samples_impl(stream_type stream,
+                       const event_stream_state<raw_probe_info>& s,
                        const arb_value_type& time, arb_value_type* sample_time, arb_value_type* sample_value) {
-    launch_1d(s.size(), 128, kernel::take_samples_impl, s.begin_marked, s.end_marked, time, sample_time, sample_value);
+    launch_1d(stream, s.size(), 128, kernel::take_samples_impl, s.begin_marked, s.end_marked, time, sample_time, sample_value);
 }
 
 } // namespace gpu

@@ -182,7 +182,8 @@ void solve_diffusion(T* __restrict__ const rhs,
 
 } // namespace kernels
 
-ARB_ARBOR_API void assemble_diffusion(arb_value_type* d,
+ARB_ARBOR_API void assemble_diffusion(stream_type stream,
+                                      arb_value_type* d,
                                       arb_value_type* rhs,
                                       const arb_value_type* invariant_d,
                                       const arb_value_type* concentration,
@@ -190,7 +191,8 @@ ARB_ARBOR_API void assemble_diffusion(arb_value_type* d,
                                       const arb_value_type dt,
                                       const arb_index_type* perm,
                                       unsigned n) {
-    launch_1d(n,
+    launch_1d(stream,
+              n,
               128,
               kernels::assemble_diffusion<arb_value_type, arb_index_type>,
               d, rhs, invariant_d, concentration, volume, dt, perm, n);
@@ -213,7 +215,8 @@ ARB_ARBOR_API void assemble_diffusion(arb_value_type* d,
 // num_levels   = [3, 2, 3, ...]
 // num_cells    = [2, 3, ...]
 // num_blocks   = level_start.size() - 1 = num_levels.size() = num_cells.size()
-ARB_ARBOR_API void solve_diffusion(arb_value_type* rhs,
+ARB_ARBOR_API void solve_diffusion(stream_type stream,
+                                   arb_value_type* rhs,
                                    arb_value_type* d,                     // diagonal values
                                    const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)
                                    const level_metadata* level_meta,      // information pertaining to each level
@@ -224,7 +227,8 @@ ARB_ARBOR_API void solve_diffusion(arb_value_type* rhs,
                                    arb_index_type* padded_size,           // length of rhs, d, u, including padding
                                    unsigned num_blocks,                   // number of blocks
                                    unsigned blocksize) {                  // size of each block
-    launch(num_blocks,
+    launch(stream,
+           num_blocks,
            blocksize,
            kernels::solve_diffusion<arb_value_type>,
            rhs, d, u, level_meta, level_lengths, level_parents, block_index, num_cells);

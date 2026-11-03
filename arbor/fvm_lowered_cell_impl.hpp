@@ -148,6 +148,12 @@ void fvm_lowered_cell_impl<Backend>::reset() {
     // NOTE: Threshold watcher reset must come after the voltage values are set,
     //       as voltage is implicitly read by watcher to set initial state.
     state_->reset_thresholds();
+
+    // Wait for all device work enqueued above (kernels and stream-ordered
+    // copies on this cell group's stream) before returning: callers run on
+    // arbitrary worker threads and must not see half-applied state. No-op on
+    // the CPU backend.
+    state_->synchronize();
 }
 
 template <typename Backend>
@@ -248,6 +254,12 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(const timestep_
         }
     }
     PL(integrate);
+
+    // Wait for all device work this epoch enqueued on the cell group's stream
+    // before handing results (spike crossings, host views) to the host; no-op
+    // on the CPU backend.
+    state_->synchronize();
+
     return state_->get_integration_result();
 }
 

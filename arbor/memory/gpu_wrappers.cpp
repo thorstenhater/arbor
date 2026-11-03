@@ -47,6 +47,34 @@ void gpu_memcpy_h2d_async(void* dest, const void* src, std::size_t n) {
     }
 }
 
+void gpu_memcpy_h2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyHostToDevice,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+}
+
+void gpu_memcpy_d2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyDeviceToDevice,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+}
+
+void gpu_memcpy_d2h_sync(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyDeviceToHost,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+    auto sync = gpu::stream_synchronize(static_cast<gpu::stream_type>(stream));
+    if (!sync) {
+        HANDLE_GPU_ERROR(sync, "stream synchronize, n="+to_string(n));
+    }
+}
+
 void* gpu_host_register(void* ptr, std::size_t size) {
     auto status = host_register(ptr, size, gpuHostRegisterPortable);
     if (!status) {
@@ -100,6 +128,18 @@ void gpu_memcpy_h2d(void* dest, const void* src, std::size_t n) {
 }
 
 void gpu_memcpy_h2d_async(void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
+void gpu_memcpy_h2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
+void gpu_memcpy_d2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
+void gpu_memcpy_d2h_sync(void* stream, void* dest, const void* src, std::size_t n) {
     NOGPU;
 }
 

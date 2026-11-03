@@ -60,8 +60,11 @@ public:
     }
 
   protected:
-    // backend specific initializations
-    virtual void init() = 0;
+    // backend specific initializations; 'stream' is a raw GPU stream handle
+    // (arb::gpu::stream_type as void*, nullptr = legacy stream) on which any
+    // upload of the event data to device memory must be enqueued. CPU
+    // backends ignore it.
+    virtual void init(void* stream) = 0;
 };
 
 struct spike_event_stream_base: event_stream_base<deliverable_event> {
@@ -91,7 +94,8 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
                            const std::vector<target_handle>& handles,
                            const std::vector<std::size_t>& divs,
                            const timestep_range& steps,
-                           std::vector<EventStream>& streams) {
+                           std::vector<EventStream>& streams,
+                           void* gpu_stream = nullptr) {
         arb_assert(lanes.size() < divs.size());
         // reset streams and allocate sufficient space for temporaries
         for (auto& stream: streams) {
@@ -134,13 +138,14 @@ struct spike_event_stream_base: event_stream_base<deliverable_event> {
             }
         }
 
-        for (auto& stream: streams) static_cast<spike_event_stream_base&>(stream).init();
+        for (auto& stream: streams) static_cast<spike_event_stream_base&>(stream).init(gpu_stream);
     }
 };
 
 struct sample_event_stream_base : event_stream_base<sample_event> {
     friend void initialize(const std::vector<std::vector<sample_event>>& staged,
-                           sample_event_stream_base& stream) {
+                           sample_event_stream_base& stream,
+                           void* gpu_stream = nullptr) {
         // clear previous data
         stream.clear();
 
@@ -163,7 +168,7 @@ struct sample_event_stream_base : event_stream_base<sample_event> {
 
         arb_assert(num_events == stream.ev_data_.size());
         arb_assert(staged.size() + 1 == stream.ev_spans_.size());
-        stream.init();
+        stream.init(gpu_stream);
     }
 };
 

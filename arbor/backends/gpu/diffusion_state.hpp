@@ -395,8 +395,12 @@ struct diffusion_state {
     // Afterwards the diagonal and RHS will have been set given dt, voltage, current, and conductivity.
     //   dt [ms] (scalar)
     //   voltage [mV]
-    void assemble(const value_type dt, const_view concentration) {
-        assemble_diffusion(d.data(),
+    // The trailing stream parameter runs all kernels on the stream of the
+    // cell group owning this matrix; the default (legacy stream) is used only
+    // by direct users outside a cell group (unit tests etc.).
+    void assemble(const value_type dt, const_view concentration, stream_type s = null_stream) {
+        assemble_diffusion(s,
+                           d.data(),
                            rhs.data(),
                            invariant_d.data(),
                            concentration.data(),
@@ -406,8 +410,9 @@ struct diffusion_state {
                            size());
     }
 
-    void solve(array& to) {
-        solve_diffusion(rhs.data(),
+    void solve(array& to, stream_type s = null_stream) {
+        solve_diffusion(s,
+                        rhs.data(),
                         d.data(),
                         u.data(),
                         level_meta.data(),
@@ -419,28 +424,29 @@ struct diffusion_state {
                         num_cells_in_block.size(),
                         max_branches_per_level);
         // unpermute the solution
-        packed_to_flat(rhs, to);
+        packed_to_flat(rhs, to, s);
     }
 
     void solve(array& concentration,
-               const value_type dt) {
-        assemble(dt, concentration);
-        solve(concentration);
+               const value_type dt,
+               stream_type s = null_stream) {
+        assemble(dt, concentration, s);
+        solve(concentration, s);
     }
 
     std::size_t size() const { return matrix_size; }
 
 private:
-    void flat_to_packed(const array& from, array& to ) {
+    void flat_to_packed(const array& from, array& to, stream_type s = null_stream) {
         arb_assert(from.size()==matrix_size);
         arb_assert(to.size()==data_size);
-        scatter(from.data(), to.data(), perm.data(), perm.size());
+        scatter(s, from.data(), to.data(), perm.data(), perm.size());
     }
 
-    void packed_to_flat(const array& from, array& to ) {
+    void packed_to_flat(const array& from, array& to, stream_type s = null_stream) {
         arb_assert(from.size()==data_size);
         arb_assert(to.size()==matrix_size);
-        gather(from.data(), to.data(), perm.data(), perm.size());
+        gather(s, from.data(), to.data(), perm.data(), perm.size());
     }
 };
 

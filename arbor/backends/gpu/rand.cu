@@ -39,6 +39,7 @@ void generate_random_numbers(
 } // namespace kernel
 
 void generate_random_numbers(
+    void* stream,         // stream of the cell group owning the storage
     arb_value_type* dst,        // points to random number storage
     std::size_t width,          // number of sites
     std::size_t width_padded,   // padded number of sites
@@ -55,7 +56,7 @@ void generate_random_numbers(
     unsigned const grid_dim_x = block_count(width, block_dim);
     unsigned const grid_dim_y = num_rv;
 
-    launch({grid_dim_x, grid_dim_y, 1}, block_dim, kernel::generate_random_numbers,
+    launch(static_cast<stream_type>(stream), {grid_dim_x, grid_dim_y, 1}, block_dim, kernel::generate_random_numbers,
         dst, width, width_padded, num_rv, seed, mech_id, counter, gid, idx, cbprng::cache_size());
 }
 

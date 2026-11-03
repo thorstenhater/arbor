@@ -45,6 +45,34 @@ inline api_error_type device_synchronize() {
     return cudaDeviceSynchronize();
 }
 
+/// Streams
+
+// Stream handle as used by the GPU backend. It crosses the API-free library
+// layers (memory:: gpu_memcpy_*(stream, ...), arb_mechanism_ppack.stream) as
+// an opaque void*; cast with static_cast<stream_type> to use the functions
+// below.
+using stream_type = cudaStream_t;
+
+// The legacy default stream ("stream 0").
+inline constexpr stream_type null_stream = nullptr;
+
+// Create a stream that does not synchronize with the legacy default stream:
+// work on such streams only orders against work on the same stream.
+inline api_error_type create_stream(stream_type* s) {
+    return cudaStreamCreateWithFlags(s, cudaStreamNonBlocking);
+}
+
+inline api_error_type destroy_stream(stream_type s) {
+    return cudaStreamDestroy(s);
+}
+
+// Block the calling host thread until all work previously submitted on s has
+// completed. On the legacy stream (null_stream) this waits for the legacy
+// stream only, not for other (non-blocking) streams in the process.
+inline api_error_type stream_synchronize(stream_type s) {
+    return cudaStreamSynchronize(s);
+}
+
 constexpr auto gpuMemcpyDeviceToHost = cudaMemcpyDeviceToHost;
 constexpr auto gpuMemcpyHostToDevice = cudaMemcpyHostToDevice;
 constexpr auto gpuMemcpyDeviceToDevice = cudaMemcpyDeviceToDevice;

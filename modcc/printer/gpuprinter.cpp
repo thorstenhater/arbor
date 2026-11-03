@@ -274,7 +274,7 @@ ARB_LIBMODCC_API std::string emit_gpu_cu_source(const Module& module_, const pri
         if(!e->body()->statements().empty()) {
             out << fmt::format(FMT_COMPILE("\n"
                                            "    auto n = p->{};\n"
-                                           "    ::arb::gpu::launch_1d(n, 128, {}, *p);\n"),
+                                           "    ::arb::gpu::launch_1d(static_cast<::arb::gpu::stream_type>(p->stream), n, 128, {}, *p);\n"),
                                width,
                                api_name);
         }
@@ -292,14 +292,15 @@ ARB_LIBMODCC_API std::string emit_gpu_cu_source(const Module& module_, const pri
         if(!init_api->body()->statements().empty()) {
             out << fmt::format(FMT_COMPILE("\n"
                                            "    auto n = p->{0};\n"
+                                           "    auto s_ = static_cast<::arb::gpu::stream_type>(p->stream);\n"
                                            "    unsigned block_dim = 128;\n"
                                            "    unsigned grid_dim = ::arb::gpu::impl::block_count(n, block_dim);\n"
-                                           "    ::arb::gpu::launch(grid_dim, block_dim, {1}, *p);\n"
+                                           "    ::arb::gpu::launch(s_, grid_dim, block_dim, {1}, *p);\n"
                                            "    if (!p->multiplicity) return;\n"),
                                "width",
                                api_name);
             // only multiply if we actually have arrays
-            if (n_state_vars) out << fmt::format(FMT_COMPILE("    ::arb::gpu::launch({{grid_dim, {}}}, block_dim, multiply, *p);\n"),
+            if (n_state_vars) out << fmt::format(FMT_COMPILE("    ::arb::gpu::launch(s_, {{grid_dim, {}}}, block_dim, multiply, *p);\n"),
                                                  n_state_vars);
         }
         out << "}\n\n";
@@ -317,7 +318,7 @@ ARB_LIBMODCC_API std::string emit_gpu_cu_source(const Module& module_, const pri
         out << fmt::format(FMT_COMPILE("void {}_apply_events_(arb_mechanism_ppack* p, arb_deliverable_event_stream* stream_ptr) {{\n"
                                        "    const arb_deliverable_event_data* const begin = stream_ptr->begin;\n"
                                        "    const arb_deliverable_event_data* const end = stream_ptr->end;\n"
-                                       "    ::arb::gpu::launch_1d(end - begin, 128, apply_events, *p, begin, end);\n"
+                                       "    ::arb::gpu::launch_1d(static_cast<::arb::gpu::stream_type>(p->stream), end - begin, 128, apply_events, *p, begin, end);\n"
                                        "}}\n\n"), class_name);
     } else {
         out << fmt::format(FMT_COMPILE("void {}_apply_events_(arb_mechanism_ppack* p, arb_deliverable_event_stream* events) {{}}\n\n"),

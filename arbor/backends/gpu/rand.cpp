@@ -47,7 +47,7 @@ void random_numbers::instantiate(mechanism& m, std::size_t value_width_padded,
     impl_ = util::make_pimpl<impl>(random_numbers_[0][0], m, value_width_padded, pos_data, seed);
 }
 
-void random_numbers::update(mechanism& m) {
+void random_numbers::update(stream_type s, mechanism& m) {
     // bail out if there are no random variables
     if (!impl_) return;
 
@@ -62,7 +62,7 @@ void random_numbers::update(mechanism& m) {
     // The RNG will be seeded by a global seed, the mechanism id, the variable index, the
     // current site's global cell, the site index within its cell and a counter representing
     // time.
-    if (cache_idx == 0) impl_->update(m, counter);
+    if (cache_idx == 0) impl_->update(s, m, counter);
 }
 
 } // namespace gpu

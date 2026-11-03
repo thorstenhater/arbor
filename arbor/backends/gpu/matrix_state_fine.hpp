@@ -396,8 +396,13 @@ public:
     //   voltage [mV]
     //   current density [A/m²]
     //   conductivity [kS/m²]
-    void assemble(const T dt, const_view voltage, const_view current, const_view conductivity, const_view area_um2) {
-        assemble_matrix_fine(d.data(),
+    // The trailing stream parameter runs all kernels on the stream of the
+    // cell group owning this matrix; the default (legacy stream) is used only
+    // by direct users outside a cell group (unit tests etc.).
+    void assemble(const T dt, const_view voltage, const_view current, const_view conductivity, const_view area_um2,
+                  stream_type s = null_stream) {
+        assemble_matrix_fine(s,
+                             d.data(),
                              rhs.data(),
                              invariant_d.data(),
                              voltage.data(),
@@ -410,8 +415,9 @@ public:
                              size());
     }
 
-    void solve(array& to) {
-        solve_matrix_fine(rhs.data(),
+    void solve(array& to, stream_type s = null_stream) {
+        solve_matrix_fine(s,
+                          rhs.data(),
                           d.data(),
                           u.data(),
                           level_meta.data(),
@@ -423,31 +429,32 @@ public:
                           num_cells_in_block.size(),
                           max_branches_per_level);
         // unpermute the solution
-        packed_to_flat(rhs, to);
+        packed_to_flat(rhs, to, s);
     }
 
 
     void solve(array& voltage,
-               const T dt, const_view current, const_view conductivity, const_view area_um2) {
-        assemble(dt, voltage, current, conductivity, area_um2);
-        solve(voltage);
+               const T dt, const_view current, const_view conductivity, const_view area_um2,
+               stream_type s = null_stream) {
+        assemble(dt, voltage, current, conductivity, area_um2, s);
+        solve(voltage, s);
     }
 
     std::size_t size() const { return matrix_size; }
 
 private:
-    void flat_to_packed(const array& from, array& to ) {
+    void flat_to_packed(const array& from, array& to, stream_type s = null_stream) {
         arb_assert(from.size()==matrix_size);
         arb_assert(to.size()==data_size);
 
-        scatter(from.data(), to.data(), perm.data(), perm.size());
+        scatter(s, from.data(), to.data(), perm.data(), perm.size());
     }
 
-    void packed_to_flat(const array& from, array& to ) {
+    void packed_to_flat(const array& from, array& to, stream_type s = null_stream) {
         arb_assert(from.size()==data_size);
         arb_assert(to.size()==matrix_size);
 
-        gather(from.data(), to.data(), perm.data(), perm.size());
+        gather(s, from.data(), to.data(), perm.data(), perm.size());
     }
 };
 

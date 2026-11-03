@@ -14,6 +14,8 @@
 #include "backends/shared_state_base.hpp"
 #include "backends/gpu/rand.hpp"
 #include "backends/gpu/gpu_store_types.hpp"
+#include "backends/gpu/stream.hpp"
+#include "memory/gpu_copy.hpp"
 #include "backends/gpu/stimulus.hpp"
 #include "backends/gpu/diffusion_state.hpp"
 #include "backends/gpu/matrix_state_fine.hpp"
@@ -61,14 +63,16 @@ struct ARB_ARBOR_API ion_state {
     ion_state(const fvm_ion_config& ion_data, unsigned align, solver_ptr ptr);
 
     // Set ion concentrations to weighted proportion of default concentrations.
-    void init_concentration();
+    // The trailing stream parameter orders these copies on the owning cell
+    // group's GPU stream (see backends/gpu/stream.hpp).
+    void init_concentration(stream_type s);
 
     // Set ionic current density to zero.
-    void zero_current();
+    void zero_current(stream_type s);
 
     // Zero currents, reset concentrations, and reset reversal potential from
     // initial values.
-    void reset();
+    void reset(stream_type s);
 };
 
 struct ARB_ARBOR_API istim_state {
@@ -90,14 +94,17 @@ struct ARB_ARBOR_API istim_state {
     // Initialized at state construction.
     istim_pp ppack_;
 
+    // The trailing stream parameters order these kernels/copies on the owning
+    // cell group's GPU stream (see backends/gpu/stream.hpp).
+
     // Zero stim current.
-    void zero_current();
+    void zero_current(stream_type s);
 
     // Zero stim current, reset indices.
-    void reset();
+    void reset(stream_type s);
 
     // Contribute to current density:
-    void add_current(const arb_value_type time, array& current_density);
+    void add_current(const arb_value_type time, array& current_density, stream_type s);
 
     // Number of stimuli:
     std::size_t size() const;
@@ -123,6 +130,26 @@ struct mech_storage {
 
 struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_state> {
     task_system_handle thread_pool;
+
+    // Every device operation that touches memory owned by this cell group —
+    // kernels, copies, fills — is enqueued on this stream, and nothing that
+    // does not belong to this group is ever enqueued on it (see the
+    // stream-per-group design and backends/gpu/stream.hpp). Created lazily
+    // on first use; the device must already be set by the caller
+    // (fvm_lowered_cell_impl::initialize calls set_gpu()). Not serialized:
+    // a deserialized state re-creates its stream on first use.
+    mutable gpu::stream stream_;
+
+    // Handle of the group stream, creating it on first call.
+    stream_type stream() const {
+        return stream_.handle();
+    }
+
+    // Block the calling thread until all device work of this group submitted
+    // on its stream has completed.
+    void synchronize() const {
+        stream_.synchronize();
+    }
 
     using cable_solver = arb::gpu::matrix_state_fine<arb_value_type, arb_index_type>;
     cable_solver solver;
@@ -193,6 +220,10 @@ struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_st
         configure_stimulus(stims);
         configure_solver(D);
         add_ions(D, ions);
+        // Ion/diffusion state constructed above fills value-initialized
+        // device arrays through fill kernels on the legacy stream; complete
+        // those before any work is enqueued on the group stream.
+        drain_legacy_stream();
     }
 
 
@@ -230,8 +261,13 @@ struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_st
     void reset();
 
     void update_sample_views() {
-        sample_time_host  = memory::on_host(sample_time);
-        sample_value_host = memory::on_host(sample_value);
+        sample_time_host  = memory::host_vector<arb_value_type>(sample_time.size());
+        sample_value_host = memory::host_vector<arb_value_type>(sample_value.size());
+        // Stream-ordered device-to-host; the samples were produced by kernels
+        // on this group's stream earlier in the epoch, so this copy observes
+        // them (and the call happens after the end-of-epoch sync point).
+        memory::copy_sync(stream(), sample_time, sample_time_host);
+        memory::copy_sync(stream(), sample_value, sample_value_host);
     }
 };
 

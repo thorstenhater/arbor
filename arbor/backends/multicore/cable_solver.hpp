@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <util/partition.hpp>
 #include <util/span.hpp>
 
@@ -124,8 +126,12 @@ struct cable_solver {
     // Setup and solve the cable equation
     // * expects the voltage from its first argument
     // * will likewise overwrite the first argument with the solution
+    // The trailing parameter is a stream handle for signature parity with
+    // the GPU backend, where these ops run on the cell group's stream;
+    // ignored on CPU.
     template<typename T>
-    void solve(T& rhs, const value_type dt, const_view current, const_view conductivity, const_view cv_area) {
+    void solve(T& rhs, const value_type dt, const_view current, const_view conductivity, const_view cv_area,
+               std::nullptr_t = {}) {
         do_solve(cell_cv_divs.data(),
                  cell_cv_divs.size() - 1,
                  rhs.data(),

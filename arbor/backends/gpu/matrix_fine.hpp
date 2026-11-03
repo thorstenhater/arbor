@@ -5,7 +5,10 @@
 
 namespace arb {
 namespace gpu {
+// The leading stream parameter is the stream of the cell group owning the
+// matrix data (see backends/gpu/stream.hpp).
 ARB_ARBOR_API void assemble_matrix_fine(
+    stream_type stream,
     arb_value_type* d,
     arb_value_type* rhs,
     const arb_value_type* invariant_d,
@@ -19,6 +22,7 @@ ARB_ARBOR_API void assemble_matrix_fine(
     unsigned n);
 
 ARB_ARBOR_API void solve_matrix_fine(
+    stream_type stream,
     arb_value_type* rhs,
     arb_value_type* d,                     // diagonal values
     const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)

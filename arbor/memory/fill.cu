@@ -31,5 +31,21 @@ void fill64(uint64_t* v, uint64_t value, std::size_t n) {
     launch_1d(n, 192, fill_kernel<uint64_t, std::size_t>, v, value, n);
 };
 
+void fill8(void* stream, uint8_t* v, uint8_t value, std::size_t n) {
+    launch_1d(static_cast<stream_type>(stream), n, 192, fill_kernel<uint8_t, std::size_t>, v, value, n);
+};
+
+void fill16(void* stream, uint16_t* v, uint16_t value, std::size_t n) {
+    launch_1d(static_cast<stream_type>(stream), n, 192, fill_kernel<uint16_t, std::size_t>, v, value, n);
+};
+
+void fill32(void* stream, uint32_t* v, uint32_t value, std::size_t n) {
+    launch_1d(static_cast<stream_type>(stream), n, 192, fill_kernel<uint32_t, std::size_t>, v, value, n);
+};
+
+void fill64(void* stream, uint64_t* v, uint64_t value, std::size_t n) {
+    launch_1d(static_cast<stream_type>(stream), n, 192, fill_kernel<uint64_t, std::size_t>, v, value, n);
+};
+
 } // namespace gpu
 } // namespace arb
