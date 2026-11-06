@@ -1,4 +1,9 @@
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <random>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include <arbor/math.hpp>
@@ -71,6 +76,162 @@ struct v3 {
             << '(' << b.x << ',' << b.y << ',' << b.z << ')'
             << " differ";
     }
+}
+
+// The Y-shaped morphology used by the nearest-neighbour tests.
+//
+//       x=-9        x=9
+//
+//         _        _  y=40
+//          \       /
+//      seg4 \     / seg2
+//  branch 2  \   /     branch 1
+//        seg3 \ /
+//              | y=25
+//              |
+//              |
+//              | branch 0
+//        seg1  |
+//              |
+//              _ y=7
+//
+//              - y=5
+//        seg0  |
+//              _ y=-5
+segment_tree nearest_tree() {
+    segment_tree tree;
+
+    // Root branch.
+    mpoint psoma_p{0, -5, 0, 5};
+    mpoint psoma_d{0,  5, 0, 5};
+
+    msize_t ssoma = tree.append(mnpos, psoma_p, psoma_d, 1);
+
+    // Main leg of y, of length 28 um
+    // Note that there is a gap of 2 um between the end of the soma segment
+    mpoint py1_p{0,  7, 0, 1};
+    mpoint py1_d{0, 25, 0, 1};
+
+    msize_t sy1 = tree.append(ssoma, py1_p, py1_d, 3);
+
+    // branch 1 of y: translation (9,15) in one segment
+    mpoint py2_d{ 9, 40, 0, 1};
+    tree.append(sy1, py2_d, 3);
+
+    // branch 2 of y: translation (-9,15) in 2 segments
+    mpoint py3_m{-6, 35, 0, 1};
+    mpoint py3_d{-9, 40, 0, 1};
+    tree.append(tree.append(sy1, py3_m, 3), py3_d, 3);
+
+    return tree;
+}
+
+// `n` zero-length segments in one branch, all of them sitting on the same point.
+// The index has to split these even though every segment has the same centroid.
+morphology coincident_morphology(unsigned n) {
+    segment_tree tree;
+    msize_t parent = mnpos;
+    for (unsigned i = 0; i<n; ++i) {
+        mpoint p{0, 0, 0, 1};
+        parent = tree.append(parent, p, p, 0);
+    }
+    return morphology(tree);
+}
+
+// Scattered points to query a placement with: segment endpoints (which land
+// exactly on forks, where several locations tie), segment interiors, points
+// jittered off the morphology, and points well outside its bounds.
+std::vector<std::array<double, 3>> sample_queries(const morphology& m, const isometry& iso, unsigned seed) {
+    std::vector<std::array<double, 3>> pts;
+
+    for (msize_t bid = 0; bid<m.num_branches(); ++bid) {
+        for (const msegment& seg: m.branch_segments(bid)) {
+            mpoint prox = iso.apply(seg.prox);
+            mpoint dist = iso.apply(seg.dist);
+            pts.push_back({prox.x, prox.y, prox.z});
+            pts.push_back({dist.x, dist.y, dist.z});
+
+            mpoint mid{0.5*(seg.prox.x + seg.dist.x),
+                       0.5*(seg.prox.y + seg.dist.y),
+                       0.5*(seg.prox.z + seg.dist.z),
+                       seg.prox.radius};
+            mid = iso.apply(mid);
+            pts.push_back({mid.x, mid.y, mid.z});
+        }
+    }
+
+    double lo[3] = {1e308, 1e308, 1e308};
+    double hi[3] = {-1e308, -1e308, -1e308};
+    for (const auto& p: pts) {
+        for (int k = 0; k<3; ++k) {
+            lo[k] = std::min(lo[k], p[k]);
+            hi[k] = std::max(hi[k], p[k]);
+        }
+    }
+
+    // Fixed seed, so a failure can be reproduced.
+    std::mt19937_64 rng(seed);
+    std::uniform_real_distribution<double> u(0., 1.);
+    std::normal_distribution<double> near(0., 1.), far(0., 50.);
+
+    const std::size_t n_on_morphology = pts.size();
+    for (std::size_t i = 0; i<200; ++i) {
+        const std::array<double, 3> base = pts[i%n_on_morphology];
+        double dx = near(rng), dy = near(rng), dz = near(rng);
+        pts.push_back({base[0] + dx, base[1] + dy, base[2] + dz});
+    }
+
+    for (unsigned i = 0; i<40; ++i) {
+        pts.push_back({lo[0] + u(rng)*(hi[0] - lo[0]) + far(rng),
+                       lo[1] + u(rng)*(hi[1] - lo[1]) + far(rng),
+                       lo[2] + u(rng)*(hi[2] - lo[2]) + far(rng)});
+    }
+
+    return pts;
+}
+
+// Check that a placement built with the index answers closest() with exactly the
+// same location and distance as one built without it, and that both agree with
+// all_closest(), which documents the set of nearest locations that closest()
+// chooses from.
+//
+// Returns the number of query points that had more than one nearest location, so
+// that callers can insist the tie policy is really being exercised rather than
+// silently passing on a morphology where nothing ties.
+unsigned expect_indexed_matches_scan(const morphology& m, const isometry& iso, unsigned seed) {
+    place_pwlin plain(m, iso, false);
+    place_pwlin indexed(m, iso, true);
+
+    const auto pts = sample_queries(m, iso, seed);
+
+    unsigned ties = 0;
+    unsigned mismatches = 0;
+    std::string first;
+
+    for (const auto& p: pts) {
+        const auto [x, y, z] = p;
+        const auto [plain_loc, plain_dist] = plain.closest(x, y, z);
+        const auto [indexed_loc, indexed_dist] = indexed.closest(x, y, z);
+        const auto [locs, all_dist] = plain.all_closest(x, y, z);
+
+        if (locs.size()>1) ++ties;
+
+        if (!(indexed_loc==plain_loc) || indexed_dist!=plain_dist ||
+            !(indexed_loc==locs.front()) || indexed_dist!=all_dist) {
+            if (first.empty()) {
+                std::ostringstream o;
+                o << "at (" << x << ", " << y << ", " << z << ") "
+                  << "scan gives {" << plain_loc.branch << ", " << plain_loc.pos << "} dist " << plain_dist
+                  << ", index gives {" << indexed_loc.branch << ", " << indexed_loc.pos << "} dist " << indexed_dist
+                  << ", all_closest has " << locs.size() << " locations";
+                first = o.str();
+            }
+            ++mismatches;
+        }
+    }
+
+    EXPECT_EQ(0u, mismatches) << first;
+    return ties;
 }
 
 } // anonymous namespace
@@ -569,52 +730,7 @@ TEST(place_pwlin, segments) {
 }
 
 TEST(place_pwlin, nearest) {
-    segment_tree tree;
-
-    //  the test morphology:
-    //
-    //       x=-9        x=9
-    //
-    //         _        _  y=40
-    //          \       /
-    //      seg4 \     / seg2
-    //  branch 2  \   /     branch 1
-    //        seg3 \ /
-    //              | y=25
-    //              |
-    //              |
-    //              | branch 0
-    //        seg1  |
-    //              |
-    //              _ y=7
-    //
-    //              - y=5
-    //        seg0  |
-    //              _ y=-5
-
-    // Root branch.
-    mpoint psoma_p{0, -5, 0, 5};
-    mpoint psoma_d{0,  5, 0, 5};
-
-    msize_t ssoma = tree.append(mnpos, psoma_p, psoma_d, 1);
-
-    // Main leg of y, of length 28 μm
-    // Note that there is a gap of 2 μm between the end of the soma segment
-    mpoint py1_p{0,  7, 0, 1};
-    mpoint py1_d{0, 25, 0, 1};
-
-    msize_t sy1 = tree.append(ssoma, py1_p, py1_d, 3);
-
-    // branch 1 of y: translation (9,15) in one segment
-    mpoint py2_d{ 9, 40, 0, 1};
-    tree.append(sy1, py2_d, 3);
-
-    // branch 2 of y: translation (-9,15) in 2 segments
-    mpoint py3_m{-6, 35, 0, 1};
-    mpoint py3_d{-9, 40, 0, 1};
-    tree.append(tree.append(sy1, py3_m, 3), py3_d, 3);
-
-    morphology m(tree);
+    morphology m(nearest_tree());
     place_pwlin place(m);
 
     {
@@ -667,4 +783,201 @@ TEST(place_pwlin, nearest) {
         EXPECT_EQ((mlocation{2, 1.}), l);
         EXPECT_EQ(1., d);
     }
+}
+
+// The same expectations on a placement built with the index. These are the
+// answers a scan gives, restated rather than computed from the index, so that
+// the index is checked against the documented behaviour and not against itself.
+TEST(place_pwlin, indexed_nearest) {
+    morphology m(nearest_tree());
+    place_pwlin place(m, isometry{}, true);
+
+    {
+        auto [l, d] = place.closest(0, -5, 0);
+        EXPECT_EQ((mlocation{0, 0.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(10, -5, 0);
+        EXPECT_EQ((mlocation{0, 0.}), l);
+        EXPECT_EQ(10., d);
+    }
+    {
+        auto [l, d] = place.closest(0, 0, 0);
+        EXPECT_EQ((mlocation{0, 5./28.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(0, 25, 0);
+        EXPECT_EQ((mlocation{0, 1.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(0, 6, 0);
+        EXPECT_EQ((mlocation{0, 10./28.}), l);
+        EXPECT_EQ(1., d);
+    }
+    {
+        auto [l, d] = place.closest(3, 30, 0);
+        EXPECT_EQ((mlocation{1, 1./3.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(-6, 35, 0);
+        EXPECT_EQ((mlocation{2, 2./3.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(-9, 40, 0);
+        EXPECT_EQ((mlocation{2, 1.}), l);
+        EXPECT_EQ(0., d);
+    }
+    {
+        auto [l, d] = place.closest(-9, 41, 0);
+        EXPECT_EQ((mlocation{2, 1.}), l);
+        EXPECT_EQ(1., d);
+    }
+}
+
+// Where several locations are equally near, closest() takes the most proximal
+// one. That policy is exactly what the index has to reproduce, so check it at
+// the points where ties actually happen.
+TEST(place_pwlin, indexed_nearest_ties) {
+    morphology m(nearest_tree());
+    place_pwlin place(m, isometry{}, true);
+
+    // The fork at y=25 is the distal end of branch 0 and the proximal end of
+    // both upper branches.
+    auto [locs, d] = place.all_closest(0, 25, 0);
+    EXPECT_EQ(0., d);
+    EXPECT_LT(1u, locs.size());
+
+    auto [l, ld] = place.closest(0, 25, 0);
+    EXPECT_EQ(0., ld);
+    EXPECT_EQ((mlocation{0, 1.}), l);
+
+    // The point (0, 49, 0) is the same distance from both tips, (9, 40, 0) and
+    // (-9, 40, 0) -- the arithmetic is identical, so they tie exactly, and the
+    // branches are unrelated rather than a fork. closest() takes the first of the
+    // locations a scan finds, whatever a scan happens to find first.
+    auto [tip_locs, tip_d] = place.all_closest(0, 49, 0);
+    ASSERT_LT(1u, tip_locs.size());
+    EXPECT_EQ(tip_locs.size(), 2u);
+
+    auto [tip_l, tip_ld] = place.closest(0, 49, 0);
+    EXPECT_EQ(tip_d, tip_ld);
+    EXPECT_EQ(tip_locs.front(), tip_l);
+    EXPECT_NE(tip_locs.end(), std::find(tip_locs.begin(), tip_locs.end(), tip_l));
+}
+
+// Segments with no length, and segments sitting on top of one another, are where
+// the bounding boxes degenerate and every distance can tie.
+TEST(place_pwlin, indexed_nearest_coincident) {
+    morphology m = coincident_morphology(20);
+    place_pwlin place(m, isometry{}, true);
+
+    {
+        auto [l, d] = place.closest(0, 0, 0);
+        EXPECT_EQ(0., d);
+        EXPECT_EQ((mlocation{0, 0.}), l);
+    }
+    {
+        auto [l, d] = place.closest(3, 4, 0);
+        EXPECT_EQ(5., d);
+    }
+    {
+        // Everything is equally near, so the answer is the most proximal location.
+        auto [locs, d] = place.all_closest(3, 4, 0);
+        EXPECT_EQ(5., d);
+        EXPECT_LT(1u, locs.size());
+
+        auto [l, ld] = place.closest(3, 4, 0);
+        EXPECT_EQ(d, ld);
+        EXPECT_EQ((mlocation{0, 0.}), l);
+    }
+
+    EXPECT_GT(expect_indexed_matches_scan(m, isometry{}, 20261105u), 0u);
+}
+
+// Indexed and unindexed placements answer identically, in any frame, over
+// morphologies that put the index under different kinds of strain: a fork,
+// zero-length and shared-endpoint segments, and a tree wide enough to need
+// several levels.
+TEST(place_pwlin, indexed_matches_scan) {
+    {
+        morphology m(nearest_tree());
+        EXPECT_GT(expect_indexed_matches_scan(m, isometry{}, 1u), 0u);
+
+        isometry iso = isometry::rotate(0.7, 0.3, 0.8, -0.5)*isometry::translate(137.5, -220.25, 61.);
+        EXPECT_GT(expect_indexed_matches_scan(m, iso, 2u), 0u);
+    }
+
+    {
+        // Zero-length segments, endpoints shared between branches, and a
+        // discontinuity where a branch starts away from its parent's end.
+        segment_tree tree;
+        msize_t s0 = tree.append(mnpos, mpoint{0, 0, 0, 1}, mpoint{2, 0, 0, 1}, 0);
+        msize_t s1 = tree.append(s0, mpoint{2, 0, 0, 1}, mpoint{2, 0, 0, 1}, 0);
+        tree.append(s1, mpoint{2, 0, 0, 1}, mpoint{2, 2, 0, 1}, 0);
+        tree.append(s1, mpoint{2, 0, 0, 2}, mpoint{2, 0, 3, 2}, 0);
+
+        morphology m(tree);
+        EXPECT_GT(expect_indexed_matches_scan(m, isometry::translate(-4, 9, 0.5), 3u), 0u);
+    }
+
+    {
+        // Wide and deep enough that no leaf holds a whole branch, so queries
+        // descend several levels and the split axis changes on the way down.
+        // Successive children of one segment become separate branches, so
+        // repeatedly appending to the same anchor grows the tree sideways.
+        segment_tree tree;
+        msize_t anchor = tree.append(mnpos, mpoint{0, 0, 0, 1}, mpoint{0, 10, 0, 1}, 0);
+
+        // Every branch starts on the tip of the trunk, so that point is shared
+        // by all of them and queries there tie across branches.
+        unsigned n_segment = 1;
+        std::mt19937_64 rng(4242u);
+        std::uniform_real_distribution<double> u(-1., 1.);
+        mpoint trunk_end{0, 10, 0, 1};
+        for (unsigned i = 0; i<12; ++i) {
+            msize_t parent = anchor;
+            mpoint from = trunk_end;
+            for (unsigned j = 0; j<6; ++j) {
+                double y = 10 + 3*(j + 1);
+                mpoint q{3*u(rng), y + 2, 3*u(rng), 1};
+                parent = tree.append(parent, from, q, 0);
+                from = q;
+                ++n_segment;
+            }
+        }
+
+        morphology m(tree);
+        ASSERT_LT(8u, m.num_branches());
+        ASSERT_LT(16u, n_segment);
+        EXPECT_GT(expect_indexed_matches_scan(m, isometry{}, 4u), 0u);
+    }
+}
+
+// Only closest() consults the index; everything else must be untouched by it.
+TEST(place_pwlin, indexed_other_interfaces_unchanged) {
+    morphology m(nearest_tree());
+    isometry iso = isometry::rotate(0.4, 1, 2, -1)*isometry::translate(1, -2, 3);
+
+    place_pwlin plain(m, iso, false);
+    place_pwlin place(m, iso, true);
+
+    for (msize_t bid = 0; bid<m.num_branches(); ++bid) {
+        for (double pos: {0., 0.25, 0.5, 1.}) {
+            mlocation loc{bid, pos};
+            EXPECT_EQ(plain.at(loc), place.at(loc));
+            EXPECT_EQ(plain.all_at(loc), place.all_at(loc));
+        }
+    }
+
+    mprovider p(m, label_dict{});
+    mextent whole = thingify(reg::all(), p);
+    ASSERT_EQ(static_cast<std::size_t>(m.num_branches()), whole.size());
+
+    EXPECT_EQ(plain.all_segments(whole), place.all_segments(whole));
+    EXPECT_EQ(plain.segments(whole).size(), place.segments(whole).size());
 }

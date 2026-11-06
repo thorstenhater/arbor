@@ -440,10 +440,17 @@ zero-length components as a result of such discontinuities.
 
 .. cpp:class:: place_pwlin
 
-   .. cpp:function:: place_pwlin(const morphology&, const isometry& = isometry())
+   .. cpp:function:: place_pwlin(const morphology&, const isometry& = isometry(), bool with_index = false)
 
       Construct a piecewise linear placement of the morphology in space,
       optionally applying the given isometry.
+
+      With ``with_index`` set, build a bounding-volume index over the placed
+      segments, which :cpp:func:`closest` then searches instead of scanning every
+      segment. The answers are the same either way. Building the index costs
+      about as much as seven scans, so it is worth it only for a placement that
+      answers many queries, and it is worth remembering that the index belongs
+      to one object: placements constructed separately have separate indexes.
 
    .. cpp:function:: mpoint at(mlocation) const
 
@@ -468,6 +475,7 @@ zero-length components as a result of such discontinuities.
    .. cpp:function:: closest(double x, double y, double z) -> std::pair<mpoint, double>
 
       Find the closest location to p. Returns the location and its distance from the input coordinates.
+      Ties are resolved in favour of the most proximal location.
 
 Isometries
 ^^^^^^^^^^

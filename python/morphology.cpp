@@ -204,9 +204,12 @@ void register_morphology(py::module& m) {
 
     // arb::place_pwlin
     place
-        .def(py::init<const arb::morphology&, const arb::isometry&>(),
+        .def(py::init<const arb::morphology&, const arb::isometry&, bool>(),
             "morphology"_a, py::arg_v("isometry", arb::isometry(), "id"),
-            "Construct a piecewise-linear placement object from the given morphology and optional isometry.")
+            py::arg("with_index") = false,
+            "Construct a piecewise-linear placement object from the given morphology and optional isometry.\n"
+            "With with_index set, build an index over the placed segments that closest() uses "
+            "instead of scanning every segment; the answers are unchanged.")
         .def("at", &arb::place_pwlin::at, "location"_a,
             "Return an interpolated mpoint corresponding to the location argument.")
         .def("all_at", &arb::place_pwlin::all_at, "location"_a,
@@ -231,7 +234,8 @@ void register_morphology(py::module& m) {
                 return pybind11::make_tuple(l, d);
             },
             "Find the location on the morphology that is closest to a 3d point. "
-            "Returns the location and its distance from the point.");
+            "Returns the location and its distance from the point. "
+            "Uses the index when one was built by the constructor.");
 
     // locset
     locset

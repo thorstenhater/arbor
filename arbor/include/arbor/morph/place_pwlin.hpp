@@ -15,7 +15,11 @@ namespace arb {
 struct place_pwlin_data;
 
 struct ARB_ARBOR_API place_pwlin {
-    explicit place_pwlin(const morphology& m, const isometry& iso = isometry{});
+    // With with_index set, build a spatial index over the placed segments that
+    // closest() uses to avoid scanning all of them. Results are unchanged; the
+    // index costs about as much to build as one scan, so it pays for itself only
+    // when a place_pwlin answers many queries.
+    explicit place_pwlin(const morphology& m, const isometry& iso = isometry{}, bool with_index = false);
 
     // Any point corresponding to the location loc.
     mpoint at(mlocation loc) const;

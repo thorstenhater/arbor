@@ -377,6 +377,14 @@ Cable cell morphology
        Construct a piecewise linear placement of the morphology in space,
        optionally applying the given isometry.
 
+    .. py:function:: place_pwlin(morphology, isometry, with_index)
+       :noindex:
+
+       As above, and with ``with_index`` true, build a bounding-volume index
+       over the placed segments that :py:meth:`closest` searches instead of
+       scanning every segment. The answers are the same either way; building the
+       index costs about as much as seven scans.
+
     .. py:method:: at(loc: location) -> location
 
        Return any single point corresponding to the :class:`location` ``loc``
@@ -402,6 +410,7 @@ Cable cell morphology
     .. py:method:: closest(x: float, y: float, z: float) -> tuple[mpoint, float]
 
         Find the closest location to p. Returns the location and its distance from the input coordinates.
+        Ties are resolved in favour of the most proximal location.
 
 .. py:class:: isometry
 
