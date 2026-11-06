@@ -366,15 +366,19 @@ instantiate_cable_cells(const recipe& rec,
 template <typename Backend> fvm_initialization_data
 fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gids,
                                            const recipe& rec) {
+    PE(fvminit);
     // ensure GPU is initialized
     set_gpu();
     // result
     fvm_initialization_data fvm_info;
 
     const std::size_t ncell = gids.size();
+    PE(make_cells);
     auto cells = instantiate_cable_cells(rec, gids, fvm_info, context_);
+    PL(make_cells);
 
     // Populate source, target and gap_junction data vectors.
+    PE(targets_and_sources);
     for (auto i: util::make_span(ncell)) {
         auto gid = gids[i];
         const auto& c = cells[i];
@@ -383,6 +387,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
         add_labels(fvm_info.gap_junction_data, c.junction_ranges());
     }
     fvm_info.shrink_to_fit();
+    PL(targets_and_sources);
 
     // extract and verify global settings
     auto global_props = get_cable_cell_global_properties(rec);
@@ -393,15 +398,21 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
     check_voltage_mV_ = global_props.membrane_voltage_limit_mV;
 
     // Discretize cells, build matrix.
+    PE(discretize);
     fvm_cv_discretization D = fvm_cv_discretize(cells, global_props.default_parameters, context_);
     arb_assert(D.n_cell() == ncell);
+    PL(discretize);
 
     // Discretize and build gap junction info.
+    PE(gj);
     auto gj_cvs = fvm_build_gap_junction_cv_map(cells, gids, D);
     auto gj_conns = fvm_resolve_gj_connections(gids, fvm_info.gap_junction_data, gj_cvs, rec);
+    PL(gj);
 
     // Discretize mechanism data.
+    PE(mechanism_data);
     fvm_mechanism_data mech_data = fvm_build_mechanism_data(global_props, cells, gids, gj_conns, D, context_);
+    PL(mechanism_data);
 
     // Fill src_to_spike and cv_to_cell vectors only if mechanisms with post_events implemented are present.
     auto max_detector = 0;
@@ -431,6 +442,7 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
                                        1u);
 
     // Create shared cell state.
+    PE(state);
     state_ = std::make_unique<shared_state>(context_.thread_pool,
                                             ncell,
                                             std::move(cv_to_cell),
@@ -441,8 +453,9 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
                                             mech_data.stimuli,
                                             data_alignment,
                                             seed_);
-
+    PL(state);
     // Keep track of mechanisms by name for probe lookup.
+    PE(mechanisms);
     std::unordered_map<std::string, mechanism*> mechptr_by_name;
     target_handles_.resize(mech_data.n_target);
     for (const auto& [name, config]: mech_data.mechanisms) {
@@ -553,16 +566,21 @@ fvm_lowered_cell_impl<Backend>::initialize(const std::vector<cell_gid_type>& gid
         default: throw invalid_mechanism_kind(config.kind);
         }
     }
+    PL(mechanisms)
 
+    PE(probes);
     add_probes(gids, cells, rec, D, mechptr_by_name, mech_data, target_handles_, fvm_info.probe_map);
-
+    PL(probes);
+    PE(partition);
     // Create lookup structure for target ids.
     util::make_partition(target_handle_divisions_,
         util::transform_view(gids,
                              [&](cell_gid_type i) { return fvm_info.num_targets[i]; }));
-
-
+    PL(partition);
+    PE(reset);
     reset();
+    PL(reset);
+    PL(fvminit);
     return fvm_info;
 }
 
