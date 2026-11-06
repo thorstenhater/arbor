@@ -16,7 +16,7 @@ adex_cell_group::adex_cell_group(const std::vector<cell_gid_type>& gids,
                                cell_label_range& cg_sources,
                                cell_label_range& cg_targets):
     gids_(gids) {
-
+    PE(adex_cell_group);
     for (auto gid: gids_) {
         const auto& cell = util::any_cast<adex_cell>(rec.get_cell_description(gid));
         // set up cell state
@@ -47,6 +47,7 @@ adex_cell_group::adex_cell_group(const std::vector<cell_gid_type>& gids,
         next_update_.push_back(0.0);
         current_time_.push_back(0.0);
     }
+    PL(adex_cell_group);
 }
 
 cell_kind adex_cell_group::get_cell_kind() const { return cell_kind::adex; }

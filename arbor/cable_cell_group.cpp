@@ -26,8 +26,11 @@ cable_cell_group::cable_cell_group(const std::vector<cell_gid_type>& gids,
                                    cell_label_range& cg_targets,
                                    fvm_lowered_cell_ptr lowered):
     gids_(gids), lowered_(std::move(lowered)) {
+    PE(cable_cell_group)
     // Construct cell implementation, retrieving handles and maps.
+    PE(fvminit);
     auto fvm_info = lowered_->initialize(gids_, rec);
+    PL(fvminit);
 
     // Propagate source and target ranges to the simulator object
     cg_sources = std::move(fvm_info.source_data);
@@ -42,6 +45,7 @@ cable_cell_group::cable_cell_group(const std::vector<cell_gid_type>& gids,
         }
     }
     spike_sources_.shrink_to_fit();
+    PL(cable_cell_group);
 }
 
 void cable_cell_group::reset() {

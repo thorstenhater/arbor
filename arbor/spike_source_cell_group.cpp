@@ -11,17 +11,14 @@
 
 namespace arb {
 
-spike_source_cell_group::spike_source_cell_group(
-    const std::vector<cell_gid_type>& gids,
-    const recipe& rec,
-    cell_label_range& cg_sources,
-    cell_label_range& cg_targets):
-    gids_(gids)
-{
+spike_source_cell_group::spike_source_cell_group(const std::vector<cell_gid_type>& gids,
+                                                 const recipe& rec,
+                                                 cell_label_range& cg_sources,
+                                                 cell_label_range& cg_targets)
+    : gids_(gids) {
+    PE(spike_source_cell_group);
     for (auto gid: gids_) {
-        if (!rec.get_probes(gid).empty()) {
-            throw bad_cell_probe(cell_kind::spike_source, gid);
-        }
+        if (!rec.get_probes(gid).empty()) throw bad_cell_probe(cell_kind::spike_source, gid);
     }
 
     time_sequences_.reserve(gids.size());
@@ -37,6 +34,7 @@ spike_source_cell_group::spike_source_cell_group(
             throw bad_cell_description(cell_kind::spike_source, gid);
         }
     }
+    PL(spike_source_cell_group);
 }
 
 cell_kind spike_source_cell_group::get_cell_kind() const {

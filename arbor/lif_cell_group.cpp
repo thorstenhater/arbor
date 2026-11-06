@@ -14,7 +14,7 @@ lif_cell_group::lif_cell_group(const std::vector<cell_gid_type>& gids,
                                cell_label_range& cg_sources,
                                cell_label_range& cg_targets):
     gids_(gids) {
-
+    PE(lif_cell_group);
     for (auto gid: gids_) {
         const auto& cell = util::any_cast<lif_cell>(rec.get_cell_description(gid));
         // set up cell state
@@ -39,6 +39,7 @@ lif_cell_group::lif_cell_group(const std::vector<cell_gid_type>& gids,
             }
         }
     }
+    PL(lif_cell_group);
 }
 
 cell_kind lif_cell_group::get_cell_kind() const {
