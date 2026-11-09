@@ -348,7 +348,7 @@ unsigned shared_state::instantiate(mechanism& m,
     // end of the step adds them in slot order. A CV that stays inside one warp
     // contributes a single add, so it keeps the direct add and costs nothing.
     // See backends/gpu/point_partials.hpp.
-    if (m.mech_.kind == arb_mechanism_kind_point) {
+    if (m.kind() == arb_mechanism_kind_point) {
         auto tables = build_point_partial_tables(n_cv, pos_data.cv.data(), pos_data.cv.size(), warp_lanes());
         if (tables.valid && tables.n_slots) {
             store.partial_d_    = array(2*tables.n_slots);
@@ -362,7 +362,8 @@ unsigned shared_state::instantiate(mechanism& m,
             m.ppack_.warp_base    = store.warp_base_d_.data();
             m.ppack_.n_partial_cv = n_cv;
 
-            fold_desc_.push_back({m.ppack_.partial, m.ppack_.part_begin, m.ppack_.part_end, n_cv});
+            fold_desc_.push_back(point_fold_desc{m.ppack_.partial, m.ppack_.part_begin,
+                                                 store.part_end_d_.data(), n_cv});
         }
     }
 
