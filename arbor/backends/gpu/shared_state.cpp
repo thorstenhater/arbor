@@ -340,6 +340,32 @@ unsigned shared_state::instantiate(mechanism& m,
         m.ppack_.peer_index = peer_indices? writer.append_with_padding(pos_data.peer_cv, 0): nullptr;
     }
 
+    // Ordered accumulation of point-process partials.
+    //
+    // A CV whose instances span more than one warp would take one add per warp
+    // it touches, in whatever order those warps reach memory. Such a CV gets
+    // scratch instead: its warps park their partials there and the fold at the
+    // end of the step adds them in slot order. A CV that stays inside one warp
+    // contributes a single add, so it keeps the direct add and costs nothing.
+    // See backends/gpu/point_partials.hpp.
+    if (m.mech_.kind == arb_mechanism_kind_point) {
+        auto tables = build_point_partial_tables(n_cv, pos_data.cv.data(), pos_data.cv.size(), warp_lanes());
+        if (tables.valid && tables.n_slots) {
+            store.partial_d_    = array(2*tables.n_slots);
+            memory::fill(store.partial_d_, 0);
+            store.part_begin_d_ = memory::on_gpu(tables.part_begin);
+            store.part_end_d_   = memory::on_gpu(tables.part_end);
+            store.warp_base_d_  = memory::on_gpu(tables.warp_base);
+
+            m.ppack_.partial      = store.partial_d_.data();
+            m.ppack_.part_begin   = store.part_begin_d_.data();
+            m.ppack_.warp_base    = store.warp_base_d_.data();
+            m.ppack_.n_partial_cv = n_cv;
+
+            fold_desc_.push_back({m.ppack_.partial, m.ppack_.part_begin, m.ppack_.part_end, n_cv});
+        }
+    }
+
     // Shift data to GPU, set up pointers
     store.parameters_d_ = memory::on_gpu(store.parameters_);
     m.ppack_.parameters = store.parameters_d_.data();
@@ -352,6 +378,13 @@ unsigned shared_state::instantiate(mechanism& m,
 
     if (m.mech_.n_random_variables) store.random_numbers_.instantiate(m, width_padded, pos_data, cbprng_seed);
     return id;
+}
+
+void shared_state::fold_point_partials() {
+    if (fold_desc_.empty()) return;
+    if (fold_desc_d_.size() != fold_desc_.size()) fold_desc_d_ = memory::on_gpu(fold_desc_);
+    launch_fold_point_partials(fold_desc_d_.data(), unsigned(fold_desc_.size()), n_cv,
+                               conductivity.data(), current_density.data());
 }
 
 void shared_state::reset() {

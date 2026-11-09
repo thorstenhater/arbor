@@ -20,8 +20,12 @@ extern "C" {
 
 // Version
 #define ARB_MECH_ABI_VERSION_MAJOR 0
-#define ARB_MECH_ABI_VERSION_MINOR 7
-#define ARB_MECH_ABI_VERSION_PATCH 0
+#define ARB_MECH_ABI_VERSION_MINOR 8
+// NOTE: the composite below ignores MINOR, so a ppack layout change must move
+// PATCH to be visible to the check in mechanism.hpp. arb_mechanism_ppack gained
+// fields in this version, and a module built against 0.7.x must not read past
+// the end of the copy the library hands it.
+#define ARB_MECH_ABI_VERSION_PATCH 1
 #define ARB_MECH_ABI_VERSION ((ARB_MECH_ABI_VERSION_MAJOR * 10000L * 10000L) + (ARB_MECH_ABI_VERSION_MAJOR * 10000L) + ARB_MECH_ABI_VERSION_PATCH)
 
 typedef const char* arb_mechanism_fingerprint;
@@ -115,6 +119,37 @@ typedef struct arb_mechanism_ppack {
     arb_ion_state*   ion_states;                    // Array of views into shared state.
 
     arb_value_type const * const * random_numbers;  // Array of random numbers
+
+    /* Below here: added in ABI 0.8.0, used by the GPU backend only.
+     * Ordered accumulation of point-process contributions.
+     *
+     * A point mechanism that accumulates into vec_g or vec_i reduces each
+     * warp's contribution with a butterfly and lets the run's root thread add
+     * the result to the target. When one CV's instances span more than one
+     * warp the CV takes several adds, and the arrival order of those adds is
+     * not part of the program, so the sum is not reproducible run to run.
+     * With these fields the roots of a multi-warp run write their partials to
+     * scratch instead of adding, and a fold that runs after every mechanism is
+     * done adds them in a fixed order. A CV whose instances live in one warp
+     * keeps the direct add: it contributes exactly one add per step, which is
+     * already independent of arrival order.
+     *
+     *   partial       scratch; slot s holds the pair (g, i) at partial[2*s]
+     *                 and partial[2*s+1]. Allocated by the backend.
+     *   part_begin    indexed by CV: first slot of that CV's partials, or -1
+     *                 if the CV keeps the direct add (single-warp run, or this
+     *                 mechanism has no instance on it).
+     *   warp_base     indexed by CV: warp index (first instance index / 32) of
+     *                 that CV's run, so a root can number its partial from 0
+     *                 within the run.
+     *   n_partial_cv  number of entries in part_begin and warp_base.
+     *
+     * A module with partial == nullptr or part_begin == nullptr behaves exactly
+     * as it did before these fields existed. */
+    arb_value_type* __restrict__ partial;
+    arb_index_type* __restrict__ part_begin;
+    arb_index_type* __restrict__ warp_base;
+    arb_size_type    n_partial_cv;
 } arb_mechanism_ppack;
 
 

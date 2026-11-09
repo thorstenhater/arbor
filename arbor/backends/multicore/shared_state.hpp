@@ -231,6 +231,11 @@ struct ARB_ARBOR_API shared_state:
     // Take samples according to marked events in a sample_event_stream.
     void take_samples();
 
+    // Nothing to fold: this backend accumulates a CV's point-process
+    // contributions serially, in instance order, so their order is already part
+    // of the program. Present so the integration loop can call it either way.
+    void fold_point_partials() {}
+
     // Reset internal state
     void reset();
 

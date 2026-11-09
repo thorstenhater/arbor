@@ -130,6 +130,7 @@ set(unit_sources
     test_span.cpp
     test_spatial_tree.cpp
     test_spike_source.cpp
+    test_point_partials.cpp
     test_spikes.cpp
     test_spike_store.cpp
     test_stats.cpp

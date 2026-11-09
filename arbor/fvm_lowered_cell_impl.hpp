@@ -195,6 +195,12 @@ fvm_integration_result fvm_lowered_cell_impl<Backend>::integrate(const timestep_
         // use mean current contributions as opposed to point sample.
         PE(stimuli);
         state_->add_stimulus_current();
+
+        // Add the point-process partials whose order the GPU could not fix at
+        // the time they were produced; a no-op on the multicore backend.
+        // NOTE: must stay after every mechanism has contributed its currents
+        // and before the cable state is integrated, which reads the result.
+        state_->fold_point_partials();
         PL(stimuli);
 
         // Take samples at cell time if sample time in this step interval.
