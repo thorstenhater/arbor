@@ -28,6 +28,7 @@ ARB_ARBOR_API void solve_matrix_fine(
     const arb_index_type* block_index,     // start index (exclusive) into levels for each gpu block
     arb_index_type* num_cells,             // the number of cells packed into this single matrix
     arb_index_type* padded_size,           // length of rhs, d, u, including padding
+    const arb_index_type* merge_data,      // parent-merge CSR tables, indexed by level_metadata::merge_data_index
     unsigned num_blocks,                   // number of blocks
     unsigned blocksize);                   // size of each block
 

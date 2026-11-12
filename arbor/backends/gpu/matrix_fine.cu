@@ -52,6 +52,16 @@ void assemble_matrix_fine(
 /// level.
 /// To avoid idle threads, one should try that on each level, there is a similar
 /// number of branches.
+///
+/// The backward pass merges a branch's final addend into its parent branch
+/// without the unordered atomic accumulation that made results depend on
+/// thread arrival order (Arbor issue #1059). Levels where every parent has
+/// at most one contributor merge directly, which cannot race. All other
+/// levels stage the addends in shared memory, then one thread per parent
+/// branch folds its whole contributor list in a fixed order given by a
+/// per-level CSR table (contributors sorted by ascending start CV index).
+/// Merged sums therefore depend only on the matrix, not on scheduling nor on
+/// how cells were packed into blocks.
 template <typename T>
 __global__
 void solve_matrix_fine(
@@ -62,8 +72,17 @@ void solve_matrix_fine(
     const arb_index_type* __restrict__ const level_lengths,
     const arb_index_type* __restrict__ const level_parents,
     const arb_index_type* __restrict__ const block_index,
-    const arb_index_type* __restrict__ const num_matrix) // number of packed matrices = number of cells
+    const arb_index_type* __restrict__ const num_matrix, // number of packed matrices = number of cells
+    const arb_index_type* __restrict__ const merge_data) // CSR tables, one per non-root level
 {
+    // Upper bound on level width: max_branches_per_level, hard-coded at
+    // construction (matrix_state_fine.hpp), equals the launch block size.
+    constexpr unsigned max_branches_per_block = 128u;
+    // Parent-merge addends staged by the backward pass, indexed by the
+    // contributing branch's column index (its tid) on the current level.
+    __shared__ T s_add_d[max_branches_per_block];
+    __shared__ T s_add_rhs[max_branches_per_block];
+
     const auto tid = threadIdx.x;
     const auto bid = blockIdx.x;
 
@@ -86,9 +105,15 @@ void solve_matrix_fine(
 
         const unsigned width = lvl_meta.num_branches;
 
+        // A level with a CSR table stages its merge addends in shared memory
+        // and folds them in phase B. A level without one (no_merge_csr) has,
+        // by construction, at most one contributor per parent branch, so
+        // phase A may merge into the parent directly: no two threads touch
+        // the same slot, hence no ordering ambiguity and no second barrier.
+        const unsigned merge_index = lvl_meta.merge_data_index;
 
-        // Perform backward substitution for each branch on this level.
-        // One thread per branch.
+        // ---- Phase A: Perform backward substitution for each branch on this
+        // level. One thread per branch.
         if (tid < width) {
             const unsigned len = lvl_lengths[tid];
             unsigned pos = lvl_meta.matrix_data_index + tid;
@@ -112,18 +137,62 @@ void solve_matrix_fine(
                     rhs[next_pos] = fma(factor, rhs[pos], rhs_next);
                     pos = next_pos;
                 }
-                // Update d and rhs at the parent node of this branch.
-                // A parent may have more than one contributing to it, so we use
-                // atomic updates to avoid races conditions.
-                const unsigned parent_index = next_lvl_meta.matrix_data_index;
-                const unsigned p = parent_index + lvl_parents[tid];
-
+                // The update for the parent node of this branch.
                 const T factor = -u[pos] / d[pos];
-                gpu_atomic_add(d + p, factor*u[pos]);
-                gpu_atomic_add(rhs + p, factor*rhs[pos]);
+                const T add_d   = factor*u[pos];
+                const T add_rhs = factor*rhs[pos];
+                if (merge_index == no_merge_csr) {
+                    // Single-contributor parent: merge in place.
+                    const unsigned p = next_lvl_meta.matrix_data_index + lvl_parents[tid];
+                    d[p]   += add_d;
+                    rhs[p] += add_rhs;
+                }
+                else {
+                    s_add_d[tid]   = add_d;
+                    s_add_rhs[tid] = add_rhs;
+                }
+            }
+            else if (merge_index != no_merge_csr) {
+                // A skipped branch contributes nothing, and phase B adds
+                // exactly what it finds staged here.
+                s_add_d[tid]   = T(0);
+                s_add_rhs[tid] = T(0);
             }
         }
         __syncthreads();
+
+        // ---- Phase B: fold the staged addends into row 0 of each parent
+        // branch. One thread per branch of the next level; each folds the
+        // complete contributor list of its own branch in CSR order, so the
+        // folded sums are reproducible by construction. Rows 0 of the next
+        // level have no writer other than this fold (contributors no longer
+        // touch them), so plain loads and stores are race free.
+        if (merge_index != no_merge_csr) { // uniform across the block
+            const unsigned next_width = next_lvl_meta.num_branches;
+            if (tid < next_width) {
+                const arb_index_type* starts = merge_data + merge_index;
+                const arb_index_type src_begin = starts[tid];
+                const arb_index_type src_end   = starts[tid+1];
+                if (src_end > src_begin) {
+                    const arb_index_type* srcs = starts + next_width + 1;
+                    const unsigned p = next_lvl_meta.matrix_data_index + tid;
+                    T acc_d   = d[p];
+                    T acc_rhs = rhs[p];
+                    for (arb_index_type j = src_begin; j < src_end; ++j) {
+                        const unsigned s = (unsigned)srcs[j];
+                        acc_d   += s_add_d[s];
+                        acc_rhs += s_add_rhs[s];
+                    }
+                    d[p]   = acc_d;
+                    rhs[p] = acc_rhs;
+                }
+            }
+            // The next level's phase A reads d and rhs at its row 0 — the
+            // slots this fold has just written — so this barrier must not be
+            // skipped when a merge table exists. Like the one above, it
+            // sits outside every tid guard.
+            __syncthreads();
+        }
     }
 
     // Solve the root
@@ -251,12 +320,13 @@ ARB_ARBOR_API void solve_matrix_fine(
     const arb_index_type* block_index,     // start index into levels for each gpu block
     arb_index_type* num_cells,             // the number of cells packed into this single matrix
     arb_index_type* padded_size,           // length of rhs, d, u, including padding
+    const arb_index_type* merge_data,      // parent-merge CSR tables, indexed by level_metadata::merge_data_index
     unsigned num_blocks,                   // number of blocks
     unsigned blocksize)                    // size of each block
 {
     launch(num_blocks, blocksize, kernels::solve_matrix_fine<arb_value_type>,
         rhs, d, u, level_meta, level_lengths, level_parents, block_index,
-        num_cells);
+        num_cells, merge_data);
 }
 
 } // namespace gpu
