@@ -392,6 +392,7 @@ fvm_cv_discretize(const cable_cell& cell,
 
             mcable span{bid, parent_refpt, cv_refpt};
             double resistance = embedding.integrate_ixa(span, D.axial_resistivity[0].at(bid));
+
             D.face_conductance[i] = 100/resistance; // 100 scales to µS.
             // Compute
             auto len = embedding.integrate_length(span);
@@ -402,11 +403,17 @@ fvm_cv_discretize(const cable_cell& cell,
             }
         }
 
+        if (!cv_cables.empty() && (D.face_conductance[i] < 0.0 || !std::isfinite(D.face_conductance[i]))) {
+            throw make_cc_error("Negative/Vanishing resistance on non-trivial cable {}",  cv_cables.front());
+        }
+
         D.cv_area[i] = 0;
         D.cv_capacitance[i] = 0;
         D.init_membrane_potential[i] = 0;
         D.diam_um[i] = 0;
         double cv_length = 0;
+
+        arb_value_type total_area = 0.0;
 
         for (const mcable& cable: cv_cables) {
             auto scale_param = [&](const auto&, const auto& par) -> double {
@@ -419,17 +426,26 @@ fvm_cv_discretize(const cable_cell& cell,
             auto pw_potential   = pw_over_cable(potential,     cable, dflt_potential,   scale_param);
             auto pw_temperature = pw_over_cable(temperature_K, cable, dflt_temperature, scale_param);
 
-            D.cv_area[i]                 += embedding.integrate_area(cable);
-            D.cv_capacitance[i]          += embedding.integrate_area(cable.branch, pw_capacitance);
+            auto area = embedding.integrate_area(cable);
+            auto capacitance = embedding.integrate_area(cable.branch, pw_capacitance);
+            auto temperature = embedding.integrate_area(cable.branch, pw_temperature);
+
+            // Do sanity checks excluding trivial CVs
+            if (area > 0.0) {
+                if (temperature <  0.0) throw make_cc_error("Negative temperature [Kelvin] on non-trivial cable {}",  cable);
+                if (capacitance <= 0.0) throw make_cc_error("Vanishing/Negative capacitance on non-trivial cable {}", cable);
+            }
+
+            D.cv_area[i]                 += area;
+            D.cv_capacitance[i]          += capacitance;
+            D.temperature_K[i]           += temperature;
             D.init_membrane_potential[i] += embedding.integrate_area(cable.branch, pw_potential);
-            D.temperature_K[i]           += embedding.integrate_area(cable.branch, pw_temperature);
             cv_length                    += embedding.integrate_length(cable);
         }
 
         double area = D.cv_area[i];
-        if (cv_length > 0) {
-            D.diam_um[i] = area/(cv_length*math::pi<double>);
-        }
+        total_area += area;
+        if (cv_length > 0) D.diam_um[i] = area/(cv_length*math::pi<double>);
         D.cv_volume[i] = 0.25*area*D.diam_um[i];
 
         if (area > 0) {
@@ -448,7 +464,10 @@ fvm_cv_discretize(const cable_cell& cell,
             D.init_membrane_potential[i] = D.init_membrane_potential[p];
             D.temperature_K[i]           = D.temperature_K[p];
         }
+
     }
+
+    if (total_area == 0.0 && n_cv > 0) throw cable_cell_error("Vacuous cell with finite CVs.");
 
     D.diffusive_ions = std::move(diffusive_ions);
     return D;
