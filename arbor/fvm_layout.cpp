@@ -353,6 +353,8 @@ fvm_cv_discretize(const cable_cell& cell,
         ax_res_0.emplace_back(pw_over_cable(resistivity, cable, dflt_resistivity, scale_param));
     }
 
+    arb_value_type total_area = 0.0;
+
     const auto& embedding = cell.embedding();
     for (auto i: count_along(D.geometry.cv_parent)) {
         auto cv_cables = D.geometry.cables(i);
@@ -412,8 +414,6 @@ fvm_cv_discretize(const cable_cell& cell,
         D.init_membrane_potential[i] = 0;
         D.diam_um[i] = 0;
         double cv_length = 0;
-
-        arb_value_type total_area = 0.0;
 
         for (const mcable& cable: cv_cables) {
             auto scale_param = [&](const auto&, const auto& par) -> double {
