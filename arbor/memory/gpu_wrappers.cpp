@@ -18,7 +18,7 @@ namespace memory {
 
 using std::to_string;
 using namespace gpu;
- 
+
 void gpu_memcpy_d2d(void* dest, const void* src, std::size_t n) {
     auto status = device_memcpy(dest, src, n, gpuMemcpyDeviceToDevice);
     if (!status) {
@@ -44,6 +44,34 @@ void gpu_memcpy_h2d_async(void* dest, const void* src, std::size_t n) {
     auto status = device_memcpy_async(dest, src, n, gpuMemcpyHostToDevice);
     if (!status) {
         HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+}
+
+void gpu_memcpy_h2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyHostToDevice,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+}
+
+void gpu_memcpy_d2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyDeviceToDevice,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+}
+
+void gpu_memcpy_d2h_sync(void* stream, void* dest, const void* src, std::size_t n) {
+    auto status = device_memcpy_async(dest, src, n, gpuMemcpyDeviceToHost,
+                                      static_cast<gpu::stream_type>(stream));
+    if (!status) {
+        HANDLE_GPU_ERROR(status, "n="+to_string(n));
+    }
+    auto sync = gpu::stream_synchronize(static_cast<gpu::stream_type>(stream));
+    if (!sync) {
+        HANDLE_GPU_ERROR(sync, "stream synchronize, n="+to_string(n));
     }
 }
 
@@ -76,6 +104,11 @@ void gpu_free(void* ptr) {
     }
 }
 
+void gpu_device_synchronize() {
+    auto status = gpu::device_synchronize();
+    if (!status) HANDLE_GPU_ERROR(status, "");
+}
+
 } // namespace memory
 } // namespace arb
 
@@ -103,6 +136,18 @@ void gpu_memcpy_h2d_async(void* dest, const void* src, std::size_t n) {
     NOGPU;
 }
 
+void gpu_memcpy_h2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
+void gpu_memcpy_d2d_async(void* stream, void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
+void gpu_memcpy_d2h_sync(void* stream, void* dest, const void* src, std::size_t n) {
+    NOGPU;
+}
+
 void* gpu_host_register(void* ptr, std::size_t size) {
     NOGPU;
     return 0;
@@ -118,6 +163,10 @@ void* gpu_malloc(std::size_t n) {
 }
 
 void gpu_free(void* ptr) {
+    NOGPU;
+}
+
+void gpu_device_synchronize() {
     NOGPU;
 }
 

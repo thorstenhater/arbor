@@ -87,6 +87,7 @@ void solve_matrix_interleaved(
 } // namespace kernels
 
 ARB_ARBOR_API void solve_matrix_flat(
+    stream_type stream,
     arb_value_type* rhs,
     arb_value_type* d,
     const arb_value_type* u,
@@ -94,7 +95,7 @@ ARB_ARBOR_API void solve_matrix_flat(
     const arb_index_type* cell_cv_divs,
     int num_mtx)
 {
-    launch_1d(num_mtx, 128, kernels::solve_matrix_flat<arb_value_type, arb_index_type>,
+    launch_1d(stream, num_mtx, 128, kernels::solve_matrix_flat<arb_value_type, arb_index_type>,
         rhs, d, u, p, cell_cv_divs, num_mtx);
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <iosfwd>
 #include <string>
 #include <unordered_map>
@@ -71,7 +72,10 @@ struct ARB_ARBOR_API ion_state {
     ion_state(const fvm_ion_config& ion_data, unsigned align, solver_ptr ptr);
 
     // Set ion concentrations to weighted proportion of default concentrations.
-    void init_concentration();
+    // The trailing parameter is a stream handle for signature parity with
+    // the GPU backend, where these ops run on the cell group's stream;
+    // ignored on CPU.
+    void init_concentration(std::nullptr_t = {});
 
     // Set ionic current density to zero.
     void zero_current();
@@ -120,7 +124,9 @@ struct ARB_ARBOR_API istim_state {
     void reset();
 
     // Contribute to current density:
-    void add_current(const arb_value_type t, array& current_density);
+    // (Trailing stream parameter for signature parity with the GPU backend;
+    // ignored on CPU.)
+    void add_current(const arb_value_type t, array& current_density, std::nullptr_t = {});
 
     // Construct state from i_clamp data:
     istim_state(const fvm_stimulus_config& stim_data, unsigned align);
@@ -130,6 +136,13 @@ struct ARB_ARBOR_API istim_state {
 
 struct ARB_ARBOR_API shared_state:
         public shared_state_base<shared_state, array, ion_state> {
+
+    // Signature parity with the GPU backend, which runs all device work of a
+    // cell group on its own stream: the "stream" of a CPU group is the null
+    // stream and synchronization is a no-op.
+    using stream_type = std::nullptr_t;
+    static constexpr std::nullptr_t stream() { return nullptr; }
+    void synchronize() const {}
 
     cable_solver solver;
 

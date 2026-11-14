@@ -81,22 +81,29 @@ unsigned warp_lanes() {
     return impl::threads_per_warp();
 }
 
-void launch_fold_point_partials(point_fold_desc* desc,
+// Runs on the owning group's stream: it reads the partials that the group's
+// mechanism kernels wrote on that stream and writes conductance/current that
+// the solver reads on it. On the legacy stream there is no ordering against a
+// non-blocking group stream, so the fold could run before its inputs were
+// written or after its outputs were consumed.
+void launch_fold_point_partials(stream_type stream,
+                                point_fold_desc* desc,
                                 unsigned n_desc,
                                 arb_size_type n_cv,
                                 arb_value_type* vec_g,
                                 arb_value_type* vec_i) {
     if (!n_desc || !n_cv) return;
-    launch_1d(n_cv, 128, kernel::fold_point_partials_impl, desc, n_desc, n_cv, vec_g, vec_i);
+    launch_1d(stream, n_cv, 128, kernel::fold_point_partials_impl, desc, n_desc, n_cv, vec_g, vec_i);
 }
 
-void add_scalar(std::size_t n, arb_value_type* data, arb_value_type v) {
-    launch_1d(n, 128, kernel::add_scalar<arb_value_type>, n, data, v);
+void add_scalar(stream_type stream, std::size_t n, arb_value_type* data, arb_value_type v) {
+    launch_1d(stream, n, 128, kernel::add_scalar<arb_value_type>, n, data, v);
 }
 
-void take_samples_impl(const event_stream_state<raw_probe_info>& s,
+void take_samples_impl(stream_type stream,
+                       const event_stream_state<raw_probe_info>& s,
                        const arb_value_type& time, arb_value_type* sample_time, arb_value_type* sample_value) {
-    launch_1d(s.size(), 128, kernel::take_samples_impl, s.begin_marked, s.end_marked, time, sample_time, sample_value);
+    launch_1d(stream, s.size(), 128, kernel::take_samples_impl, s.begin_marked, s.end_marked, time, sample_time, sample_value);
 }
 
 } // namespace gpu

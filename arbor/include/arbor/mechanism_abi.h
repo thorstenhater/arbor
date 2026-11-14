@@ -23,8 +23,9 @@ extern "C" {
 #define ARB_MECH_ABI_VERSION_MINOR 8
 // NOTE: the composite below ignores MINOR, so a ppack layout change must move
 // PATCH to be visible to the check in mechanism.hpp. arb_mechanism_ppack gained
-// fields in this version, and a module built against 0.7.x must not read past
-// the end of the copy the library hands it.
+// fields in this version (ordered-accumulation partials and the per-group stream
+// handle), and a module built against 0.7.x must not read past the end of the
+// copy the library hands it.
 #define ARB_MECH_ABI_VERSION_PATCH 1
 #define ARB_MECH_ABI_VERSION ((ARB_MECH_ABI_VERSION_MAJOR * 10000L * 10000L) + (ARB_MECH_ABI_VERSION_MAJOR * 10000L) + ARB_MECH_ABI_VERSION_PATCH)
 
@@ -150,6 +151,19 @@ typedef struct arb_mechanism_ppack {
     arb_index_type* __restrict__ part_begin;
     arb_index_type* __restrict__ warp_base;
     arb_size_type    n_partial_cv;
+
+    /* Below here: added in ABI 0.8.0, used by the GPU backend only.
+     * Per-cell-group CUDA/HIP stream.
+     *
+     * Set by gpu::shared_state::instantiate() for every mechanism the group
+     * owns, so a generated kernel launches on the stream of its owning group
+     * rather than the legacy default stream. NULL on the CPU backends and for
+     * mechanisms not instantiated by a GPU cell group; a module that ignores
+     * it behaves exactly as before. */
+    void* stream;                                   // Backend stream handle (GPU stream for the
+                                                    // owning cell group); NULL for CPU backends
+                                                    // and for mechanisms not instantiated by a
+                                                    // GPU cell group.
 } arb_mechanism_ppack;
 
 

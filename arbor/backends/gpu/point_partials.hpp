@@ -136,14 +136,13 @@ struct point_fold_desc {
 // from a host compiler that has no view of the target.
 unsigned warp_lanes();
 
-// Add every parked partial into conductivity and current_density, one thread
-// per CV, mechanisms in instantiation order, slots in ascending order. Launched
-// after all mechanisms have contributed their currents for the step.
-void launch_fold_point_partials(point_fold_desc* desc,
-                                unsigned n_desc,
-                                arb_size_type n_cv,
-                                arb_value_type* vec_g,
-                                arb_value_type* vec_i);
+// The fold itself — add every parked partial into conductivity and
+// current_density, one thread per CV, mechanisms in instantiation order, slots
+// in ascending order — is launched after all mechanisms have contributed their
+// currents for the step. It is defined in backends/gpu/shared_state.cu and
+// declared there, where the stream type exists: it must be enqueued on the
+// owning cell group's stream, not the legacy one. This header stays free of
+// device types so the table construction remains testable without a GPU.
 
 } // namespace gpu
 } // namespace arb

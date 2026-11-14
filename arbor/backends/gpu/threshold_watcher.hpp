@@ -17,26 +17,34 @@
 namespace arb {
 namespace gpu {
 
-// CUDA implementation entry points:
-void test_thresholds_impl(int size,
-                          arb_value_type t_after,
-                          arb_value_type t_before,
-                          const arb_index_type* src_to_spike,
-                          arb_value_type* time_since_spike,
-                          stack_storage<threshold_crossing>& stack,
-                          arb_index_type* is_crossed,
-                          arb_value_type* prev_values,
-                          const arb_index_type* cv_index,
-                          const arb_value_type* values,
-                          const arb_value_type* thresholds,
-                          bool record);
+// CUDA implementation entry points; all take the owning cell group's stream
+// (see backends/gpu/stream.hpp), on which their launches must be enqueued.
+// The stream defaults to the legacy stream so that direct users outside a
+// cell group (unit tests, examples) keep working unchanged.
+void test_thresholds_impl(
+    stream_type stream,
+    int size,
+    arb_value_type t_after,
+    arb_value_type t_before,
+    const arb_index_type* src_to_spike,
+    arb_value_type* time_since_spike,
+    stack_storage<threshold_crossing>& stack,
+    arb_index_type* is_crossed,
+    arb_value_type* prev_values,
+    const arb_index_type* cv_index,
+    const arb_value_type* values,
+    const arb_value_type* thresholds,
+    bool record);
 
-void reset_crossed_impl(int size,
-                        arb_index_type* is_crossed,
-                        const arb_index_type* cv_index,
-                        const arb_value_type* values,
-                        const arb_value_type* thresholds,
-                        arb_value_type* prev_values);
+void reset_crossed_impl(
+    stream_type stream,
+    int size,
+    arb_index_type* is_crossed,
+    const arb_index_type* cv_index,
+    const arb_value_type* values,
+    const arb_value_type* thresholds,
+    arb_value_type* prev_values);
+
 
 struct threshold_watcher {
     using stack_type = stack<threshold_crossing>;
@@ -71,27 +79,35 @@ struct threshold_watcher {
     }
 
     /// Remove all stored crossings that were detected in previous calls to test()
-    void clear_crossings() {
-        stack_.update_host();
-        stack_.clear();
+    /// Stream parameters order the stack copies/kernels on the owning cell
+    /// group's GPU stream; the default (legacy stream) preserves the
+    /// behaviour for direct users outside a cell group (unit tests etc.).
+    void clear_crossings(stream_type s = null_stream) {
+        stack_.update_host(s);
+        stack_.clear(s);
     }
 
     /// Reset state machine for each detector.
     /// Assume that the values in values_ have been set correctly before
     /// calling, because the values are used to determine the initial state
-    void reset(const array& values) {
+    /// and to seed each detector's own previous value.
+    void reset(const array& values, stream_type s = null_stream) {
         if (size() == 0) return;
         values_ = values.data();
-        clear_crossings();
-        reset_crossed_impl((int)size(), is_crossed_.data(), cv_index_.data(), values_, thresholds_.data(), v_prev_.data());
+        clear_crossings(s);
+        reset_crossed_impl(s, (int)size(), is_crossed_.data(), cv_index_.data(), values_, thresholds_.data(), v_prev_.data());
     }
 
     // Testing-only interface.
     bool is_crossed(int i) const { return is_crossed_[i]; }
 
-    const std::vector<threshold_crossing>& crossings() const {
-        stack_.update_host();
-        if (stack_.overflow()) throw arbor_internal_error("gpu/threshold_watcher: gpu spike buffer overflow");
+    const std::vector<threshold_crossing>& crossings(stream_type s = null_stream) const {
+        stack_.update_host(s);
+
+        if (stack_.overflow()) {
+            throw arbor_internal_error("gpu/threshold_watcher: gpu spike buffer overflow");
+        }
+
         crossings_.clear();
         crossings_.insert(crossings_.end(), stack_.begin(), stack_.end());
         return crossings_;
@@ -101,10 +117,14 @@ struct threshold_watcher {
     /// Crossing events are recorded for each threshold that has been
     /// crossed since current time t, and the last time the test was
     /// performed.
-    void test(array& time_since_spike, const arb_value_type& t_before, const arb_value_type& t_after) {
+    void test(array& time_since_spike,
+              const arb_value_type& t_before,
+              const arb_value_type& t_after,
+              stream_type s = null_stream) {
         if (size() <= 0) return;
         arb_assert(values_);
-        test_thresholds_impl((int)size(),
+        test_thresholds_impl(s,
+                             (int)size(),
                              t_after, t_before,
                              src_to_spike_, time_since_spike.data(),
                              stack_.storage(),
@@ -129,7 +149,7 @@ struct threshold_watcher {
     iarray cv_index_;           // Compartment indexes of values to watch.
     iarray is_crossed_;         // Boolean flag for state of each watch.
     array thresholds_;          // Threshold for each watch.
-    array v_prev_;              // Values at previous sample time.
+    array v_prev_;              // Values at previous sample time, per detector.
 
     // Hybrid host/gpu data structure for accumulating threshold crossings.
     mutable stack_type stack_;

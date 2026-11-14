@@ -2,6 +2,7 @@
 
 #include <arbor/export.hpp>
 #include <arbor/fvm_types.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 namespace arb {
 namespace gpu {
@@ -25,7 +26,7 @@ struct istim_pp {
     arb_value_type* current_density;
 };
 
-ARB_ARBOR_API void istim_add_current_impl(int n, const istim_pp& pp);
+ARB_ARBOR_API void istim_add_current_impl(stream_type stream, int n, const istim_pp& pp);
 
 } // namespace gpu
 } // namespace arb

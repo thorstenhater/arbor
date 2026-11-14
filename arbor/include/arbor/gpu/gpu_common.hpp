@@ -53,5 +53,25 @@ void launch_1d(unsigned elements, unsigned block_size, Kernel kernel, Args&&... 
     launch(impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
 }
 
+// Launch on an explicit stream. All device work of a cable cell group's GPU
+// backend must go through these overloads, on the group's own stream (see
+// backends/gpu/stream.hpp); the stream-less overloads above stay for device
+// work that is not owned by a cell group (examples, unit tests, helpers) and
+// keep using the legacy default stream.
+template<typename Kernel, typename... Args>
+void launch(stream_type s, const dim3& blocks, const dim3& threads, Kernel kernel, Args&&... args) {
+    kernel<<<blocks, threads, 0, s>>>(std::forward<Args>(args)...);
+    ARB_GPU_CHECK(get_last_error());
+#ifndef NDEBUG
+    ARB_GPU_CHECK(stream_synchronize(s));
+#endif
+}
+
+template<typename Kernel, typename... Args>
+void launch_1d(stream_type s, unsigned elements, unsigned block_size, Kernel kernel, Args&&... args) {
+    if (!elements) return;
+    launch(s, impl::block_count(elements, block_size), block_size, kernel, std::forward<Args>(args)...);
+}
+
 } // namespace gpu
 } // namespace arb

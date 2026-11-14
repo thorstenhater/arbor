@@ -4,6 +4,7 @@
 
 #include <arbor/export.hpp>
 #include <arbor/fvm_types.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 
 namespace arb {
 namespace gpu {
@@ -85,14 +86,17 @@ struct level_metadata {
     unsigned merge_data_index = no_merge_csr;
 };
 
-// C wrappers around kernels
+// C wrappers around kernels; the leading stream parameter is the stream of
+// the cell group owning the matrix data (see backends/gpu/stream.hpp).
 ARB_ARBOR_API void gather(
+    stream_type stream,
     const arb_value_type* from,
     arb_value_type* to,
     const arb_index_type* p,
     unsigned n);
 
 ARB_ARBOR_API void scatter(
+    stream_type stream,
     const arb_value_type* from,
     arb_value_type* to,
     const arb_index_type* p,

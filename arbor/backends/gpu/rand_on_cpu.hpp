@@ -29,7 +29,7 @@ struct random_numbers::impl {
         gid_{pos_data.gid},
         idx_{pos_data.idx} {}
 
-    void update(mechanism& m, cbprng::value_type counter) {
+    void update(stream_type s, mechanism& m, cbprng::value_type counter) {
         const auto num_rv = m.mech_.n_random_variables;
         const auto width = m.ppack_.width;
         const cbprng::value_type mech_id = m.mechanism_id();
@@ -37,8 +37,10 @@ struct random_numbers::impl {
         arb_value_type* dst = random_numbers_h_.data();
         arb::multicore::generate_random_numbers(dst, width, value_width_padded_, num_rv, seed_,
             mech_id, counter, gid_.data(), idx_.data());
-        // transfer values to device
-        memory::gpu_memcpy_h2d(random_numbers_, dst,
+        // transfer values to device, ordered on the group's stream; safe
+        // because the host staging buffer is not rewritten until the next
+        // cache wrap, which the per-epoch synchronization bounds.
+        memory::gpu_memcpy_h2d_async(s, random_numbers_, dst,
             (num_rv*cbprng::cache_size()*value_width_padded_)*sizeof(arb_value_type));
     }
 };

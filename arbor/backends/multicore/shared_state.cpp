@@ -74,7 +74,7 @@ ion_state::ion_state(const fvm_ion_config& ion_data,
     if (flags_.xd())       Xd_      = {ion_data.reset_iconc.begin(), ion_data.reset_iconc.end(),  pad(alignment)};
 }
 
-void ion_state::init_concentration() {
+void ion_state::init_concentration(std::nullptr_t) {
     // NB. not resetting Xd here, it's controlled via the solver.
     if (flags_.reset_xi()) std::copy(init_Xi_.begin(), init_Xi_.end(), Xi_.begin());
     if (flags_.reset_xo()) std::copy(init_Xo_.begin(), init_Xo_.end(), Xo_.begin());
@@ -143,7 +143,7 @@ void istim_state::reset() {
     std::copy(envl_divs_.data(), envl_divs_.data()+n, envl_index_.begin());
 }
 
-void istim_state::add_current(const arb_value_type time, array& current_density) {
+void istim_state::add_current(const arb_value_type time, array& current_density, std::nullptr_t) {
     constexpr double two_pi = 2*math::pi<double>;
 
     // Consider vectorizing...

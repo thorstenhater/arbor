@@ -8,7 +8,10 @@
 namespace arb {
 namespace gpu {
 
-ARB_ARBOR_API void assemble_diffusion(arb_value_type* d,
+// The leading stream parameter is the stream of the cell group owning the
+// matrix data (see backends/gpu/stream.hpp).
+ARB_ARBOR_API void assemble_diffusion(stream_type stream,
+                                      arb_value_type* d,
                                       arb_value_type* rhs,
                                       const arb_value_type* invariant_d,
                                       const arb_value_type* concentration,
@@ -17,7 +20,8 @@ ARB_ARBOR_API void assemble_diffusion(arb_value_type* d,
                                       const arb_index_type* perm,
                                       unsigned n);
 
-ARB_ARBOR_API void solve_diffusion(arb_value_type* rhs,
+ARB_ARBOR_API void solve_diffusion(stream_type stream,
+                                   arb_value_type* rhs,
                                    arb_value_type* d,                     // diagonal values
                                    const arb_value_type* u,               // upper diagonal (and lower diagonal as the matrix is SPD)
                                    const level_metadata* level_meta,      // information pertaining to each level

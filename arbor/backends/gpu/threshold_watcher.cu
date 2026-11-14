@@ -1,6 +1,7 @@
 #include <cmath>
 
 #include <arbor/fvm_types.hpp>
+#include <arbor/gpu/gpu_api.hpp>
 #include <arbor/gpu/math_cu.hpp>
 
 #include "backends/threshold_crossing.hpp"
@@ -119,7 +120,8 @@ void reset_crossed_impl(int size,
 
 } // namespace kernel
 
-void test_thresholds_impl(int size,
+void test_thresholds_impl(stream_type stream,
+                          int size,
                           const arb_value_type t_after,
                           const arb_value_type t_before,
                           const arb_index_type* src_to_spike,
@@ -132,22 +134,23 @@ void test_thresholds_impl(int size,
                           const arb_value_type* thresholds,
                           bool record_time_since_spike) {
     if (record_time_since_spike) {
-        launch_1d(size, 128, kernel::test_thresholds_record_impl,
+        launch_1d(stream, size, 128, kernel::test_thresholds_record_impl,
                   size, t_after, t_before, src_to_spike, time_since_spike, stack, is_crossed, prev_values, cv_index, values, thresholds);
     }
     else {
-        launch_1d(size, 128, kernel::test_thresholds_impl,
+        launch_1d(stream, size, 128, kernel::test_thresholds_impl,
                   size, t_after, t_before, src_to_spike, time_since_spike, stack, is_crossed, prev_values, cv_index, values, thresholds);
     }
 }
 
-void reset_crossed_impl(int size,
+void reset_crossed_impl(stream_type stream,
+                        int size,
                         arb_index_type* is_crossed,
                         const arb_index_type* cv_index,
                         const arb_value_type* values,
                         const arb_value_type* thresholds,
                         arb_value_type* prev_values) {
-    launch_1d(size, 128, kernel::reset_crossed_impl,
+    launch_1d(stream, size, 128, kernel::reset_crossed_impl,
               size, is_crossed, cv_index, values, thresholds, prev_values);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 #include <arbor/mechanism.hpp>
@@ -10,6 +11,8 @@
 #include <backends/rand_fwd.hpp>
 #include <backends/gpu/gpu_store_types.hpp>
 
+#include <arbor/gpu/gpu_api.hpp>
+
 namespace arb {
 namespace gpu {
 
@@ -18,7 +21,10 @@ public:
     void instantiate(mechanism& m, std::size_t value_width_padded, const mechanism_layout& pos_data,
         arb_seed_type seed);
 
-    void update(mechanism& m);
+    // Selects the next random number cache and, when the cache wraps,
+    // regenerates the numbers; all device work runs on `s`, the stream of the
+    // cell group owning this store (pass `null_stream` outside a cell group).
+    void update(stream_type s, mechanism& m);
 
     ARB_SERDES_ENABLE(random_numbers, data_, random_number_update_counter_);
 

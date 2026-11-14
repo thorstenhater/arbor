@@ -1000,6 +1000,11 @@ void advance_mech_cpu(arb_mechanism_ppack* pp) {
 void advance_mech_gpu(arb_mechanism_ppack* pp) {
     const auto width = pp->width;
     arb_value_type* ptr = archive_ptr->claim(width);
+    // The random number values are produced by kernels on the cell group's
+    // own (non-blocking) stream; the copies below run on the legacy stream,
+    // which has no implicit ordering against non-blocking streams. Wait for
+    // the device (i.e. every stream) before reading.
+    memory::gpu_device_synchronize();
     // copy gpu pointer
     arb_value_type const * gpu_ptr;
     memory::gpu_memcpy_d2h(&gpu_ptr, pp->random_numbers, sizeof(arb_value_type const*));

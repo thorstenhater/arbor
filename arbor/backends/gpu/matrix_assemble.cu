@@ -155,6 +155,7 @@ void assemble_matrix_interleaved(
 } // namespace kernels
 
 ARB_ARBOR_API void assemble_matrix_flat(
+        stream_type stream,
         arb_value_type* d,
         arb_value_type* rhs,
         const arb_value_type* invariant_d,
@@ -168,7 +169,7 @@ ARB_ARBOR_API void assemble_matrix_flat(
         const arb_index_type* cell_to_intdom,
         unsigned n)
 {
-    launch_1d(n, 128, kernels::assemble_matrix_flat<arb_value_type, arb_index_type>,
+    launch_1d(stream, n, 128, kernels::assemble_matrix_flat<arb_value_type, arb_index_type>,
         d, rhs, invariant_d, voltage, current, conductivity, cv_capacitance,
         area, cv_to_cell, dt_intdom, cell_to_intdom, n);
 }

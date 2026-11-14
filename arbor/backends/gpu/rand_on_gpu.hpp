@@ -33,12 +33,12 @@ struct random_numbers::impl {
         prng_indices_d_ = memory::on_gpu(prng_indices_);
     }
 
-    void update(mechanism& m, cbprng::value_type counter) {
+    void update(stream_type s, mechanism& m, cbprng::value_type counter) {
         const auto num_rv = m.mech_.n_random_variables;
         const auto width = m.ppack_.width;
         const cbprng::value_type mech_id = m.mechanism_id();
-        // generate random numbers on the device
-        generate_random_numbers(random_numbers_, width, value_width_padded_, num_rv, seed_,
+        // generate random numbers on the device, on the group's stream
+        generate_random_numbers(s, random_numbers_, width, value_width_padded_, num_rv, seed_,
             mech_id, counter, prng_indices_[0], prng_indices_[1]);
     }
 };

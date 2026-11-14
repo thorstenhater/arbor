@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <util/partition.hpp>
 #include <util/span.hpp>
 
@@ -63,9 +65,13 @@ struct diffusion_solver {
     // Assemble the matrix
     //   concentration   [mM]      (per control volume)
     //   dt              [ms]      (scalar)
+    // The trailing parameter is a stream handle for signature parity with
+    // the GPU backend, where these ops run on the cell group's stream;
+    // ignored on CPU.
     template<typename T>
     void solve(T& concentration,
-               value_type dt) {
+               value_type dt,
+               std::nullptr_t = {}) {
         auto cell_cv_part = util::partition_view(cell_cv_divs);
         index_type ncells = cell_cv_part.size();
 
