@@ -15,6 +15,7 @@
 #include "backends/gpu/rand.hpp"
 #include "backends/gpu/gpu_store_types.hpp"
 #include "backends/gpu/stimulus.hpp"
+#include "backends/gpu/point_partials.hpp"
 #include "backends/gpu/diffusion_state.hpp"
 #include "backends/gpu/matrix_state_fine.hpp"
 #include "backends/gpu/threshold_watcher.hpp"
@@ -119,6 +120,16 @@ struct mech_storage {
     memory::device_vector<arb_value_type*> state_vars_d_;
     memory::device_vector<arb_ion_state>   ion_states_d_;
     random_numbers random_numbers_;
+
+    // Scratch and index tables for ordered accumulation of point-process
+    // partials; empty unless this mechanism has a CV whose instances span more
+    // than one warp. See backends/gpu/point_partials.hpp. Deliberately not
+    // serialised: a mechanism restored without tables adds its partials
+    // directly, which is what it did before the tables existed.
+    array    partial_d_;
+    iarray   part_begin_d_;
+    iarray   warp_base_d_;
+    iarray   part_end_d_;
 };
 
 struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_state> {
@@ -164,6 +175,11 @@ struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_st
     std::unordered_map<std::string, ion_state> ion_data;
     std::vector<mech_storage> storage;
     std::vector<spike_event_stream> streams;
+
+    // One entry per mechanism instance group that parked partials, in
+    // instantiation order, which is the order the fold adds them in.
+    std::vector<point_fold_desc> fold_desc_;
+    memory::device_vector<point_fold_desc> fold_desc_d_;
 
     shared_state() = default;
 
@@ -225,6 +241,11 @@ struct ARB_ARBOR_API shared_state: shared_state_base<shared_state, array, ion_st
 
     // Take samples according to marked events in a sample_event_stream.
     void take_samples();
+
+    // Add the point-process partials that a multi-warp run cannot add in a
+    // defined order. Called once per step after every mechanism has contributed
+    // its currents; does nothing if no mechanism needs it.
+    void fold_point_partials();
 
     // Reset internal state
     void reset();

@@ -143,6 +143,9 @@ ARB_LIBMODCC_API std::string emit_gpu_cu_source(const Module& module_, const pri
                                    "arb_index_type * __restrict__ {0}multiplicity      __attribute__((unused)) = params_.multiplicity;\\\n"
                                    "arb_value_type ** __restrict__ {0}state_vars        __attribute__((unused)) = params_.state_vars;\\\n"
                                    "arb_value_type * __restrict__ {0}weight            __attribute__((unused)) = params_.weight;\\\n"
+                                   "arb_value_type * __restrict__ {0}partial           __attribute__((unused)) = params_.partial;\\\n"
+                                   "arb_index_type * __restrict__ {0}part_begin        __attribute__((unused)) = params_.part_begin;\\\n"
+                                   "arb_index_type * __restrict__ {0}warp_base         __attribute__((unused)) = params_.warp_base;\\\n"
                                    "auto& {0}events            __attribute__((unused)) = params_.events;\\\n"
                                    "auto& {0}mechanism_id      __attribute__((unused)) = params_.mechanism_id;\\\n"),
                        pp_var_pfx);
@@ -488,7 +491,22 @@ void emit_state_update_cu(std::ostream& out,
             << var << " = fma(" << weight << ", " << name << ", " << var << ");\n";
     }
     else if (d.accumulate) {
-        if (flags.is_point) {
+        if (flags.is_point && (d.data_var == "vec_g" || d.data_var == "vec_i")) {
+            /* Point instances of one CV are spread over however many warps the
+             ** run covers, and the order those partials reach the target is not
+             ** part of the program. So the roots of a run that straddles a warp
+             ** boundary park their partial in scratch, and a fold adds all of
+             ** them in slot order once every mechanism is done (see
+             ** backends/gpu/point_partials.hpp). A run inside one warp keeps the
+             ** direct add: it is the only add that CV gets.
+             */
+            const int target_ix = d.data_var == "vec_g"? 0: 1;
+            out << "::arb::gpu::accumulate_point(" << weight << "*" << name << ',' << data << ", " << index << ", lane_mask_, "
+                << pp_var_pfx << "partial, " << pp_var_pfx << "part_begin, " << pp_var_pfx << "warp_base, " << target_ix << ");\n";
+        }
+        else if (flags.is_point) {
+            // Any other accumulated target (ionic current) keeps the plain warp
+            // reduction and the atomic add it implies.
             out << "::arb::gpu::reduce_by_key(" << weight << "*" << name << ',' << data << ", " << index << ", lane_mask_);\n";
         }
         else {

@@ -63,11 +63,26 @@ std::ostream& operator<<(std::ostream& o, branch b) {
         << "]";
 }
 
+// Value of level_metadata::merge_data_index when a level needs no
+// parent-merge table: either no branch has a parent (the root level of a
+// block), or every parent branch on the next level has at most one
+// contributor on this level. In the latter case the solve_matrix_fine kernel
+// merges the single addend directly, with no ordering ambiguity.
+inline constexpr unsigned no_merge_csr = ~0u;
+
 struct level_metadata {
     unsigned num_branches = 0; // Number of branches in a level
     unsigned max_length = 0;   // Length of the longest branch
     unsigned matrix_data_index = 0;   // Index into data values (d, u, rhs) of the first branch
     unsigned level_data_index  = 0;   // Index into data values (lengths, parents) of each level
+    // Index into the parent-merge CSR table of the solve_matrix_fine kernel,
+    // or no_merge_csr (see above). Where a table exists, it holds per level
+    //   [num_branches(next level)+1 start offsets][contributor column index ...]
+    // and the contributors of one parent branch are listed in ascending order
+    // of their start index (a global CV index), so that folding the staged
+    // addends in table order reproduces the merged sums bit for bit across
+    // runs and under any regrouping of cells into blocks.
+    unsigned merge_data_index = no_merge_csr;
 };
 
 // C wrappers around kernels

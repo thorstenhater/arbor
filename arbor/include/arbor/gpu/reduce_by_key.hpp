@@ -56,10 +56,12 @@ struct key_set_pos {
     }
 };
 
-template <typename T, typename I>
+// The in-warp part of the reduction: after this, every lane that starts a run
+// segment inside this warp holds the sum over that segment. The order of these
+// adds is fixed. What is not fixed is the order the segments reach memory.
+template <typename T>
 __device__ __inline__
-void reduce_by_key(T contribution, T* target, I i, lane_mask_type mask) {
-    key_set_pos run(i, mask);
+void butterfly_in_run(T& contribution, const key_set_pos& run) {
     unsigned shift = 1;
     const unsigned width = run.width;
 
@@ -73,10 +75,55 @@ void reduce_by_key(T contribution, T* target, I i, lane_mask_type mask) {
         shift <<= 1;
         w = shift<width? shift: 0;
     }
+}
+
+template <typename T, typename I>
+__device__ __inline__
+void reduce_by_key(T contribution, T* target, I i, lane_mask_type mask) {
+    key_set_pos run(i, mask);
+    butterfly_in_run(contribution, run);
 
     if(run.is_root) {
         // The update must be atomic, because the run may span multiple warps.
         gpu_atomic_add(target+i, contribution);
+    }
+}
+
+// Same reduction as reduce_by_key, but a warp whose run continues in another
+// warp hands its partial to scratch instead of adding it to the target.
+//
+// Point instances are laid out in ascending CV order, so a CV occupies one
+// contiguous run of instances. A run that stays inside a warp contributes a
+// single add per step, which is the same value whenever it lands; a run that
+// straddles a warp boundary contributes one add per warp it touches, and the
+// order those adds arrive in is decided by the memory system rather than by the
+// program, which makes the accumulated conductance and current irreproducible.
+// Those partials are stored here, in slot order, which is ascending warp
+// order, and gpu::fold_point_partials adds them once every mechanism is done.
+//
+// partial, part_begin and warp_base are the scratch tables described in
+// arbor/mechanism_abi.h. target_ix selects the half of a slot that belongs to
+// this target (0 = vec_g, 1 = vec_i). With part_begin == nullptr, or for a CV
+// whose run stays in one warp, this does exactly what reduce_by_key does.
+template <typename T, typename I>
+__device__ __inline__
+void accumulate_point(T contribution, T* target, I i, lane_mask_type mask,
+                      T* partial, const I* part_begin, const I* warp_base,
+                      unsigned target_ix) {
+    key_set_pos run(i, mask);
+    butterfly_in_run(contribution, run);
+
+    if (run.is_root) {
+        const I begin = part_begin? part_begin[i]: -1;
+        if (begin >= 0) {
+            const unsigned tid  = threadIdx.x + blockDim.x*blockIdx.x;
+            const unsigned warp = tid / impl::threads_per_warp();
+            const unsigned rank = unsigned(begin - warp_base[i]) + warp; // 0 within the run
+            partial[2*rank + target_ix] = contribution;
+        }
+        else {
+            gpu_atomic_add(target+i, contribution);
+        }
     }
 }
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstring>
+#include <algorithm>
+#include <tuple>
 
 #include <vector>
 
@@ -17,6 +19,52 @@
 
 namespace arb {
 namespace gpu {
+
+// Build one level's parent-merge CSR table, appended to `out`:
+//   [next_width + 1 start offsets][contributor column index per contributor]
+// Each contributor tuple is (parent branch column, contributor's global start
+// CV index, contributor column). Contributors of one parent are stored in
+// ascending order of start index; the kernel's fold relies on that order for
+// bit-exact reproducibility. If every parent column has at most one
+// contributor no table is needed (the kernel merges directly): `out` is left
+// untouched and the function returns false. Otherwise the table is appended
+// and the function returns true.
+template <typename I>
+inline bool build_merge_csr(
+        std::vector<std::tuple<unsigned, unsigned, unsigned>> contribs,
+        unsigned next_width,
+        std::vector<I>& out)
+{
+    util::sort(contribs, [](const auto& l, const auto& r) {
+        return std::make_tuple(std::get<0>(l), std::get<1>(l))
+             < std::make_tuple(std::get<0>(r), std::get<1>(r));
+    });
+
+    // A fold is only needed once two threads would write the same parent.
+    if (contribs.size() < 2 ||
+        std::adjacent_find(contribs.begin(), contribs.end(), [](const auto& l, const auto& r) {
+            return std::get<0>(l) == std::get<0>(r);
+        }) == contribs.end()) {
+        return false;
+    }
+
+    const auto base = out.size();
+    const unsigned n = contribs.size();
+    out.resize(base + next_width + 1 + n);
+
+    unsigned i = 0;
+    for (unsigned c = 0; c < next_width; ++c) {
+        out[base + c] = (I)i;
+        while (i < n && std::get<0>(contribs[i]) == c) { ++i; }
+    }
+    out[base + next_width] = (I)i;
+    arb_assert(i == n); // every parent column lies below next_width
+
+    for (unsigned j = 0; j < n; ++j) {
+        out[base + next_width + 1 + j] = (I)std::get<2>(contribs[j]);
+    }
+    return true;
+}
 
 template <typename T, typename I>
 struct matrix_state_fine {
@@ -67,6 +115,10 @@ public:
     // level sequentially in memory. Indexed by level_metadata::level_data_index
     iarray level_parents;
 
+    // Parent-merge CSR tables for the solve kernel, one per level that needs
+    // one; indexed by level_metadata::merge_data_index. See build_merge_csr.
+    iarray merge_data;
+
     // Stores the indices to the first level belonging to each block
     // block b owns { levels[block_index[b]], ..., levels[block_index[b+1] - 1] }
     // there is an additional entry at the end of the vector to make the above
@@ -94,6 +146,13 @@ public:
         forest trees(p, cell_cv_divs);
         trees.optimize();
 
+        // Mapping from the forest's internal CV order to the caller's flat CV
+        // order. Used below both for the final permutation and to order the
+        // parent-merge contributors of a level by the caller's CV index, which
+        // - unlike the internal index - is independent of how cells happen to
+        // be grouped into blocks, so merge orders are stable across packings.
+        auto perm_balancing = trees.permutation();
+
         // Now distribute the cells into gpu blocks.
         // While the total number of branches on each level of theses cells in a
         // block are less than `max_branches_per_level` we add more cells. If
@@ -116,11 +175,11 @@ public:
 
         unsigned num_branches = 0u;
         for (auto c: make_span(0u, num_cells)) {
-            auto cell_start = cell_cv_divs[c];
-            auto cell_tree = trees.branch_tree(c);
-            auto fine_tree = trees.compartment_tree(c);
-            auto branch_starts  = trees.branch_offsets(c);
-            auto branch_lengths = trees.branch_lengths(c);
+            const auto  cell_start     = cell_cv_divs[c];
+            const auto& cell_tree      = trees.branch_tree(c);
+            const auto& fine_tree      = trees.compartment_tree(c);
+            const auto& branch_starts  = trees.branch_offsets(c);
+            const auto& branch_lengths = trees.branch_lengths(c);
 
             auto depths = depth_from_root(cell_tree);
 
@@ -158,7 +217,8 @@ public:
                 for (auto i: make_span(cell_num_levels)) {
                     block_num_branches_per_depth[i] += cell_num_branches_per_depth[i];
                 }
-            } else {
+            }
+            else {
                 // otherwise start a new block
                 block_ix[c] = current_block + 1;
                 temp_ncells_in_block.push_back(1);
@@ -175,8 +235,6 @@ public:
                     }
                 }
             }
-            num_cells_in_block = memory::make_const_view(temp_ncells_in_block);
-
 
             // the branch map for the block in which we put the cell
             // maps levels to a list of branches in that level
@@ -184,9 +242,8 @@ public:
 
             // build branch_map:
             // branch_map[i] is a list of branch meta-data for branches with depth i
-            if (cell_num_levels > branch_map.size()) {
-                branch_map.resize(cell_num_levels);
-            }
+            if (cell_num_levels > branch_map.size()) branch_map.resize(cell_num_levels);
+
             for (auto i: make_span(num_cell_branches)) {
                 branch b;
                 auto depth = depths[i];
@@ -203,6 +260,8 @@ public:
             // total number of branches of all cells
             num_branches += num_cell_branches;
         }
+
+        num_cells_in_block = memory::make_const_view(temp_ncells_in_block);
 
         for (auto& branch_map: branch_maps) {
             // reverse the levels
@@ -255,6 +314,10 @@ public:
         std::vector<level_metadata> temp_meta;
         std::vector<size_type> temp_lengths, temp_parents, temp_data_part, temp_block_index;
 
+        // Concatenated parent-merge CSR tables for levels where more than one
+        // branch contributes to the same parent; see build_merge_csr.
+        std::vector<size_type> temp_merge;
+
         temp_block_index.reserve(branch_maps.size() + 1);
         temp_block_index.push_back(0);
         temp_data_part.reserve(branch_maps.size());
@@ -264,7 +327,9 @@ public:
         // Offset into the packed data format, used to access level_lengths and level_parents
         auto data_start = 0u;
         for (const auto& branch_map: branch_maps) {
-            for (const auto& lvl_branches: branch_map) {
+            const auto num_block_levels = (unsigned)branch_map.size();
+            for (unsigned l: make_span(num_block_levels)) {
+                const auto& lvl_branches = branch_map[l];
 
                 level_metadata lvl_meta;
                 std::vector<size_type> lvl_lengths(lvl_branches.size()), lvl_parents(lvl_branches.size());
@@ -288,6 +353,30 @@ public:
                     auto index = b.parent_id==npos? npos: branch_locs[b.parent_id].index;
                     lvl_parents[bi] = index;
                     ++bi;
+                }
+
+                // Every branch below the block's root level merges an addend
+                // into a branch of the level above. Where two or more branches
+                // share a parent, record all contributors of this level in a
+                // CSR table ordered by start index so that the solve kernel
+                // can fold them reproducibly; otherwise (a strictly single-
+                // contributor level) leave the sentinel in place and let the
+                // kernel merge directly.
+                if (l + 1 < num_block_levels) {
+                    std::vector<std::tuple<unsigned, unsigned, unsigned>> contribs;
+                    contribs.reserve(lvl_branches.size());
+                    for (auto i = 0u; i < lvl_branches.size(); ++i) {
+                        // Order key: the contributor's caller-side flat CV index
+                        // (grouping-invariant), not the forest's internal index.
+                        auto caller_start = perm_balancing[lvl_branches[i].start_idx];
+                        contribs.emplace_back((unsigned)lvl_parents[i], caller_start, i);
+                    }
+                    const auto merge_index = (unsigned)temp_merge.size();
+                    if (build_merge_csr(std::move(contribs),
+                                        (unsigned)branch_map[l + 1].size(),
+                                        temp_merge)) {
+                        lvl_meta.merge_data_index = merge_index;
+                    }
                 }
 
                 data_start+= lvl_meta.num_branches;
@@ -330,10 +419,11 @@ public:
         level_meta     = memory::make_const_view(temp_meta);
         level_lengths  = memory::make_const_view(temp_lengths);
         level_parents  = memory::make_const_view(temp_parents);
+        if (!temp_merge.empty()) {
+            merge_data = memory::make_const_view(temp_merge);
+        }
         data_partition = memory::make_const_view(temp_data_part);
         block_index    = memory::make_const_view(temp_block_index);
-
-        auto perm_balancing = trees.permutation();
 
         // apppy permutation form balancing
         std::vector<size_type> perm_tmp2(matrix_size);
@@ -420,6 +510,7 @@ public:
                           block_index.data(),
                           num_cells_in_block.data(),
                           data_partition.data(),
+                          merge_data.data(),
                           num_cells_in_block.size(),
                           max_branches_per_level);
         // unpermute the solution
