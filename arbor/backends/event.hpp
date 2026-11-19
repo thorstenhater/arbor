@@ -50,8 +50,9 @@ struct deliverable_event {
 // Subset of event information required for mechanism delivery.
 struct deliverable_event_data {
     cell_local_size_type mech_index = 0; // same as target_handle::mech_index
-    float weight = 0;
+    float weight = 0.0f;
 
+    bool operator==(deliverable_event_data const&) const noexcept = default;
     auto operator<=>(deliverable_event_data const&) const noexcept = default;
 
     deliverable_event_data(cell_local_size_type idx, float w) noexcept:

@@ -259,10 +259,10 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
     // Split epoch into equally sized timesteps (last timestep is chosen to match end of epoch)
     timesteps_.reset(ep, dt);
 
-    PE(clear);
+    PE(clear_samples);
     sample_events_.resize(timesteps_.size());
     for (auto& v: sample_events_) v.clear();
-    PL(clear);
+    PL(clear_samples);
 
     // Create sample events and delivery information.
     //
@@ -277,7 +277,7 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
     // value as defined below, grouping together all the samples of the
     // same probe for this callback in this association.
 
-    PE(samplesetup);
+    PE(setup_samples);
     std::vector<sampler_call_info> call_info;
 
     sample_size_type n_samples = 0;
@@ -316,7 +316,7 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
             arb_assert(n_samples==call_info.back().end_offset);
         }
     }
-    PL(samplesetup);
+    PL(setup_samples);
 
     // Run integration and collect samples, spikes.
     auto result = lowered_->integrate(timesteps_, event_lanes, sample_events_);
@@ -324,7 +324,7 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
     // For each sampler callback registered in `call_info`, construct the
     // vector of sample entries from the lowered cell sample times and values
     // and then call the callback.
-    PE(sampledeliver);
+    PE(deliver_samples);
 
     fvm_probe_scratch scratch;
     scratch.reserve(max_samples_per_call);
@@ -332,7 +332,7 @@ void cable_cell_group::advance(epoch ep, time_type dt, const event_lane_subrange
     for (auto& sc: call_info) {
         run_samples(sc, result.sample_time.data(), result.sample_value.data(), scratch);
     }
-    PL(sampledeliver);
+    PL(deliver_samples);
 
     // Copy out spike voltage threshold crossings from the back end, then
     // generate spikes with global spike source ids. The threshold crossings

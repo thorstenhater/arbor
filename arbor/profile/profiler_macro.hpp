@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arbor/profile/profiler.hpp>
+#include <arbor/version.hpp>
 
 #ifdef ARB_GPU_ENABLED
 #include <arbor/gpu/gpu_api.hpp>

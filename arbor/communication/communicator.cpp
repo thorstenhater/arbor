@@ -83,7 +83,7 @@ void make_remote_connections(const std::vector<cell_gid_type>& gids,
                              resolver& target_resolver,
                              resolver& source_resolver,
                              communicator::connection_list& out) {
-    PE(connections);
+    PE(connections_remote);
     std::vector<connection> ext_connections;
     std::size_t n_ext = 0;
     target_resolver.clear();
@@ -99,17 +99,17 @@ void make_remote_connections(const std::vector<cell_gid_type>& gids,
             ++n_ext;
         }
     }
-    PL(connections);
+    PL(connections_remote);
 
     PE(sort);
     util::sort(ext_connections);
     PL(sort);
 
-    PE(destructure);
+    PE(destructure_remote);
     out.clear();
     out.reserve(n_ext);
     out.make(ext_connections);
-    PL(destructure);
+    PL(destructure_remote);
 }
 
 void communicator::update_connections(const recipe& rec,
@@ -134,9 +134,9 @@ void communicator::update_connections(const recipe& rec,
     PL(index);
 
     // Construct connection from external
-    PE(remote);
+    PE(remote_connections);
     make_remote_connections(gids, rec, dom_dec, target_resolver, source_resolver, ext_connections_);
-    PL(remote);
+    PL(remote_connections);
 
     // Construct connections from recipe callback
     // NOTE: It'd great to parallelize here, however, as we write to different
@@ -254,11 +254,11 @@ void communicator::update_connections(const recipe& rec,
 
     // Sort the connections for each domain; num_domains_ independent sorts
     // parallelized trivially.
-    PE(sort_local);
+    PE(sort_local_connections);
     threading::parallel_for::apply(0, num_domains_, ctx_->thread_pool.get(),
                                    [&](auto i) { ska_sort(connections_by_src_domain[i].begin(), connections_by_src_domain[i].end(),
                                                           [](const connection& c) { return std::make_tuple(c.source.gid, c.source.index); }); });
-    PL(sort_local);
+    PL(sort_local_connections);
 
     PE(partition);
     reset_partition(connections_by_src_domain, connection_part_);
@@ -329,11 +329,11 @@ generate_all_to_all_vector(const std::vector<spike>& spikes,
 
 communicator::spikes
 communicator::exchange(std::vector<spike>& local_spikes) {
-    PE(exchange);
-    PE(sort);
+    PE(communicator_exchange);
+    PE(sort_local_spikes);
     // sort the spikes in ascending order of source gid
     util::sort_by(local_spikes, [](spike s){return s.source;});
-    PL(sort);
+    PL(sort_local_spikes);
 
     PE(sum_spikes);
     num_local_spikes_ = ctx_->distributed->sum(local_spikes.size());
@@ -363,7 +363,7 @@ communicator::exchange(std::vector<spike>& local_spikes) {
     // sort, since we cannot trust our peers
     std::sort(remote_spikes.begin(), remote_spikes.end());
     PL(post_process);
-    PL(exchange);
+    PL(communicator_exchange);
     return {std::move(global_spikes), std::move(remote_spikes)};
 }
 

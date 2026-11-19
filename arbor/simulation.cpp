@@ -33,12 +33,12 @@ ARB_ARBOR_API void merge_cell_events(time_type t_from,
                                      std::vector<event_generator>& generators,
                                      pse_vector& new_events) {
     // Tree-merge events in [t_from, t_to) from old, pending, and generator events.
-    PE(setup);
+    PE(discard_old_events);
     // discard events from before the current epoch
     old_events.left = std::lower_bound(old_events.begin(), old_events.end(),
                                        t_from,
                                        [](auto const& l, auto r) noexcept { return l.time < r; });
-    PL(setup);
+    PL(discard_old_events);
 
     PE(reserve);
     std::size_t n_evts = old_events.size() + pending.size();
@@ -268,7 +268,7 @@ simulation_state::simulation_state(const recipe& rec,
 
 void simulation_state::update(const recipe& rec) {
     PE(arbor);
-    PE(update);
+    PE(update_connections);
     communicator_.update_connections(rec, ddc_, source_resolution_map_, target_resolution_map_);
     // Use half minimum delay of the network for max integration interval.
     t_interval_ = min_delay()/2;
@@ -279,7 +279,7 @@ void simulation_state::update(const recipe& rec) {
     // Forget old generators, if present
     event_generators_.clear();
     event_generators_.resize(num_local_cells);
-    PE(generators);
+    PE(update_generators);
     auto target_resolver = resolver(&target_resolution_map_);
     cell_size_type lidx = 0;
     cell_size_type gidx = 0;
@@ -299,14 +299,14 @@ void simulation_state::update(const recipe& rec) {
         }
         ++gidx;
     }
-    PL(generators);
+    PL(update_generators);
 
     // Create event lane buffers.
     // One buffer is consumed by cell group updates while the other is filled with events for
     // the following epoch. In each buffer there is one lane for each local cell.
     event_lanes_[0].resize(num_local_cells);
     event_lanes_[1].resize(num_local_cells);
-    PL(update);
+    PL(update_connections);
     PL(arbor);
 }
 
@@ -436,9 +436,9 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
         PL(spikeio);
 
         // Append events formed from global spikes to per-cell pending event queues.
-        PE(walkspikes);
+        PE(walk_spikes);
         communicator_.make_event_queues(spikes, pending_events_);
-        PL(walkspikes);
+        PL(walk_spikes);
         PL(exchange);
     };
 
@@ -471,21 +471,21 @@ time_type simulation_state::run(time_type tfinal, time_type dt) {
                 // NET_RECEIVE (weight) { state = state + weight^2 }
                 //
                 // ie synapses are not linear in weight
-                PE(sort);
+                PE(sort_pending);
                 ska_sort(pending_events_[i].begin(), pending_events_[i].end(),
                          [](const auto& o) { return std::tie(o.time, o.target, o.weight); });
-                PL(sort);
+                PL(sort_pending);
 
-                PE(merge_cell_events);
+                PE(merge_pending);
                 merge_cell_events(next.t0, next.t1,                                      // time range [from, to)
                                   util::range_pointer_view(event_lanes(next.id - 1)[i]), // last epoch's events
                                   util::range_pointer_view(pending_events_[i]),          // current epoch's
                                   event_generators_[i],
                                   event_lanes(next.id)[i]);                              // out: merged events
-                PL(merge_cell_events);
-                PE(clear);
+                PL(merge_pending);
+                PE(clear_pending);
                 pending_events_[i].clear();
-                PL(clear);
+                PL(clear_pending);
                 PL(enqueue);
             });
     };
