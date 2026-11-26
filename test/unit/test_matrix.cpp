@@ -124,3 +124,50 @@ TEST(matrix, solve_multi_matrix) {
     m.solve(v, dt, i, mg, area);
     EXPECT_TRUE(testing::seq_almost_eq<double>(expected, v));
 }
+
+TEST(matrix, solve_multi_matrix_with_empty) {
+    // As before, but throw in a few empty cells
+    using util::assign;
+    using array = solver_type::array;
+
+    // Combined matrix may have zero-blocks, corresponding to a zero dt.
+    // Zero-blocks are indicated by zero value in the diagonal (the off-diagonal
+    // elements should be ignored).
+    // These submatrices should leave the rhs as-is when solved.
+
+    // Three matrices, sizes 3, 3 and 2, with no branching.
+    // parent index:
+    std::vector<index_type> p = {0, 0, 1, 3, 3, 5, 5};
+    // cell divisipn index:
+    std::vector<index_type> c = {0, 3, 3, 5, 5, 7};
+
+    value_type dt = 1e-3;
+
+    // Face conductances.
+    vvec g = {0, 1, 1, 0, 1, 0, 2};
+
+    // Capacitances.
+    vvec Cm = {1, 1, 1, 1, 1, 2, 3};
+
+    // Initial voltage of zero; currents alone determine rhs.
+    auto v = vvec{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    array area(7, 1.0);
+
+    // (Scaled) membrane conductances contribute to diagonal.
+    array mg = { 1'000,   2'000,   3'000,   4'000,   5'000,   6'000,    7'000};
+    array i  = {-7'000, -15'000, -25'000, -34'000, -49'000, -70'000, -102'000};
+
+    // Expected matrix and rhs:
+    // u   = [ 0 -1 -1  0 -1  0 -2]
+    // d   = [ 3  5  5  6  7  10  12]
+    // rhs = [ 7 15 25 34 49 70 102 ]
+    //
+    // Expected solution:
+    // x = [ 4 5 6 7 8 9 10 ]
+
+    solver_type m(p, c, Cm, g);
+    std::vector<value_type> expected = {4, 5, 6, 7, 8, 9, 10};
+
+    m.solve(v, dt, i, mg, area);
+    EXPECT_TRUE(testing::seq_almost_eq<double>(expected, v));
+}

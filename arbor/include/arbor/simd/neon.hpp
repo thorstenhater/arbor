@@ -26,10 +26,12 @@ struct simd_traits<neon_double2> {
     static constexpr unsigned min_align = alignof(vector_type);
 };
 
+// NOTE: we cannot use i64 here, since of all possible things, we are missing
+//       i64x2 vminq_s64(i64x2, i64x2).
 template <>
 struct simd_traits<neon_int2> {
     static constexpr unsigned width = 2;
-    using scalar_type = int32_t;
+    using scalar_type = int32_t; 
     using vector_type = int32x2_t;
     using mask_impl = neon_int2;  // int64x2_t
     static constexpr unsigned min_align = alignof(vector_type);
@@ -223,6 +225,19 @@ struct neon_double2 : implbase<neon_double2> {
         return a;
     }
 
+    static float64x2_t copy_from_masked(const float64x2_t& v, const double* p,
+                                        const int32x2_t& mask) {
+        // need to 'upcast' mask to f64
+        // mask is i32x2 = {h, l} where h and l are i32 and either 0b111... or 0b000...
+        auto u = vreinterpret_u32_s32(mask);
+        auto a = vcombine_u32(u, u);                  // {i0, i1, i0, i1}
+        auto z = vzipq_u32(a, a).val[0];              // {i0, i0, i1, i1}
+        auto m = vreinterpretq_u64_u32(z);
+        // mask now has been splatted across m = {h:h, l:l}
+        float64x2_t r = vld1q_f64(p);
+        return vbslq_f64(m, r, v);
+    }
+
     static float64x2_t neg(const float64x2_t& a) { return vnegq_f64(a); }
 
     static float64x2_t add(const float64x2_t& a, const float64x2_t& b) { return vaddq_f64(a, b); }
@@ -278,6 +293,20 @@ struct neon_double2 : implbase<neon_double2> {
                               const float64x2_t& v) {
         return vbslq_f64(vreinterpretq_u64_f64(m), u, v);
     }
+
+    static float64x2_t ifelse(const int32x2_t& mask,
+                              const float64x2_t& l,
+                              const float64x2_t& r) {
+        // need to 'upcast' mask to f64
+        // mask is i32x2 = {h, l} where h and l are i32 and either 0b111... or 0b000...
+        auto u = vreinterpret_u32_s32(mask);
+        auto a = vcombine_u32(u, u);                  // {i0, i1, i0, i1}
+        auto z = vzipq_u32(a, a).val[0];              // {i0, i0, i1, i1}
+        auto m = vreinterpretq_u64_u32(z);
+        // mask now has been splatted across m = {h:h, l:l}
+        return vbslq_f64(m, l, r);
+    }
+
 
     static float64x2_t mask_broadcast(bool b) {
         return vreinterpretq_f64_u64(vdupq_n_u64(-(int64)b));
